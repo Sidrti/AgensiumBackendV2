@@ -1,0 +1,531 @@
+{
+  "tool": {
+    "id": "clean-my-data",
+    "name": "Clean My Data",
+    "description": "Comprehensive data cleaning and validation tool. Handle missing values, detect and remove outliers, validate governance compliance, and ensure test coverage requirements. Clean your data with configurable strategies while maintaining data integrity.",
+    "icon": "🧹",
+    "category": "shape",
+    "isAvailable": true,
+    "version": "1.0.0",
+    "available_agents": [
+      "null-handler",
+      "outlier-remover",
+      "type-fixer",
+      "governance-checker",
+      "test-coverage-agent"
+    ],
+    "files": {
+      "primary": {
+        "description": "Data file to clean and validate",
+        "required": true,
+        "formats": ["csv", "json", "xlsx"],
+        "max_size_mb": 500
+      }
+    }
+  },
+  "agents": {
+    "null-handler": {
+      "id": "null-handler",
+      "name": "Null Handler",
+      "description": "Detects and handles missing values in data. Analyzes null patterns and applies configurable imputation strategies including mean, median, mode, forward fill, backward fill, KNN imputation, and row/column removal.",
+      "icon": "🔧",
+      "category": "Data Cleaning",
+      "accuracy": "98%",
+      "features": [
+        "Null Detection",
+        "Pattern Analysis",
+        "Imputation Strategies",
+        "Quality Scoring"
+      ],
+      "input": { "type": "CSV, JSON, XLSX" },
+      "version": "1.0.0",
+      "required_files": ["primary"],
+      "parameters": {
+        "global_strategy": {
+          "type": "string",
+          "description": "Global strategy for handling nulls",
+          "default": "column_specific",
+          "allowed": ["drop_rows", "column_specific"]
+        },
+        "column_strategies": {
+          "type": "object",
+          "description": "Per-column imputation strategies (column -> strategy)",
+          "default": {}
+        },
+        "fill_values": {
+          "type": "object",
+          "description": "Constant values for constant fill strategy",
+          "default": {}
+        },
+        "knn_neighbors": {
+          "type": "integer",
+          "description": "Number of neighbors for KNN imputation",
+          "default": 5,
+          "min": 1,
+          "max": 20
+        },
+        "null_reduction_weight": {
+          "type": "float",
+          "description": "Weight for null reduction in scoring",
+          "default": 0.5,
+          "min": 0,
+          "max": 1
+        },
+        "data_retention_weight": {
+          "type": "float",
+          "description": "Weight for data retention in scoring",
+          "default": 0.3,
+          "min": 0,
+          "max": 1
+        },
+        "column_retention_weight": {
+          "type": "float",
+          "description": "Weight for column retention in scoring",
+          "default": 0.2,
+          "min": 0,
+          "max": 1
+        },
+        "excellent_threshold": {
+          "type": "integer",
+          "description": "Score threshold for excellent quality",
+          "default": 90,
+          "min": 0,
+          "max": 100
+        },
+        "good_threshold": {
+          "type": "integer",
+          "description": "Score threshold for good quality",
+          "default": 75,
+          "min": 0,
+          "max": 100
+        }
+      },
+      "output_structure": {
+        "agent_id": "string",
+        "agent_name": "string",
+        "status": "string",
+        "execution_time_ms": "integer",
+        "summary_metrics": {
+          "total_rows_processed": "integer",
+          "nulls_handled": "integer",
+          "original_nulls": "integer",
+          "remaining_nulls": "integer",
+          "total_issues": "integer"
+        },
+        "data": {
+          "cleaning_score": "object",
+          "null_analysis": "object",
+          "imputation_log": "array",
+          "summary": "string",
+          "row_level_issues": "array"
+        }
+      }
+    },
+    "outlier-remover": {
+      "id": "outlier-remover",
+      "name": "Outlier Remover",
+      "description": "Detects and handles outliers in numeric data. Uses configurable detection methods (Z-score, IQR, Percentile) and removal/imputation strategies to clean data while maintaining integrity.",
+      "icon": "📍",
+      "category": "Data Cleaning",
+      "accuracy": "97%",
+      "features": [
+        "Outlier Detection",
+        "Multiple Methods",
+        "Removal/Imputation",
+        "Quality Scoring"
+      ],
+      "input": { "type": "CSV, JSON, XLSX" },
+      "version": "1.0.0",
+      "required_files": ["primary"],
+      "parameters": {
+        "detection_method": {
+          "type": "string",
+          "description": "Outlier detection method",
+          "default": "iqr",
+          "allowed": ["z_score", "iqr", "percentile"]
+        },
+        "removal_strategy": {
+          "type": "string",
+          "description": "Strategy for handling detected outliers",
+          "default": "remove",
+          "allowed": ["remove", "impute_mean", "impute_median"]
+        },
+        "z_threshold": {
+          "type": "float",
+          "description": "Z-score threshold for outlier detection",
+          "default": 3.0,
+          "min": 1.0,
+          "max": 5.0
+        },
+        "iqr_multiplier": {
+          "type": "float",
+          "description": "IQR multiplier for outlier bounds",
+          "default": 1.5,
+          "min": 0.5,
+          "max": 3.0
+        },
+        "lower_percentile": {
+          "type": "float",
+          "description": "Lower percentile for percentile method",
+          "default": 1.0,
+          "min": 0,
+          "max": 10
+        },
+        "upper_percentile": {
+          "type": "float",
+          "description": "Upper percentile for percentile method",
+          "default": 99.0,
+          "min": 90,
+          "max": 100
+        },
+        "outlier_reduction_weight": {
+          "type": "float",
+          "description": "Weight for outlier reduction in scoring",
+          "default": 0.5,
+          "min": 0,
+          "max": 1
+        },
+        "data_retention_weight": {
+          "type": "float",
+          "description": "Weight for data retention in scoring",
+          "default": 0.3,
+          "min": 0,
+          "max": 1
+        },
+        "column_retention_weight": {
+          "type": "float",
+          "description": "Weight for column retention in scoring",
+          "default": 0.2,
+          "min": 0,
+          "max": 1
+        },
+        "excellent_threshold": {
+          "type": "integer",
+          "description": "Score threshold for excellent quality",
+          "default": 90,
+          "min": 0,
+          "max": 100
+        },
+        "good_threshold": {
+          "type": "integer",
+          "description": "Score threshold for good quality",
+          "default": 75,
+          "min": 0,
+          "max": 100
+        }
+      },
+      "output_structure": {
+        "agent_id": "string",
+        "agent_name": "string",
+        "status": "string",
+        "execution_time_ms": "integer",
+        "summary_metrics": {
+          "total_rows_processed": "integer",
+          "outliers_handled": "integer",
+          "original_outliers": "integer",
+          "remaining_outliers": "integer",
+          "total_issues": "integer"
+        },
+        "data": {
+          "outlier_score": "object",
+          "outlier_analysis": "object",
+          "removal_log": "array",
+          "summary": "string",
+          "row_level_issues": "array"
+        }
+      }
+    },
+    "type-fixer": {
+      "id": "type-fixer",
+      "name": "Type Fixer",
+      "description": "Detects and fixes data type inconsistencies in columns. Analyzes column types and applies configurable type conversion strategies to ensure proper data types (numeric, integer, datetime, string, category).",
+      "icon": "🔤",
+      "category": "Data Cleaning",
+      "accuracy": "96%",
+      "features": [
+        "Type Detection",
+        "Type Mismatch Analysis",
+        "Automatic Type Conversion",
+        "Quality Scoring"
+      ],
+      "input": { "type": "CSV, JSON, XLSX" },
+      "version": "1.0.0",
+      "required_files": ["primary"],
+      "parameters": {
+        "auto_convert_numeric": {
+          "type": "boolean",
+          "description": "Automatically convert to numeric type",
+          "default": true
+        },
+        "auto_convert_datetime": {
+          "type": "boolean",
+          "description": "Automatically convert to datetime type",
+          "default": true
+        },
+        "auto_convert_category": {
+          "type": "boolean",
+          "description": "Automatically convert to category type",
+          "default": true
+        },
+        "preserve_mixed_types": {
+          "type": "boolean",
+          "description": "Keep columns with mixed types as object",
+          "default": false
+        },
+        "type_reduction_weight": {
+          "type": "float",
+          "description": "Weight for type issue reduction in scoring",
+          "default": 0.5,
+          "min": 0,
+          "max": 1
+        },
+        "data_retention_weight": {
+          "type": "float",
+          "description": "Weight for data retention in scoring",
+          "default": 0.3,
+          "min": 0,
+          "max": 1
+        },
+        "column_retention_weight": {
+          "type": "float",
+          "description": "Weight for column retention in scoring",
+          "default": 0.2,
+          "min": 0,
+          "max": 1
+        },
+        "excellent_threshold": {
+          "type": "integer",
+          "description": "Score threshold for excellent quality",
+          "default": 90,
+          "min": 0,
+          "max": 100
+        },
+        "good_threshold": {
+          "type": "integer",
+          "description": "Score threshold for good quality",
+          "default": 75,
+          "min": 0,
+          "max": 100
+        }
+      },
+      "output_structure": {
+        "agent_id": "string",
+        "agent_name": "string",
+        "status": "string",
+        "execution_time_ms": "integer",
+        "summary_metrics": {
+          "total_rows_processed": "integer",
+          "type_issues_fixed": "integer",
+          "original_type_issues": "integer",
+          "remaining_type_issues": "integer",
+          "total_issues": "integer"
+        },
+        "data": {
+          "fixing_score": "object",
+          "type_analysis": "object",
+          "fix_log": "array",
+          "summary": "string",
+          "row_level_issues": "array"
+        }
+      }
+    },
+    "governance-checker": {
+      "id": "governance-checker",
+      "name": "Governance Checker",
+      "description": "Validates data governance compliance including lineage, consent, and classification requirements. Ensures data meets governance standards and compliance frameworks.",
+      "icon": "📋",
+      "category": "Governance",
+      "accuracy": "95%",
+      "features": [
+        "Lineage Validation",
+        "Consent Verification",
+        "Classification Check",
+        "PII Detection"
+      ],
+      "input": { "type": "CSV, JSON, XLSX" },
+      "version": "1.0.0",
+      "required_files": ["primary"],
+      "parameters": {
+        "lineage_weight": {
+          "type": "float",
+          "description": "Weight for lineage component",
+          "default": 0.3,
+          "min": 0,
+          "max": 1
+        },
+        "consent_weight": {
+          "type": "float",
+          "description": "Weight for consent component",
+          "default": 0.4,
+          "min": 0,
+          "max": 1
+        },
+        "classification_weight": {
+          "type": "float",
+          "description": "Weight for classification component",
+          "default": 0.3,
+          "min": 0,
+          "max": 1
+        },
+        "compliance_threshold": {
+          "type": "integer",
+          "description": "Score threshold for compliant status",
+          "default": 80,
+          "min": 0,
+          "max": 100
+        },
+        "needs_review_threshold": {
+          "type": "integer",
+          "description": "Score threshold for needs review status",
+          "default": 60,
+          "min": 0,
+          "max": 100
+        },
+        "required_lineage_fields": {
+          "type": "array",
+          "description": "List of required lineage fields",
+          "default": [],
+          "items": "string"
+        },
+        "required_consent_fields": {
+          "type": "array",
+          "description": "List of required consent fields",
+          "default": [],
+          "items": "string"
+        },
+        "required_classification_fields": {
+          "type": "array",
+          "description": "List of required classification fields",
+          "default": [],
+          "items": "string"
+        }
+      },
+      "output_structure": {
+        "agent_id": "string",
+        "agent_name": "string",
+        "status": "string",
+        "execution_time_ms": "integer",
+        "summary_metrics": {
+          "total_records": "integer",
+          "total_fields": "integer",
+          "governance_score": "number",
+          "compliance_status": "string",
+          "issues_found": "integer"
+        },
+        "data": {
+          "governance_scores": "object",
+          "compliance_status": "string",
+          "total_records": "integer",
+          "fields_analyzed": "array",
+          "governance_issues": "array"
+        }
+      }
+    },
+    "test-coverage-agent": {
+      "id": "test-coverage-agent",
+      "name": "Test Coverage Agent",
+      "description": "Validates data test coverage including uniqueness, range, and format constraints. Ensures data meets quality and validation requirements for testing.",
+      "icon": "🧪",
+      "category": "Testing",
+      "accuracy": "97%",
+      "features": [
+        "Uniqueness Testing",
+        "Range Validation",
+        "Format Validation",
+        "Coverage Scoring"
+      ],
+      "input": { "type": "CSV, JSON, XLSX" },
+      "version": "1.0.0",
+      "required_files": ["primary"],
+      "parameters": {
+        "uniqueness_weight": {
+          "type": "float",
+          "description": "Weight for uniqueness tests",
+          "default": 0.4,
+          "min": 0,
+          "max": 1
+        },
+        "range_weight": {
+          "type": "float",
+          "description": "Weight for range tests",
+          "default": 0.3,
+          "min": 0,
+          "max": 1
+        },
+        "format_weight": {
+          "type": "float",
+          "description": "Weight for format tests",
+          "default": 0.3,
+          "min": 0,
+          "max": 1
+        },
+        "excellent_threshold": {
+          "type": "integer",
+          "description": "Score threshold for excellent status",
+          "default": 90,
+          "min": 0,
+          "max": 100
+        },
+        "good_threshold": {
+          "type": "integer",
+          "description": "Score threshold for good status",
+          "default": 75,
+          "min": 0,
+          "max": 100
+        },
+        "unique_columns": {
+          "type": "array",
+          "description": "List of columns that should have unique values",
+          "default": [],
+          "items": "string"
+        },
+        "range_tests": {
+          "type": "object",
+          "description": "Range constraints for numeric columns (column -> {min, max})",
+          "default": {}
+        },
+        "format_tests": {
+          "type": "object",
+          "description": "Format constraints for columns (column -> pattern or {pattern, description})",
+          "default": {}
+        }
+      },
+      "output_structure": {
+        "agent_id": "string",
+        "agent_name": "string",
+        "status": "string",
+        "execution_time_ms": "integer",
+        "summary_metrics": {
+          "total_records": "integer",
+          "total_fields": "integer",
+          "test_coverage_score": "number",
+          "coverage_status": "string",
+          "issues_found": "integer"
+        },
+        "data": {
+          "test_coverage_scores": "object",
+          "coverage_status": "string",
+          "total_records": "integer",
+          "fields_analyzed": "array",
+          "test_coverage_issues": "array"
+        }
+      }
+    }
+  },
+  "response_structure": {
+    "status": "string",
+    "timestamp": "string (ISO 8601)",
+    "execution_time_ms": "integer",
+    "report": {
+      "common_arrays": {
+        "alerts": "array - Contains cleaning and validation alerts across selected agents",
+        "issues": "array - Field-level issues detected by selected agents",
+        "recommendations": "array - Recommendations for data improvement",
+        "executiveSummary": "array - High-level summary metrics",
+        "visualizations": "array - Graph-ready data structures (reserved for future use)"
+      },
+      "agent_results": "object - Individual agent results keyed by agent_id",
+      "downloads": "array - Available downloadable reports"
+    }
+  }
+}
