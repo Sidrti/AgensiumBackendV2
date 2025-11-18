@@ -805,7 +805,7 @@ Content-Type: application/json
 **Environment Variable** (for OpenAI API):
 
 ```bash
-
+export OPENAI_API_KEY="sk-your-openai-api-key-here"
 ```
 
 **Model Used**: `gpt-4o-mini` (cost-effective and powerful)

@@ -484,7 +484,7 @@ but not a specific database security score."
 
 ```bash
 # .env file
-
+OPENAI_API_KEY=sk-your-openai-api-key-here
 ```
 
 **Model Used**:

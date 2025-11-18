@@ -35,14 +35,14 @@ class AnalysisSummaryAI:
     def __init__(
         self,
         api_key: Optional[str] = None,
-        model: str = "gpt-5-nano",
+        model: str = "gpt-4o-mini",
     ):
         """
         Initialize the Analysis Summary AI generator.
 
         Args:
             api_key: OpenAI API key
-            model: Model name to use (default: gpt-5-nano - latest & most efficient)
+            model: Model name to use (default: gpt-4o-mini - latest & most efficient)
         """
         # Prefer a provided api_key argument, but fall back to environment variable.
         self.api_key = api_key or os.environ.get("OPENAI_API_KEY")

@@ -100,6 +100,7 @@ class CleanMyDataDownloads:
             null_output = agent_results.get("null-handler", {})
             outlier_output = agent_results.get("outlier-remover", {})
             type_output = agent_results.get("type-fixer", {})
+            duplicate_output = agent_results.get("duplicate-resolver", {})
             governance_output = agent_results.get("governance-checker", {})
             test_output = agent_results.get("test-coverage-agent", {})
             
@@ -120,15 +121,19 @@ class CleanMyDataDownloads:
             if type_output.get("status") == "success":
                 self._create_type_fixer_sheet(wb, type_output)
             
-            # 5. GOVERNANCE CHECKER SHEET
+            # 5. DUPLICATE RESOLVER SHEET
+            if duplicate_output.get("status") == "success":
+                self._create_duplicate_resolver_sheet(wb, duplicate_output)
+            
+            # 6. GOVERNANCE CHECKER SHEET
             if governance_output.get("status") == "success":
                 self._create_governance_sheet(wb, governance_output)
             
-            # 6. TEST COVERAGE SHEET
+            # 7. TEST COVERAGE SHEET
             if test_output.get("status") == "success":
                 self._create_test_coverage_sheet(wb, test_output)
             
-            # 7. ALERTS SHEET
+            # 8. ALERTS SHEET
             if alerts:
                 self._create_alerts_sheet(wb, alerts)
             
@@ -510,9 +515,96 @@ class CleanMyDataDownloads:
                 ws.cell(row=row, column=col_idx).alignment = self.left_alignment
             row += 1
     
+    def _create_duplicate_resolver_sheet(self, wb, agent_output):
+        """Create duplicate resolver detailed sheet."""
+        ws = wb.create_sheet("Duplicates", 4)
+        self._set_column_widths(ws, [30, 15, 50])
+        
+        row = 1
+        ws[f'A{row}'] = "DUPLICATE RESOLVER ANALYSIS"
+        ws[f'A{row}'].font = Font(bold=True, size=12, color="FFFFFF")
+        ws[f'A{row}'].fill = self.header_fill
+        row += 2
+        
+        data = agent_output.get("data", {})
+        summary_metrics = agent_output.get("summary_metrics", {})
+        
+        metadata = [
+            ["Status", agent_output.get("status")],
+            ["Execution Time (ms)", agent_output.get("execution_time_ms", 0)],
+            ["Duplicates Detected", summary_metrics.get("duplicates_detected", 0)],
+            ["Duplicates Resolved", summary_metrics.get("duplicates_resolved", 0)],
+            ["Rows Removed", summary_metrics.get("rows_removed", 0)],
+            ["Remaining Rows", summary_metrics.get("remaining_rows", 0)]
+        ]
+        
+        for key, value in metadata:
+            ws[f'A{row}'] = key
+            ws[f'B{row}'] = value
+            ws[f'A{row}'].font = Font(bold=True)
+            ws[f'A{row}'].fill = self.subheader_fill
+            ws[f'A{row}'].border = self.border
+            ws[f'B{row}'].border = self.border
+            row += 1
+        
+        row += 1
+        
+        # Deduplication scores
+        ws[f'A{row}'] = "DEDUPLICATION SCORES"
+        ws[f'A{row}'].font = Font(bold=True, size=10)
+        ws[f'A{row}'].fill = self.subheader_fill
+        row += 1
+        
+        dedup_score = data.get("dedup_score", {})
+        metrics = dedup_score.get("metrics", {})
+        score_items = [
+            ["Overall Score", dedup_score.get("overall_score", 0)],
+            ["Dedup Reduction Rate", f"{metrics.get('dedup_reduction_rate', 0):.1f}%"],
+            ["Data Retention Rate", f"{metrics.get('data_retention_rate', 0):.1f}%"],
+            ["Duplicate % Before", f"{metrics.get('duplicate_percentage_before', 0):.2f}%"],
+            ["Duplicate % After", f"{metrics.get('duplicate_percentage_after', 0):.2f}%"]
+        ]
+        
+        for key, value in score_items:
+            ws[f'A{row}'] = key
+            ws[f'B{row}'] = value
+            ws[f'A{row}'].border = self.border
+            ws[f'B{row}'].border = self.border
+            row += 1
+        
+        row += 1
+        
+        # Duplicate detection methods summary
+        ws[f'A{row}'] = "DETECTION METHODS"
+        ws[f'A{row}'].font = Font(bold=True, size=10)
+        ws[f'A{row}'].fill = self.subheader_fill
+        ws.merge_cells(f'A{row}:C{row}')
+        row += 1
+        
+        headers = ["Detection Method", "Count", "Percentage"]
+        for col_idx, header in enumerate(headers, 1):
+            cell = ws.cell(row=row, column=col_idx, value=header)
+            cell.fill = self.header_fill
+            cell.font = self.header_font
+            cell.border = self.border
+            cell.alignment = self.center_alignment
+        row += 1
+        
+        duplicate_analysis = data.get("duplicate_analysis", {})
+        for method, method_data in duplicate_analysis.get("duplicate_summary", {}).items():
+            if isinstance(method_data, dict):
+                ws.cell(row=row, column=1, value=method.replace('_', ' ').title())
+                ws.cell(row=row, column=2, value=method_data.get("duplicate_count", 0))
+                ws.cell(row=row, column=3, value=f"{method_data.get('duplicate_percentage', 0):.2f}%")
+                
+                for col_idx in range(1, 4):
+                    ws.cell(row=row, column=col_idx).border = self.border
+                    ws.cell(row=row, column=col_idx).alignment = self.left_alignment
+                row += 1
+    
     def _create_governance_sheet(self, wb, agent_output):
         """Create governance checker detailed sheet."""
-        ws = wb.create_sheet("Governance", 4)
+        ws = wb.create_sheet("Governance", 5)
         self._set_column_widths(ws, [30, 15, 50])
         
         row = 1
@@ -594,7 +686,7 @@ class CleanMyDataDownloads:
     
     def _create_test_coverage_sheet(self, wb, agent_output):
         """Create test coverage detailed sheet."""
-        ws = wb.create_sheet("Test Coverage", 5)
+        ws = wb.create_sheet("Test Coverage", 6)
         self._set_column_widths(ws, [30, 15, 50])
         
         row = 1

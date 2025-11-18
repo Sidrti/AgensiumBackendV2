@@ -270,12 +270,13 @@ response = requests.post(
 Set via environment variable:
 
 ```bash
-
+export OPENAI_API_KEY="sk-..."
 ```
 
 Or in `.env` file:
 
 ```
+OPENAI_API_KEY=sk-...
 ```
 
 ### Model Configuration
