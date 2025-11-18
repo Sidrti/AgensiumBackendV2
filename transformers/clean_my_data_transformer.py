@@ -48,6 +48,7 @@ def transform_clean_my_data_response(
     type_fixer_output = agent_results.get("type-fixer", {})
     duplicate_resolver_output = agent_results.get("duplicate-resolver", {})
     field_standardization_output = agent_results.get("field-standardization", {})
+    cleanse_writeback_output = agent_results.get("cleanse-writeback", {})
     quarantine_output = agent_results.get("quarantine-agent", {})
     governance_output = agent_results.get("governance-checker", {})
     test_coverage_output = agent_results.get("test-coverage-agent", {})
@@ -311,6 +312,51 @@ def transform_clean_my_data_response(
                     "message": f"Limited improvement in standardization: {col_improvements.get('improvement_percentage', 0):.1f}% improvement. Consider additional synonym mappings."
                 })
     
+    # ==================== CLEANSE WRITEBACK ALERTS & ISSUES ====================
+    if cleanse_writeback_output.get("status") == "success":
+        writeback_data = cleanse_writeback_output.get("data", {})
+        writeback_score = writeback_data.get("writeback_score", {})
+        writeback_analysis = writeback_data.get("writeback_analysis", {})
+        integrity_verification = writeback_analysis.get("integrity_verification", {})
+        
+        overall_score = writeback_score.get("overall_score", 0)
+        all_checks_passed = integrity_verification.get("all_checks_passed", False)
+        data_ready = writeback_analysis.get("data_ready_for_next_tool", False)
+        
+        # Alert if integrity checks failed
+        if not all_checks_passed or not data_ready:
+            severity = "critical" if not all_checks_passed else "high"
+            all_alerts.append({
+                "alert_id": "alert_cleanse_writeback",
+                "severity": severity,
+                "category": "data_quality_assurance",
+                "message": f"Cleanse writeback integrity: {overall_score:.1f}/100. Checks passed: {integrity_verification.get('checks_passed', 0)}/{integrity_verification.get('checks_passed', 0) + integrity_verification.get('checks_failed', 0)}. Data ready: {data_ready}",
+                "affected_fields_count": writeback_analysis.get("total_agents_processed", 0),
+                "recommendation": f"Review integrity verification results. Data {'is NOT' if not data_ready else 'is'} ready for next pipeline tool."
+            })
+        
+        # Add integrity issues
+        for issue in writeback_data.get("integrity_issues", []):
+            all_issues.append({
+                "issue_id": f"issue_writeback_{issue.get('check_name', 'unknown')}",
+                "agent_id": "cleanse-writeback",
+                "field_name": issue.get("details", {}).get("column", "") if isinstance(issue.get("details"), dict) else "",
+                "issue_type": issue.get("issue_type", "integrity_failure"),
+                "severity": issue.get("severity", "high"),
+                "message": issue.get("message", "Integrity verification issue detected")
+            })
+        
+        # Alert on excellent performance
+        if all_checks_passed and overall_score >= 95:
+            all_alerts.append({
+                "alert_id": "alert_writeback_success",
+                "severity": "info",
+                "category": "data_quality_assurance",
+                "message": f"Cleanse writeback successful: {overall_score:.1f}/100. All integrity checks passed. Data is ready for next tool with complete audit trail.",
+                "affected_fields_count": writeback_analysis.get("final_row_count", 0),
+                "recommendation": f"Data package contains comprehensive manifest with {writeback_analysis.get('comprehensive_manifest', {}).get('total_transformations', 0)} logged transformations. Safe to proceed to 'Master My Data'."
+            })
+    
     # ==================== GOVERNANCE ALERTS & ISSUES ====================
     if governance_output.get("status") == "success":
         governance_data = governance_output.get("data", {})
@@ -502,6 +548,21 @@ def transform_clean_my_data_response(
                 "timeline": "1 week" if rec.get("priority") == "high" else "2 weeks" if rec.get("priority") == "medium" else "3 weeks"
             })
     
+    # Cleanse writeback recommendations
+    if cleanse_writeback_output.get("status") == "success":
+        writeback_data = cleanse_writeback_output.get("data", {})
+        writeback_analysis = writeback_data.get("writeback_analysis", {})
+        
+        for rec in writeback_analysis.get("recommendations", [])[:5]:
+            all_recommendations.append({
+                "recommendation_id": f"rec_writeback_{rec.get('action', 'unknown')}",
+                "agent_id": "cleanse-writeback",
+                "field_name": "data_package",
+                "priority": rec.get("priority", "medium"),
+                "recommendation": f"{rec.get('action', 'Unknown action')}: {rec.get('reason', '')}",
+                "timeline": "immediate" if rec.get("priority") == "critical" else "1 week" if rec.get("priority") == "high" else "2 weeks"
+            })
+    
     # ==================== GENERATE EXECUTIVE SUMMARY ====================
     
     # Overall cleaning quality summary
@@ -536,6 +597,11 @@ def transform_clean_my_data_response(
     if cleanse_previewer_output.get("status") == "success":
         preview_score = cleanse_previewer_output.get("data", {}).get("preview_score", {}).get("overall_score", 0)
         overall_quality += preview_score
+        quality_count += 1
+    
+    if cleanse_writeback_output.get("status") == "success":
+        writeback_score = cleanse_writeback_output.get("data", {}).get("writeback_score", {}).get("overall_score", 0)
+        overall_quality += writeback_score
         quality_count += 1
     
     if quality_count > 0:
@@ -575,6 +641,20 @@ def transform_clean_my_data_response(
             "value": f"{test_score:.1f}",
             "status": test_status,
             "description": f"Test Coverage: {test_status.replace('_', ' ').title()}"
+        })
+    
+    # Cleanse writeback summary
+    if cleanse_writeback_output.get("status") == "success":
+        writeback_score = cleanse_writeback_output.get("data", {}).get("writeback_score", {}).get("overall_score", 0)
+        data_ready = cleanse_writeback_output.get("summary_metrics", {}).get("data_ready_for_pipeline", False)
+        quality_status = cleanse_writeback_output.get("data", {}).get("quality_status", "unknown")
+        
+        executive_summary.append({
+            "summary_id": "exec_cleanse_writeback",
+            "title": "Data Pipeline Readiness",
+            "value": f"{writeback_score:.1f}",
+            "status": "ready" if data_ready else "not_ready",
+            "description": f"Integrity: {quality_status.replace('_', ' ').title()}, Pipeline Ready: {'Yes' if data_ready else 'No'}"
         })
     
     # Issues and alerts summary
@@ -658,6 +738,14 @@ def transform_clean_my_data_response(
         values_changed = field_standardization_output.get("summary_metrics", {}).get("values_changed", 0)
         variations_reduced = field_standardization_output.get("summary_metrics", {}).get("variations_reduced", 0)
         analysis_text_parts.append(f"- Field Standardization: Quality Score {standardization_score:.1f}/100 ({values_changed} values standardized, {variations_reduced} variations reduced)")
+    
+    if cleanse_writeback_output.get("status") == "success":
+        writeback_score = cleanse_writeback_output.get("data", {}).get("writeback_score", {}).get("overall_score", 0)
+        checks_passed = cleanse_writeback_output.get("summary_metrics", {}).get("integrity_checks_passed", 0)
+        checks_failed = cleanse_writeback_output.get("summary_metrics", {}).get("integrity_checks_failed", 0)
+        data_ready = cleanse_writeback_output.get("summary_metrics", {}).get("data_ready_for_pipeline", False)
+        transformations_logged = cleanse_writeback_output.get("summary_metrics", {}).get("total_transformations_logged", 0)
+        analysis_text_parts.append(f"- Cleanse Writeback: Quality Score {writeback_score:.1f}/100 (Integrity: {checks_passed}/{checks_passed + checks_failed} checks passed, {transformations_logged} transformations logged, Data ready: {data_ready})")
     
     if governance_output.get("status") == "success":
         gov_score = governance_output.get("data", {}).get("governance_scores", {}).get("overall", 0)

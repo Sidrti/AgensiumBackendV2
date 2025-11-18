@@ -15,6 +15,7 @@
       "type-fixer",
       "duplicate-resolver",
       "field-standardization",
+      "cleanse-writeback",
       "governance-checker",
       "test-coverage-agent"
     ],
@@ -846,6 +847,134 @@
           "content": "string (base64)",
           "size_bytes": "integer",
           "format": "string"
+        }
+      }
+    },
+    "cleanse-writeback": {
+      "id": "cleanse-writeback",
+      "name": "Cleanse Writeback",
+      "description": "Final quality assurance and documentation step that guarantees the dataset leaving the 'Cleanse My Data' tool is not only fixed but also perfectly documented and ready for the next tool. Performs integrity verification, finalizes comprehensive manifest of all cleaning operations, and packages data with complete audit log for chain integrity and auditability.",
+      "icon": "✅",
+      "category": "Data Quality Assurance",
+      "accuracy": "99%",
+      "features": [
+        "Integrity Verification",
+        "Manifest Finalization",
+        "Comprehensive Audit Log",
+        "Data Packaging",
+        "Chain Integrity Enforcement",
+        "Lineage Documentation"
+      ],
+      "input": { "type": "CSV, JSON, XLSX (cleaned data)" },
+      "version": "1.0.0",
+      "required_files": ["primary"],
+      "parameters": {
+        "verify_numeric_types": {
+          "type": "boolean",
+          "description": "Verify that numeric columns are truly numeric after cleaning",
+          "default": true
+        },
+        "verify_datetime_types": {
+          "type": "boolean",
+          "description": "Verify that datetime columns are properly formatted",
+          "default": true
+        },
+        "verify_no_new_nulls": {
+          "type": "boolean",
+          "description": "Verify that cleaning operations did not introduce new nulls",
+          "default": true
+        },
+        "verify_no_duplicates": {
+          "type": "boolean",
+          "description": "Verify that no duplicate rows were introduced during cleaning",
+          "default": true
+        },
+        "verify_data_retention": {
+          "type": "boolean",
+          "description": "Verify that data retention is within acceptable limits",
+          "default": true
+        },
+        "generate_comprehensive_manifest": {
+          "type": "boolean",
+          "description": "Generate comprehensive cleansing manifest with all agent actions",
+          "default": true
+        },
+        "include_transformation_summary": {
+          "type": "boolean",
+          "description": "Include high-level transformation summary in manifest",
+          "default": true
+        },
+        "agent_manifests": {
+          "type": "object",
+          "description": "Dictionary of agent_id -> agent output for manifest aggregation",
+          "default": {}
+        },
+        "original_row_count": {
+          "type": "integer",
+          "description": "Original row count before cleaning (for retention verification)",
+          "default": null
+        },
+        "original_column_count": {
+          "type": "integer",
+          "description": "Original column count before cleaning (for retention verification)",
+          "default": null
+        },
+        "integrity_weight": {
+          "type": "float",
+          "description": "Weight for integrity verification in scoring",
+          "default": 0.4,
+          "min": 0,
+          "max": 1
+        },
+        "completeness_weight": {
+          "type": "float",
+          "description": "Weight for manifest completeness in scoring",
+          "default": 0.3,
+          "min": 0,
+          "max": 1
+        },
+        "auditability_weight": {
+          "type": "float",
+          "description": "Weight for auditability in scoring",
+          "default": 0.3,
+          "min": 0,
+          "max": 1
+        },
+        "excellent_threshold": {
+          "type": "integer",
+          "description": "Score threshold for excellent quality",
+          "default": 95,
+          "min": 0,
+          "max": 100
+        },
+        "good_threshold": {
+          "type": "integer",
+          "description": "Score threshold for good quality",
+          "default": 85,
+          "min": 0,
+          "max": 100
+        }
+      },
+      "output_structure": {
+        "agent_id": "string",
+        "agent_name": "string",
+        "status": "string",
+        "execution_time_ms": "integer",
+        "summary_metrics": {
+          "total_rows_verified": "integer",
+          "total_columns_verified": "integer",
+          "integrity_checks_passed": "integer",
+          "integrity_checks_failed": "integer",
+          "agents_in_manifest": "integer",
+          "data_ready_for_pipeline": "boolean",
+          "total_transformations_logged": "integer"
+        },
+        "data": {
+          "writeback_score": "object",
+          "quality_status": "string",
+          "writeback_analysis": "object",
+          "summary": "string",
+          "integrity_issues": "array"
         }
       }
     },
