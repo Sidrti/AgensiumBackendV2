@@ -410,9 +410,9 @@ def transform_profile_my_data_response(
             "issues": all_issues,
             "recommendations": all_recommendations,
             "executiveSummary": executive_summary,
-            "analysisSummary": analysis_summary,
+            # "analysisSummary": analysis_summary,
             "visualizations": [],
-            "routing_decisions": routing_decisions,
+            # "routing_decisions": routing_decisions,
             # Individual agent outputs (for detailed inspection)
             **{agent_id: output for agent_id, output in agent_results.items() if output.get("status") == "success"},
             # Downloads with Excel and JSON exports
