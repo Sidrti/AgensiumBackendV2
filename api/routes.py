@@ -12,7 +12,7 @@ from datetime import datetime
 from typing import Dict, Any, Optional, List
 from fastapi import APIRouter, HTTPException, File, UploadFile, Form
 
-from agents import readiness_rater, unified_profiler, drift_detector, score_risk, governance_checker, test_coverage_agent, null_handler, outlier_remover, type_fixer
+from agents import readiness_rater, unified_profiler, drift_detector, score_risk, governance_checker, test_coverage_agent, null_handler, outlier_remover, type_fixer, duplicate_resolver
 from transformers import profile_my_data_transformer, clean_my_data_transformer
 from ai import ChatAgent
 from .dependencies import decode_base64_file
@@ -497,6 +497,22 @@ def execute_agent_flexible(
         primary_bytes, primary_filename = files_map["primary"]
         
         return type_fixer.execute_type_fixer(
+            primary_bytes,
+            primary_filename,
+            parameters
+        )
+    
+    elif agent_id == "duplicate-resolver":
+        if "primary" not in files_map:
+            return {
+                "status": "error",
+                "error": "Duplicate resolver requires 'primary' file",
+                "execution_time_ms": 0
+            }
+        
+        primary_bytes, primary_filename = files_map["primary"]
+        
+        return duplicate_resolver.execute_duplicate_resolver(
             primary_bytes,
             primary_filename,
             parameters

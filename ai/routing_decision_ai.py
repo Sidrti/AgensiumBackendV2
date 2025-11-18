@@ -53,14 +53,15 @@ class RoutingDecisionAI:
             },
             "clean-my-data": {
                 "name": "Clean My Data",
-                "description": "Data cleaning and validation - null handling, outlier removal, type fixing, governance validation, test coverage",
-                "agents": ["null-handler", "outlier-remover", "type-fixer", "governance-checker", "test-coverage-agent"],
+                "description": "Data cleaning and validation - null handling, outlier removal, type fixing, duplicate resolution, governance validation, test coverage",
+                "agents": ["null-handler", "outlier-remover", "type-fixer", "duplicate-resolver", "governance-checker", "test-coverage-agent"],
                 "requires_files": ["primary"],
                 "optional_files": [],
                 "use_cases": [
                     "Remove null/missing values",
                     "Detect and handle outliers",
                     "Fix data type inconsistencies",
+                    "Detect and resolve duplicate records",
                     "Validate data governance rules",
                     "Assess test coverage requirements",
                     "Improve data quality scores",
@@ -327,7 +328,7 @@ class RoutingDecisionAI:
                 # Dispatch to whichever OpenAI client is available (old style module or new OpenAI class client)
                 if hasattr(self.openai_client, "ChatCompletion"):
                     response = self.openai_client.ChatCompletion.create(
-                        model="gpt-5-nano",
+                        model="gpt-4o-mini",
                         messages=[
                             {
                                 "role": "system",
@@ -342,7 +343,7 @@ class RoutingDecisionAI:
                 else:
                     # Use new OpenAI client interface
                     response = self.openai_client.chat.completions.create(
-                        model="gpt-5-nano",
+                        model="gpt-4o-mini",
                         messages=[
                             {
                                 "role": "system",

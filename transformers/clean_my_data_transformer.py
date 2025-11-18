@@ -45,6 +45,7 @@ def transform_clean_my_data_response(
     null_handler_output = agent_results.get("null-handler", {})
     outlier_output = agent_results.get("outlier-remover", {})
     type_fixer_output = agent_results.get("type-fixer", {})
+    duplicate_resolver_output = agent_results.get("duplicate-resolver", {})
     governance_output = agent_results.get("governance-checker", {})
     test_coverage_output = agent_results.get("test-coverage-agent", {})
     
@@ -160,6 +161,38 @@ def transform_clean_my_data_response(
                 "message": f"Type mismatch: currently '{current}', should be '{suggested}'. {'; '.join(col_analysis.get('issues', []))}"
             })
     
+    # ==================== DUPLICATE RESOLVER ALERTS & ISSUES ====================
+    if duplicate_resolver_output.get("status") == "success":
+        dedup_data = duplicate_resolver_output.get("data", {})
+        dedup_score = dedup_data.get("dedup_score", {})
+        duplicate_analysis = dedup_data.get("duplicate_analysis", {})
+        
+        overall_score = dedup_score.get("overall_score", 0)
+        total_duplicates = duplicate_analysis.get("total_duplicates", 0)
+        
+        if total_duplicates > 0:
+            severity = "high" if total_duplicates > len(duplicate_analysis.get("duplicate_summary", {})) * 10 else "medium"
+            all_alerts.append({
+                "alert_id": "alert_duplicates",
+                "severity": severity,
+                "category": "data_cleaning",
+                "message": f"Duplicate records detected: {total_duplicates} duplicates found ({duplicate_analysis.get('duplicate_summary', {}).get('exact', {}).get('duplicate_percentage', 0):.1f}% of data)",
+                "affected_fields_count": total_duplicates,
+                "recommendation": f"Run duplicate resolver to remove {total_duplicates} duplicate records and improve data quality."
+            })
+        
+        # Add duplicate issues per detection method
+        for method, method_data in duplicate_analysis.get("duplicate_summary", {}).items():
+            if isinstance(method_data, dict) and method_data.get("duplicate_count", 0) > 0:
+                all_issues.append({
+                    "issue_id": f"issue_duplicate_{method}",
+                    "agent_id": "duplicate-resolver",
+                    "field_name": method,
+                    "issue_type": "duplicate_record",
+                    "severity": "high" if method_data.get("duplicate_percentage", 0) > 5 else "medium",
+                    "message": f"{method.replace('_', ' ').title()}: {method_data.get('duplicate_count', 0)} duplicates ({method_data.get('duplicate_percentage', 0):.2f}%)"
+                })
+    
     # ==================== GOVERNANCE ALERTS & ISSUES ====================
     if governance_output.get("status") == "success":
         governance_data = governance_output.get("data", {})
@@ -265,6 +298,31 @@ def transform_clean_my_data_response(
                 "timeline": "1 week" if rec.get("priority") == "high" else "2 weeks" if rec.get("priority") == "medium" else "3 weeks"
             })
     
+    # Duplicate resolver recommendations
+    if duplicate_resolver_output.get("status") == "success":
+        dedup_data = duplicate_resolver_output.get("data", {})
+        duplicate_analysis = dedup_data.get("duplicate_analysis", {})
+        
+        if duplicate_analysis.get("total_duplicates", 0) > 0:
+            all_recommendations.append({
+                "recommendation_id": "rec_duplicate_resolution",
+                "agent_id": "duplicate-resolver",
+                "field_name": "multiple",
+                "priority": "high" if duplicate_analysis.get("total_duplicates", 0) > 100 else "medium",
+                "recommendation": f"Remove {duplicate_analysis.get('total_duplicates', 0)} duplicate records to improve data quality and uniqueness",
+                "timeline": "1 week"
+            })
+        
+        for rec in duplicate_analysis.get("recommendations", [])[:3]:
+            all_recommendations.append({
+                "recommendation_id": f"rec_dedup_{rec.get('action', 'unknown')}",
+                "agent_id": "duplicate-resolver",
+                "field_name": "multiple",
+                "priority": rec.get("priority", "medium"),
+                "recommendation": rec.get("reason", ""),
+                "timeline": "1 week" if rec.get("priority") == "high" else "2 weeks"
+            })
+    
     # ==================== GENERATE EXECUTIVE SUMMARY ====================
     
     # Overall cleaning quality summary
@@ -284,6 +342,11 @@ def transform_clean_my_data_response(
     if type_fixer_output.get("status") == "success":
         type_score = type_fixer_output.get("data", {}).get("fixing_score", {}).get("overall_score", 0)
         overall_quality += type_score
+        quality_count += 1
+    
+    if duplicate_resolver_output.get("status") == "success":
+        dedup_score = duplicate_resolver_output.get("data", {}).get("dedup_score", {}).get("overall_score", 0)
+        overall_quality += dedup_score
         quality_count += 1
     
     if quality_count > 0:

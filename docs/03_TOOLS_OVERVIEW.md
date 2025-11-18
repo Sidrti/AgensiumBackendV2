@@ -5,7 +5,7 @@
 | Tool                | Purpose                | Agents   | Files                       | Use Case                                                  |
 | ------------------- | ---------------------- | -------- | --------------------------- | --------------------------------------------------------- |
 | **Profile My Data** | Comprehensive analysis | 6 agents | Primary + Optional Baseline | First-time exploration, quality baseline, risk assessment |
-| **Clean My Data**   | Data improvement       | 5 agents | Primary only                | Fix quality issues, prepare for ML                        |
+| **Clean My Data**   | Data improvement       | 6 agents | Primary only                | Fix quality issues, remove duplicates, prepare for ML     |
 
 ---
 
@@ -16,7 +16,7 @@ Both tools provide comprehensive downloads with every analysis:
 - **Excel Report**: Professional multi-sheet workbook with all findings
 
   - Profile My Data: 10 sheets (profiling, drift, risk, readiness, governance, test coverage, alerts, issues, recommendations)
-  - Clean My Data: 9 sheets (null handling, outliers, type fixing, governance, test coverage, alerts, issues, recommendations)
+  - Clean My Data: 10 sheets (null handling, outliers, type fixing, duplicates, governance, test coverage, alerts, issues, recommendations)
 
 - **JSON Export**: Complete hierarchical data with all agent results
   - All agent outputs included
@@ -532,7 +532,97 @@ clean-my-data
 
 ---
 
-#### 4. Governance Checker
+#### 4. Duplicate Resolver ✨ NEW
+
+**ID**: `duplicate-resolver`
+
+**Purpose**: Detect and resolve duplicate records with comprehensive duplicate detection strategies
+
+**What It Does**:
+
+- Detects exact duplicate records
+- Identifies duplicates with case/whitespace variations
+- Handles email case-insensitivity
+- Finds duplicates that differ only in missing values
+- Detects conflicting duplicates (same key, different values)
+- Applies configurable merge/removal strategies
+- Tracks deduplication operations
+- Calculates deduplication effectiveness
+
+**Duplicate Detection Types** (all 5 methods by default):
+
+1. **Exact Duplicates**: Identical values across all columns
+2. **Case Variations**: Same data with different casing (e.g., "John" vs "john") or extra whitespace
+3. **Email Case-Insensitivity**: Same records where only email differs in case
+4. **Missing Value Duplicates**: Identical records except for null placement
+5. **Conflicting Duplicates**: Same key columns but conflicting values in other columns
+
+**Merge Strategies**:
+
+- `remove_duplicates`: Keep first occurrence, remove subsequent duplicates
+- `merge_smart`: Intelligently merge rows by key columns, using conflict resolution strategy
+
+**Conflict Resolution Strategies**:
+
+- `keep_first`: Keep first occurrence's values
+- `keep_last`: Keep last occurrence's values
+- `merge_smart`: Attempt to merge non-conflicting values intelligently
+
+**Parameters**:
+
+```json
+{
+  "detection_types": [
+    "exact",
+    "case_variations",
+    "email_case",
+    "missing_values",
+    "conflicting"
+  ],
+  "merge_strategy": "remove_duplicates", // remove_duplicates or merge_smart
+  "email_columns": [], // Auto-detected if empty (e.g., ["email", "contact_email"])
+  "key_columns": [], // Columns for dedup key (all columns if empty)
+  "null_handling": "ignore_nulls", // ignore_nulls or match_nulls
+  "conflict_resolution": "keep_first", // keep_first, keep_last, merge_smart
+  "dedup_reduction_weight": 0.5, // Dedup effectiveness importance
+  "data_retention_weight": 0.3, // Data retention importance
+  "column_retention_weight": 0.2, // Column retention importance
+  "excellent_threshold": 90, // Excellent score >= this
+  "good_threshold": 75 // Good score >= this
+}
+```
+
+**Output**:
+
+- Deduplication score (0-100)
+- Quality status: Excellent / Good / Needs Improvement
+- Per-detection-method summary
+- Duplicates detected per method
+- Resolution log (what was done)
+- Row-level duplicate issues
+- Recommendations
+
+**Quality Metrics**:
+
+- Total duplicates detected
+- Duplicates resolved
+- Remaining rows
+- Rows removed
+- Duplicate percentage before/after
+- Data retention %
+- Column retention %
+
+**Example Usage Scenarios**:
+
+- Clean customer database before CRM migration
+- Merge data from multiple sources with format variations
+- Ensure unique user records in application databases
+- Prepare data for deduplication before machine learning
+- Comply with data governance: one record per entity
+
+---
+
+#### 5. Governance Checker
 
 **ID**: `governance-checker`
 
@@ -575,8 +665,19 @@ See Profile Tool section above.
 - null-handler: Fix missing values
 - outlier-remover: Remove outliers
 - type-fixer: Fix type mismatches
+- duplicate-resolver: Remove duplicate records
 - governance-checker: Ensure compliance
 - test-coverage-agent: Verify coverage
+```
+
+### Scenario: Merge Data From Multiple Sources
+
+**Use**: Clean My Data with duplicate focus
+
+```
+- duplicate-resolver: Handle format variations and duplicates
+- null-handler: Fix any remaining null values
+- type-fixer: Standardize data types
 ```
 
 ### Scenario: Compare Two Datasets

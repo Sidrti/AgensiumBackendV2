@@ -745,7 +745,7 @@ volumes:
 
 ```bash
 # .env file (never commit to Git)
-
+OPENAI_API_KEY=sk-...
 SECRET_KEY=your-secret-key
 DATABASE_URL=postgresql://user:pass@host/db
 LOG_LEVEL=INFO
