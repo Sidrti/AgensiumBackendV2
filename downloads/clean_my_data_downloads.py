@@ -7,9 +7,14 @@ Generates two complete export formats:
 2. JSON Report (.json) - Complete hierarchical data structure
 
 Agents covered:
+- cleanse-previewer: 'What If' analysis and impact assessment
+- quarantine-agent: Invalid data identification and isolation
 - null-handler: Null value detection and handling
 - outlier-remover: Outlier detection and removal
 - type-fixer: Type conversion and fixing
+- duplicate-resolver: Duplicate record detection and resolution
+- field-standardization: Field value standardization
+- cleanse-writeback: Final quality assurance and documentation
 - governance-checker: Governance compliance validation
 - test-coverage-agent: Test coverage validation
 """
@@ -248,7 +253,7 @@ class CleanMyDataDownloads:
                 "content_base64": base64.b64encode(file_content).decode('utf-8'),
                 "size_bytes": len(file_content),
                 "creation_date": datetime.utcnow().isoformat() + "Z",
-                "sheets": ["Summary", "Null Handler", "Outlier Remover", "Type Fixer", "Governance", "Test Coverage", "Alerts", "Issues", "Recommendations"]
+                "sheets": ["Summary", "Cleanse Preview", "Null Handler", "Outlier Remover", "Type Fixer", "Quarantine", "Duplicates", "Field Standardization", "Cleanse Writeback", "Governance", "Test Coverage", "Alerts", "Issues", "Recommendations"]
             }
         except Exception as e:
             print(f"Error generating Excel report: {str(e)}")

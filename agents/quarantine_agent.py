@@ -457,8 +457,9 @@ def _detect_corrupted_records(df: pd.DataFrame) -> List[int]:
     corrupted.extend(df[all_null_mask].index.tolist())
     
     # Check for records with suspicious values (e.g., SQL injection patterns)
+    # Using non-capturing groups (?:...) to avoid pandas warning about match groups
     suspicious_patterns = [
-        r"(?i)(drop\s+table|delete\s+from|insert\s+into|update\s+|select\s+\*)",
+        r"(?i)(?:drop\s+table|delete\s+from|insert\s+into|update\s+|select\s+\*)",
         r"['\"]?\s*OR\s+['\"]?1['\"]?\s*=['\"]?1",
         r"<script[^>]*>.*?</script>",
         r"javascript:",
