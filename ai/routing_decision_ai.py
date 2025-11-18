@@ -22,9 +22,11 @@ import os
 from typing import Dict, Any, List, Optional
 from datetime import datetime
 try:
-    import openai
+    from openai import OpenAI
+    OPENAI_AVAILABLE = True
 except ImportError:
-    openai = None
+    OpenAI = None
+    OPENAI_AVAILABLE = False
 
 
 class RoutingDecisionAI:
@@ -70,24 +72,23 @@ class RoutingDecisionAI:
             }
         }
         # Configure OpenAI API key from provided value or environment variable
-        provided_key = api_key or os.getenv("OPENAI_API_KEY")
-        if provided_key:
-            try:
-                # Prefer the new OpenAI client class if available
-                try:
-                    from openai import OpenAI as OpenAIClass  # type: ignore
-                    self.openai_client = OpenAIClass(api_key=provided_key)
-                except Exception:
-                    # Fall back to using the global openai module (older client)
-                    if hasattr(openai, "api_key"):
-                        openai.api_key = provided_key
-                    self.openai_client = openai
-            except Exception:
-                # If setting API key fails, proceed without raising - LLM call will fallback
-                print("Warning: Failed to set OpenAI API key for OpenAI package")
-        else:
+        self.api_key = api_key or os.environ.get("OPENAI_API_KEY")
+        self.openai_client = None
+        self.use_ai = False
+        
+        if not self.api_key:
             print("Warning: OPENAI_API_KEY not set - AI-based routing will use fallback recommendations")
-            self.openai_client = None
+        elif not OPENAI_AVAILABLE:
+            print("Warning: OpenAI package not installed. To enable AI routing, install 'openai' and set OPENAI_API_KEY.")
+        else:
+            try:
+                self.openai_client = OpenAI(api_key=self.api_key)
+                self.use_ai = True
+                print("Info: OpenAI client initialized successfully for routing decisions.")
+            except Exception as e:
+                print(f"Warning: Failed to initialize OpenAI client: {str(e)}. Using fallback routing.")
+                self.openai_client = None
+                self.use_ai = False
 
     def get_routing_decisions(
         self,
@@ -300,61 +301,35 @@ class RoutingDecisionAI:
     ) -> List[Dict[str, Any]]:
         """Use LLM to generate intelligent routing recommendations with retry logic"""
 
+        # Check if AI is available
+        if not self.use_ai or not self.openai_client:
+            print("Info: OpenAI not configured - using rule-based fallback recommendations")
+            return self._get_fallback_recommendations(current_tool, analysis)
+        
         max_retries = 3
         retry_count = 0
-        # If no API key is present, avoid calling the OpenAI API and use a fallback
-        api_key_set = False
-        try:
-            # If we have an instantiated OpenAI client or module with api_key attribute
-            if getattr(self, 'openai_client', None) is None:
-                api_key_set = False
-            elif hasattr(self.openai_client, 'api_key'):
-                api_key_set = bool(getattr(self.openai_client, 'api_key', None))
-            else:
-                # New OpenAI client may not expose api_key attribute; assume that initialization succeeded
-                api_key_set = True
-        except Exception:
-            api_key_set = False
-
-        if not api_key_set:
-            print("Info: OPENAI_API_KEY not configured - using rule-based fallback recommendations")
-            return self._get_fallback_recommendations(current_tool, analysis)
         
         while retry_count < max_retries:
             try:
                 # Build prompt for LLM
                 prompt = self._build_routing_prompt(current_tool, analysis, agent_results)
 
-                # Dispatch to whichever OpenAI client is available (old style module or new OpenAI class client)
-                if hasattr(self.openai_client, "ChatCompletion"):
-                    response = self.openai_client.ChatCompletion.create(
-                        model="gpt-4o-mini",
-                        messages=[
-                            {
-                                "role": "system",
-                                "content": "You are an expert data analysis advisor. Your role is to recommend the best next tool to use based on current analysis results. Return a JSON array of recommendations."
-                            },
-                            {
-                                "role": "user",
-                                "content": prompt
-                            }
-                        ]
-                    )
-                else:
-                    # Use new OpenAI client interface
-                    response = self.openai_client.chat.completions.create(
-                        model="gpt-4o-mini",
-                        messages=[
-                            {
-                                "role": "system",
-                                "content": "You are an expert data analysis advisor. Your role is to recommend the best next tool to use based on current analysis results. Return a JSON array of recommendations."
-                            },
-                            {
-                                "role": "user",
-                                "content": prompt
-                            }
-                        ]
-                    )
+                # Use new OpenAI client interface
+                response = self.openai_client.chat.completions.create(
+                    model="gpt-4o-mini",
+                    messages=[
+                        {
+                            "role": "system",
+                            "content": "You are an expert data analysis advisor. Your role is to recommend the best next tool to use based on current analysis results. Return a JSON array of recommendations."
+                        },
+                        {
+                            "role": "user",
+                            "content": prompt
+                        }
+                    ],
+                    temperature=0.3,
+                    max_tokens=800,
+                )
 
                 # Parse response
                 response_text = response.choices[0].message.content.strip()
@@ -378,7 +353,13 @@ class RoutingDecisionAI:
                 if not isinstance(recommendations, list):
                     recommendations = [recommendations]
 
-                return recommendations
+                # Validate recommendations structure
+                validated_recommendations = []
+                for rec in recommendations:
+                    if isinstance(rec, dict) and "next_tool" in rec:
+                        validated_recommendations.append(rec)
+                
+                return validated_recommendations if validated_recommendations else self._get_fallback_recommendations(current_tool, analysis)
                 
             except Exception as e:
                 retry_count += 1
@@ -387,10 +368,13 @@ class RoutingDecisionAI:
                     # Return rule-based recommendations as fallback
                     return self._get_fallback_recommendations(current_tool, analysis)
                 else:
-                    # Exponential backoff: wait 2, 4, 8 seconds
-                    wait_time = 2 ** retry_count
-                    print(f"Retry {retry_count}/{max_retries} in {wait_time}s. Error: {str(e)}")
+                    # Exponential backoff: wait 1, 2, 4 seconds
+                    wait_time = 2 ** (retry_count - 1)
+                    print(f"Retry {retry_count}/{max_retries} after {wait_time}s. Error: {str(e)}")
                     time.sleep(wait_time)
+        
+        # Should never reach here, but return fallback just in case
+        return self._get_fallback_recommendations(current_tool, analysis)
 
     def _build_routing_prompt(
         self,
