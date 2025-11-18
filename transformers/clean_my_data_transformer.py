@@ -856,60 +856,60 @@ def transform_clean_my_data_response(
     complete_analysis_text = "\n".join(analysis_text_parts)
     
     # Generate summary using AI
-    analysis_summary = {
-        "status": "pending",
-        "summary": "",
-        "execution_time_ms": 0,
-        "model_used": None
-    }
+    # analysis_summary = {
+    #     "status": "pending",
+    #     "summary": "",
+    #     "execution_time_ms": 0,
+    #     "model_used": None
+    # }
     
-    try:
-        ai_generator = AnalysisSummaryAI()
-        summary_result = ai_generator.generate_summary(
-            analysis_text=complete_analysis_text,
-            dataset_name="Data Cleaning Analysis"
-        )
-        analysis_summary = summary_result
-    except Exception as e:
-        # Fallback to rule-based summary if OpenAI is unavailable
-        print(f"Warning: OpenAI summary generation failed: {str(e)}. Using fallback summary.")
-        try:
-            analysis_summary = {
-                "status": "success",
-                "summary": f"Data cleaning analysis completed with {len(all_alerts)} alerts and {len(all_recommendations)} recommendations. " +
-                          f"Overall quality: {'Excellent' if overall_quality >= 90 else 'Good' if overall_quality >= 75 else 'Fair'}. " +
-                          f"Key actions: {', '.join([rec.get('recommendation', '')[:50] for rec in all_recommendations[:2]])}.",
-                "execution_time_ms": 0,
-                "model_used": "fallback-rule-based"
-            }
-        except Exception as fallback_error:
-            print(f"Error in fallback summary: {str(fallback_error)}")
-            analysis_summary = {
-                "status": "error",
-                "summary": "Unable to generate summary",
-                "execution_time_ms": 0,
-                "model_used": None
-            }
+    # try:
+    #     ai_generator = AnalysisSummaryAI()
+    #     summary_result = ai_generator.generate_summary(
+    #         analysis_text=complete_analysis_text,
+    #         dataset_name="Data Cleaning Analysis"
+    #     )
+    #     analysis_summary = summary_result
+    # except Exception as e:
+    #     # Fallback to rule-based summary if OpenAI is unavailable
+    #     print(f"Warning: OpenAI summary generation failed: {str(e)}. Using fallback summary.")
+    #     try:
+    #         analysis_summary = {
+    #             "status": "success",
+    #             "summary": f"Data cleaning analysis completed with {len(all_alerts)} alerts and {len(all_recommendations)} recommendations. " +
+    #                       f"Overall quality: {'Excellent' if overall_quality >= 90 else 'Good' if overall_quality >= 75 else 'Fair'}. " +
+    #                       f"Key actions: {', '.join([rec.get('recommendation', '')[:50] for rec in all_recommendations[:2]])}.",
+    #             "execution_time_ms": 0,
+    #             "model_used": "fallback-rule-based"
+    #         }
+    #     except Exception as fallback_error:
+    #         print(f"Error in fallback summary: {str(fallback_error)}")
+    #         analysis_summary = {
+    #             "status": "error",
+    #             "summary": "Unable to generate summary",
+    #             "execution_time_ms": 0,
+    #             "model_used": None
+    #         }
     
     # ==================== GENERATE ROUTING RECOMMENDATIONS ====================
     # Use routing AI agent to recommend next best tool
-    routing_decisions = []
-    try:
-        from ai.routing_decision_ai import RoutingDecisionAI
+    # routing_decisions = []
+    # try:
+    #     from ai.routing_decision_ai import RoutingDecisionAI
         
-        routing_ai = RoutingDecisionAI()
-        routing_decisions = routing_ai.get_routing_decisions(
-            current_tool="clean-my-data",
-            agent_results=agent_results,
-            primary_filename="data.csv",
-            baseline_filename=None,
-            current_parameters=None
-        )
+    #     routing_ai = RoutingDecisionAI()
+    #     routing_decisions = routing_ai.get_routing_decisions(
+    #         current_tool="clean-my-data",
+    #         agent_results=agent_results,
+    #         primary_filename="data.csv",
+    #         baseline_filename=None,
+    #         current_parameters=None
+    #     )
         
-        print(f"Generated {len(routing_decisions)} routing recommendations")
-    except Exception as e:
-        print(f"Warning: Routing AI agent failed: {str(e)}")
-        routing_decisions = []
+    #     print(f"Generated {len(routing_decisions)} routing recommendations")
+    # except Exception as e:
+    #     print(f"Warning: Routing AI agent failed: {str(e)}")
+    #     routing_decisions = []
     
     # ==================== GENERATE DOWNLOADS ====================
     # Use dedicated download module for comprehensive Excel and JSON exports
@@ -954,9 +954,10 @@ def transform_clean_my_data_response(
             "issues": all_issues,
             "recommendations": all_recommendations,
             "executiveSummary": executive_summary,
-            "analysisSummary": analysis_summary,
+            # "analysisSummary": analysis_summary,
             "visualizations": [],
-            "routing_decisions": routing_decisions,
+            # "routing_decisions": routing_decisions,
+        
             # Individual agent outputs (for detailed inspection)
             **{agent_id: output for agent_id, output in agent_results.items() if output.get("status") == "success"},
             # Downloads with Excel and JSON exports
