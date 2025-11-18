@@ -35,7 +35,7 @@ app = FastAPI(
 load_dotenv()
 
 # Configure CORS
-FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:3000") # Use an environment variable for best practice
+FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:5173") # Use an environment variable for best practice
 
 app.add_middleware(
     CORSMiddleware,

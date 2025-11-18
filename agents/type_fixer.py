@@ -12,6 +12,7 @@ import numpy as np
 import io
 import re
 import time
+import base64
 from typing import Dict, Any, Optional, List
 
 
@@ -119,6 +120,10 @@ def execute_type_fixer(
             "row_level_issues": type_issues[:100]  # Limit to first 100
         }
 
+        # Generate cleaned file (CSV format)
+        cleaned_file_bytes = _generate_cleaned_file(df_fixed, filename)
+        cleaned_file_base64 = base64.b64encode(cleaned_file_bytes).decode('utf-8')
+
         return {
             "status": "success",
             "agent_id": "type-fixer",
@@ -131,7 +136,13 @@ def execute_type_fixer(
                 "remaining_type_issues": type_analysis['total_issues'] - len(fix_log),
                 "total_issues": len(type_issues)
             },
-            "data": type_fixing_data
+            "data": type_fixing_data,
+            "cleaned_file": {
+                "filename": f"cleaned_{filename}",
+                "content": cleaned_file_base64,
+                "size_bytes": len(cleaned_file_bytes),
+                "format": filename.split('.')[-1].lower()
+            }
         }
 
     except Exception as e:
@@ -422,3 +433,20 @@ def _convert_numpy_types(obj):
         return [_convert_numpy_types(item) for item in obj]
     else:
         return obj
+
+
+def _generate_cleaned_file(df: pd.DataFrame, original_filename: str) -> bytes:
+    """
+    Generate cleaned data file in CSV format.
+    
+    Args:
+        df: Cleaned dataframe
+        original_filename: Original filename to determine format
+        
+    Returns:
+        File contents as bytes
+    """
+    # Always export as CSV for consistency and compatibility
+    output = io.BytesIO()
+    df.to_csv(output, index=False)
+    return output.getvalue()

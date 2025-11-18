@@ -13,6 +13,7 @@ import numpy as np
 import io
 import time
 import re
+import base64
 from typing import Dict, Any, Optional, List, Set, Tuple
 
 
@@ -127,6 +128,10 @@ def execute_duplicate_resolver(
             "row_level_issues": duplicate_issues[:100]  # Limit to first 100
         }
 
+        # Generate cleaned file (CSV format)
+        cleaned_file_bytes = _generate_cleaned_file(df_deduplicated, filename)
+        cleaned_file_base64 = base64.b64encode(cleaned_file_bytes).decode('utf-8')
+
         return {
             "status": "success",
             "agent_id": "duplicate-resolver",
@@ -140,7 +145,13 @@ def execute_duplicate_resolver(
                 "rows_removed": len(original_df) - len(df_deduplicated),
                 "total_issues": len(duplicate_issues)
             },
-            "data": dedup_data
+            "data": dedup_data,
+            "cleaned_file": {
+                "filename": f"cleaned_{filename}",
+                "content": cleaned_file_base64,
+                "size_bytes": len(cleaned_file_bytes),
+                "format": filename.split('.')[-1].lower()
+            }
         }
 
     except Exception as e:
@@ -597,3 +608,20 @@ def _convert_numpy_types(obj):
         return [_convert_numpy_types(item) for item in obj]
     else:
         return obj
+
+
+def _generate_cleaned_file(df: pd.DataFrame, original_filename: str) -> bytes:
+    """
+    Generate cleaned data file in CSV format.
+    
+    Args:
+        df: Cleaned dataframe
+        original_filename: Original filename to determine format
+        
+    Returns:
+        File contents as bytes
+    """
+    # Always export as CSV for consistency and compatibility
+    output = io.BytesIO()
+    df.to_csv(output, index=False)
+    return output.getvalue()

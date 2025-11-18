@@ -249,48 +249,17 @@ Welcome to the Agensium Backend documentation suite. This guide helps you get st
 
 ---
 
-### 7. **07_DOWNLOADS_AND_CHAT.md** - Downloads & Chat Features (NEW)
+### 7. **07_DOWNLOADS_AND_CHAT.md** - Downloads & Chat Features
 
-**Purpose**: Complete guide to new downloads system and chat agent capabilities
+**Purpose**: Complete guide to downloads system and chat agent capabilities
 
 **Contains**:
 
 - Downloads System Architecture
-
-  - CleanMyDataDownloads module
-  - ProfileMyDataDownloads module
-  - Excel export (9-10 sheets per tool)
-  - JSON export (complete hierarchical data)
-  - Base64 encoding
-  - Styling and formatting
-
 - Chat Agent Implementation
-
-  - ChatAgent module (`/rough/chat_agent.py`)
-  - GPT-4 powered Q&A
-  - System prompt engineering
-  - Chat history handling
-  - Context-aware responses
-
 - API Integration Examples
-
-  - Download request/response format
-  - Chat endpoint usage
-  - Client-side decoding
-  - Error handling
-
 - Configuration & Customization
-
-  - OpenAI API key setup
-  - Model selection
-  - Response timeout configuration
-  - Custom export templates
-
 - Use Cases & Examples
-  - Understanding quality issues
-  - Following up on previous questions
-  - Compliance questions
-  - Multi-report analysis
 
 **Read if you want to**:
 
@@ -298,12 +267,41 @@ Welcome to the Agensium Backend documentation suite. This guide helps you get st
 - Add chat Q&A to your frontend
 - Understand download architecture
 - Configure OpenAI integration
-- Handle downloads in client apps
-- Implement chat with context history
-- Customize export formats
-- Debug download/chat issues
 
 **Estimated reading time**: 30-40 minutes
+
+---
+
+### 8. **08_CLEANED_FILES_FEATURE.md** - Cleaned Data Files Feature (NEW)
+
+**Purpose**: Complete guide to the cleaned data files feature for Clean My Data tool
+
+**Contains**:
+
+- Feature overview and architecture
+- Data flow (6-step process)
+- Agent modifications (null-handler, outlier-remover, type-fixer, duplicate-resolver)
+- Transformer modifications
+- Downloader modifications
+- Standard download file structure
+- Cleaned file structure with agent tracking
+- Complete API response examples
+- Frontend integration code
+- Field reference documentation
+- Error handling and troubleshooting
+- Testing checklist
+- Future enhancements
+
+**Read if you want to**:
+
+- Download cleaned CSV files from each agent
+- Understand the cleaned files implementation
+- Integrate cleaned files into your frontend
+- Track which agent produced which cleaned file
+- Debug cleaned files issues
+- Extend cleaned files feature
+
+**Estimated reading time**: 20-30 minutes
 
 ---
 
@@ -322,6 +320,14 @@ Welcome to the Agensium Backend documentation suite. This guide helps you get st
 2. Run analysis with `/analyze` endpoint
 3. Extract downloads from response
 4. Decode base64 blobs in client application
+
+### "I want to download cleaned data files from each cleaning agent"
+
+1. Run `/analyze` endpoint with Clean My Data tool
+2. Read: [08_CLEANED_FILES_FEATURE.md](./08_CLEANED_FILES_FEATURE.md) - Complete guide
+3. Extract cleaned files from downloads array (look for `agent_id` field)
+4. Decode base64 content in client application
+5. Download CSV files for data from each agent (Null Handler, Outlier Remover, Type Fixer, Duplicate Resolver)
 
 ### "I want to ask questions about my analysis"
 
@@ -522,16 +528,17 @@ http://localhost:8000/docs
 
 ## 📝 Document Versions
 
-| Document                 | Version | Last Updated  | Status     |
-| ------------------------ | ------- | ------------- | ---------- |
-| 00_INDEX.md              | 2.0     | November 2025 | ✅ Updated |
-| 01_GETTING_STARTED.md    | 2.0     | November 2025 | ✅ Updated |
-| 02_ARCHITECTURE.md       | 2.0     | November 2025 | ✅ Updated |
-| 03_TOOLS_OVERVIEW.md     | 2.0     | November 2025 | ✅ Updated |
-| 04_API_REFERENCE.md      | 2.0     | November 2025 | ✅ Updated |
-| 05_AGENT_DEVELOPMENT.md  | 2.0     | November 2025 | ✅ Updated |
-| 06_DEPLOYMENT.md         | 2.0     | November 2025 | ✅ Updated |
-| 07_DOWNLOADS_AND_CHAT.md | 1.0     | November 2025 | ✅ New     |
+| Document                    | Version | Last Updated  | Status      |
+| --------------------------- | ------- | ------------- | ----------- |
+| 00_INDEX.md                 | 2.1     | November 2025 | ✅ Updated  |
+| 01_GETTING_STARTED.md       | 2.0     | November 2025 | ✅ Updated  |
+| 02_ARCHITECTURE.md          | 2.0     | November 2025 | ✅ Updated  |
+| 03_TOOLS_OVERVIEW.md        | 2.0     | November 2025 | ✅ Updated  |
+| 04_API_REFERENCE.md         | 2.0     | November 2025 | ✅ Updated  |
+| 05_AGENT_DEVELOPMENT.md     | 2.0     | November 2025 | ✅ Updated  |
+| 06_DEPLOYMENT.md            | 2.0     | November 2025 | ✅ Updated  |
+| 07_DOWNLOADS_AND_CHAT.md    | 1.0     | November 2025 | ✅ Existing |
+| 08_CLEANED_FILES_FEATURE.md | 1.0     | November 2025 | ✅ New      |
 
 ---
 

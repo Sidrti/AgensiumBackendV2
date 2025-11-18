@@ -11,6 +11,7 @@ import pandas as pd
 import numpy as np
 import io
 import time
+import base64
 from typing import Dict, Any, Optional
 
 try:
@@ -106,6 +107,10 @@ def execute_null_handler(
         # Identify null handling issues
         null_issues = _identify_null_issues(original_df, df_cleaned)
         
+        # Generate cleaned file (CSV format)
+        cleaned_file_bytes = _generate_cleaned_file(df_cleaned, filename)
+        cleaned_file_base64 = base64.b64encode(cleaned_file_bytes).decode('utf-8')
+        
         # Build results
         null_handling_data = {
             "cleaning_score": cleaning_score,
@@ -128,7 +133,13 @@ def execute_null_handler(
                 "remaining_nulls": int(df_cleaned.isnull().sum().sum()),
                 "total_issues": len(null_issues)
             },
-            "data": null_handling_data
+            "data": null_handling_data,
+            "cleaned_file": {
+                "filename": f"cleaned_{filename}",
+                "content": cleaned_file_base64,
+                "size_bytes": len(cleaned_file_bytes),
+                "format": filename.split('.')[-1].lower()
+            }
         }
 
     except Exception as e:
@@ -391,3 +402,20 @@ def _identify_null_issues(original_df: pd.DataFrame, cleaned_df: pd.DataFrame) -
                 })
     
     return issues
+
+
+def _generate_cleaned_file(df: pd.DataFrame, original_filename: str) -> bytes:
+    """
+    Generate cleaned data file in CSV format.
+    
+    Args:
+        df: Cleaned dataframe
+        original_filename: Original filename to determine format
+        
+    Returns:
+        File contents as bytes
+    """
+    # Always export as CSV for consistency and compatibility
+    output = io.BytesIO()
+    df.to_csv(output, index=False)
+    return output.getvalue()

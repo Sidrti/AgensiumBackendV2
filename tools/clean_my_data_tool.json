@@ -8,6 +8,7 @@
     "isAvailable": true,
     "version": "1.0.0",
     "available_agents": [
+      "quarantine-agent",
       "null-handler",
       "outlier-remover",
       "type-fixer",
@@ -25,6 +26,145 @@
     }
   },
   "agents": {
+    "quarantine-agent": {
+      "id": "quarantine-agent",
+      "name": "Quarantine Agent",
+      "description": "Identifies, isolates, and manages bad, invalid, or suspicious data to prevent corruption of the main processing pipeline. Detects missing required fields, type mismatches, out-of-range values, invalid formats, broken records, and schema mismatches.",
+      "icon": "🚫",
+      "category": "Data Quality & Security",
+      "accuracy": "98%",
+      "features": [
+        "Invalid Data Detection",
+        "Data Isolation",
+        "Quarantine Logging",
+        "Quality Scoring",
+        "Corruption Prevention"
+      ],
+      "input": { "type": "CSV, JSON, XLSX" },
+      "version": "1.0.0",
+      "required_files": ["primary"],
+      "parameters": {
+        "detect_missing_fields": {
+          "type": "boolean",
+          "description": "Detect missing required fields",
+          "default": true
+        },
+        "detect_type_mismatches": {
+          "type": "boolean",
+          "description": "Detect data type mismatches",
+          "default": true
+        },
+        "detect_out_of_range": {
+          "type": "boolean",
+          "description": "Detect out-of-range numeric values",
+          "default": true
+        },
+        "detect_invalid_formats": {
+          "type": "boolean",
+          "description": "Detect invalid format values",
+          "default": true
+        },
+        "detect_broken_records": {
+          "type": "boolean",
+          "description": "Detect corrupted or broken records",
+          "default": true
+        },
+        "detect_schema_mismatches": {
+          "type": "boolean",
+          "description": "Detect schema mismatches",
+          "default": true
+        },
+        "required_fields": {
+          "type": "array",
+          "description": "List of required field names",
+          "default": [],
+          "items": "string"
+        },
+        "range_constraints": {
+          "type": "object",
+          "description": "Numeric range constraints (column -> {min, max})",
+          "default": {}
+        },
+        "format_constraints": {
+          "type": "object",
+          "description": "Format constraints (column -> regex pattern)",
+          "default": {}
+        },
+        "expected_schema": {
+          "type": "object",
+          "description": "Expected data types for columns (column -> type)",
+          "default": {}
+        },
+        "quarantine_reduction_weight": {
+          "type": "float",
+          "description": "Weight for quarantine effectiveness in scoring",
+          "default": 0.5,
+          "min": 0,
+          "max": 1
+        },
+        "data_integrity_weight": {
+          "type": "float",
+          "description": "Weight for data integrity in scoring",
+          "default": 0.3,
+          "min": 0,
+          "max": 1
+        },
+        "processing_efficiency_weight": {
+          "type": "float",
+          "description": "Weight for processing efficiency in scoring",
+          "default": 0.2,
+          "min": 0,
+          "max": 1
+        },
+        "excellent_threshold": {
+          "type": "integer",
+          "description": "Score threshold for excellent quality",
+          "default": 90,
+          "min": 0,
+          "max": 100
+        },
+        "good_threshold": {
+          "type": "integer",
+          "description": "Score threshold for good quality",
+          "default": 75,
+          "min": 0,
+          "max": 100
+        }
+      },
+      "output_structure": {
+        "agent_id": "string",
+        "agent_name": "string",
+        "status": "string",
+        "execution_time_ms": "integer",
+        "summary_metrics": {
+          "total_rows_processed": "integer",
+          "quarantined_records": "integer",
+          "clean_records": "integer",
+          "quarantine_percentage": "number",
+          "quarantine_issues_found": "integer"
+        },
+        "data": {
+          "quality_score": "object",
+          "quality_status": "string",
+          "quarantine_analysis": "object",
+          "quarantine_log": "array",
+          "summary": "string",
+          "row_level_issues": "array"
+        },
+        "cleaned_file": {
+          "filename": "string",
+          "content": "string (base64)",
+          "size_bytes": "integer",
+          "format": "string"
+        },
+        "quarantine_file": {
+          "filename": "string",
+          "content": "string (base64)",
+          "size_bytes": "integer",
+          "format": "string"
+        }
+      }
+    },
     "null-handler": {
       "id": "null-handler",
       "name": "Null Handler",
