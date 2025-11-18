@@ -600,6 +600,29 @@ def transform_clean_my_data_response(
     
     # ==================== GENERATE EXECUTIVE SUMMARY ====================
     
+    # Count active agents (agents with successful execution)
+    active_agents = sum(1 for agent_output in agent_results.values() if agent_output.get("status") == "success")
+    total_possible_agents = len(agent_results)
+    
+    # Always present: Agents used summary
+    executive_summary.append({
+        "summary_id": "exec_agents_used",
+        "title": "Agents Executed",
+        "value": f"{active_agents}/{total_possible_agents}",
+        "status": "success" if active_agents > 0 else "warning",
+        "description": f"{active_agents} of {total_possible_agents} agents executed successfully"
+    })
+    
+    # Always present: Execution time summary
+    execution_time_seconds = execution_time_ms / 1000
+    executive_summary.append({
+        "summary_id": "exec_execution_time",
+        "title": "Total Execution Time",
+        "value": f"{execution_time_seconds:.2f}s",
+        "status": "excellent" if execution_time_seconds < 30 else "good" if execution_time_seconds < 60 else "fair",
+        "description": f"Analysis completed in {execution_time_seconds:.2f} seconds"
+    })
+    
     # Overall cleaning quality summary
     overall_quality = 0
     quality_count = 0
