@@ -201,13 +201,128 @@ def execute_cleanse_previewer(
             "recommendations": recommendations
         }
         
+        # ==================== GENERATE ALERTS ====================
+        alerts = []
+        
+        # High-impact rules alert
+        if overall_impact_assessment["high_impact_rules"] > 0:
+            alerts.append({
+                "alert_id": "alert_preview_high_impact",
+                "severity": "critical" if not overall_impact_assessment["safe_to_execute"] else "high",
+                "category": "cleaning_impact",
+                "message": f"{overall_impact_assessment['high_impact_rules']} high-impact cleaning rule(s) detected. Safety: {preview_analysis['execution_safety']}",
+                "affected_fields_count": overall_impact_assessment["high_impact_rules"],
+                "recommendation": "Review high-impact rules before execution. Consider creating backups."
+            })
+        
+        # Safety alert
+        if not overall_impact_assessment["safe_to_execute"]:
+            alerts.append({
+                "alert_id": "alert_preview_unsafe",
+                "severity": "critical",
+                "category": "execution_safety",
+                "message": f"Execution safety: CAUTION - {len(overall_impact_assessment['warnings'])} warning(s) detected",
+                "affected_fields_count": len(overall_impact_assessment["warnings"]),
+                "recommendation": "Address warnings before executing cleaning operations. Risk of significant data loss or corruption."
+            })
+        
+        # Quality score alert
+        if preview_score["overall_score"] < 75:
+            alerts.append({
+                "alert_id": "alert_preview_quality",
+                "severity": "high" if preview_score["overall_score"] < 60 else "medium",
+                "category": "preview_quality",
+                "message": f"Preview quality score: {preview_score['overall_score']:.1f}/100 ({quality_status})",
+                "affected_fields_count": len(preview_rules),
+                "recommendation": "Review preview analysis results. Consider adjusting cleaning strategy."
+            })
+        
+        # Simulation failures alert
+        failed_simulations = preview_score["metrics"]["total_simulations"] - preview_score["metrics"]["successful_simulations"]
+        if failed_simulations > 0:
+            alerts.append({
+                "alert_id": "alert_preview_simulation_failures",
+                "severity": "high",
+                "category": "simulation_error",
+                "message": f"{failed_simulations} simulation(s) failed out of {preview_score['metrics']['total_simulations']} total",
+                "affected_fields_count": failed_simulations,
+                "recommendation": "Review and fix failed simulation rules before execution."
+            })
+        
+        # ==================== GENERATE ISSUES ====================
+        issues = []
+        
+        # Extract impact issues
+        impact_issues = _extract_impact_issues(simulated_results)
+        for impact_issue in impact_issues[:100]:
+            issues.append({
+                "issue_id": f"issue_preview_{impact_issue.get('rule_id', 'unknown')}_{impact_issue.get('issue_type', 'unknown')}",
+                "agent_id": "cleanse-previewer",
+                "field_name": impact_issue.get("rule_id", "N/A"),
+                "issue_type": impact_issue.get("issue_type", "preview_issue"),
+                "severity": impact_issue.get("severity", "medium"),
+                "message": impact_issue.get("description", "Preview issue detected")
+            })
+        
+        # ==================== GENERATE RECOMMENDATIONS ====================
+        agent_recommendations = []
+        
+        # Top recommendations from preview analysis
+        for rec in recommendations[:7]:
+            rec_id = f"rec_preview_{rec.get('action', 'unknown')}"
+            affected_rules = rec.get("affected_rules", [])
+            field_name = ", ".join(affected_rules[:3]) if affected_rules else "multiple"
+            
+            agent_recommendations.append({
+                "recommendation_id": rec_id,
+                "agent_id": "cleanse-previewer",
+                "field_name": field_name,
+                "priority": rec.get("priority", "medium"),
+                "recommendation": f"{rec.get('action', 'Review')}: {rec.get('reason', 'No reason provided')}",
+                "timeline": "immediate" if rec.get("priority") == "critical" else "1 week" if rec.get("priority") == "high" else "2 weeks"
+            })
+        
+        # Safety-based recommendations
+        if not overall_impact_assessment["safe_to_execute"]:
+            agent_recommendations.append({
+                "recommendation_id": "rec_preview_safety",
+                "agent_id": "cleanse-previewer",
+                "field_name": "all rules",
+                "priority": "critical",
+                "recommendation": "Create data backup before executing cleaning operations. High risk of data loss detected.",
+                "timeline": "immediate"
+            })
+        
+        # ==================== GENERATE EXECUTIVE SUMMARY ====================
+        executive_summary = [{
+            "summary_id": "exec_cleanse_preview",
+            "title": "Cleanse Preview Status",
+            "value": f"{preview_score['overall_score']:.1f}",
+            "status": "excellent" if quality_status == "excellent" else "good" if quality_status == "good" else "needs_review",
+            "description": f"Preview Score: {preview_score['overall_score']:.1f}/100, Safety: {preview_analysis['execution_safety']}, {len(preview_rules)} rules analyzed ({overall_impact_assessment['high_impact_rules']} high-impact)"
+        }]
+        
+        # ==================== GENERATE AI ANALYSIS TEXT ====================
+        ai_analysis_parts = []
+        ai_analysis_parts.append(f"CLEANSE PREVIEWER ANALYSIS:")
+        ai_analysis_parts.append(f"- Preview Score: {preview_score['overall_score']:.1f}/100 (Accuracy: {preview_score['metrics']['accuracy_score']:.1f}, Safety: {preview_score['metrics']['safety_score']:.1f}, Completeness: {preview_score['metrics']['completeness_score']:.1f})")
+        ai_analysis_parts.append(f"- Rules Analyzed: {len(preview_rules)} total ({overall_impact_assessment['high_impact_rules']} high-impact, {overall_impact_assessment['medium_impact_rules']} medium-impact, {overall_impact_assessment['low_impact_rules']} low-impact)")
+        ai_analysis_parts.append(f"- Execution Safety: {preview_analysis['execution_safety']} ({'SAFE' if overall_impact_assessment['safe_to_execute'] else 'CAUTION REQUIRED'})")
+        ai_analysis_parts.append(f"- Warnings: {len(overall_impact_assessment['warnings'])} critical warnings detected")
+        if overall_impact_assessment['warnings']:
+            ai_analysis_parts.append(f"- Top Warnings: {'; '.join(overall_impact_assessment['warnings'][:3])}")
+        ai_analysis_parts.append(f"- Simulations: {preview_score['metrics']['successful_simulations']}/{preview_score['metrics']['total_simulations']} successful")
+        ai_analysis_text = "\n".join(ai_analysis_parts)
+        
         # Build results
         preview_data = {
             "preview_score": preview_score,
             "quality_status": quality_status,
             "preview_analysis": preview_analysis,
             "summary": f"Preview analysis completed. Quality: {quality_status}. Analyzed {len(preview_rules)} cleaning rules across {len(df)} rows. Safety: {preview_analysis['execution_safety']}.",
-            "impact_issues": _extract_impact_issues(simulated_results)[:100]
+            "impact_issues": _extract_impact_issues(simulated_results)[:100],
+            "executive_summary": executive_summary,
+            "ai_analysis_text": ai_analysis_text
         }
 
         return {
@@ -224,7 +339,10 @@ def execute_cleanse_previewer(
                 "safe_to_execute": overall_impact_assessment["safe_to_execute"],
                 "total_warnings": len(overall_impact_assessment["warnings"])
             },
-            "data": preview_data
+            "data": preview_data,
+            "alerts": alerts,
+            "issues": issues,
+            "recommendations": agent_recommendations
         }
 
     except Exception as e:

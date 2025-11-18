@@ -262,6 +262,170 @@ def profile_data(
             "info_messages": info_messages
         }
         
+        # ==================== GENERATE ALERTS ====================
+        alerts = []
+        quality_grade = quality_summary["quality_grade"]
+        fields_with_issues = len([f for f in field_profiles if f["quality_score"] < 80])
+        
+        if overall_quality_score < 80:
+            alerts.append({
+                "alert_id": "alert_quality_001",
+                "severity": "high" if overall_quality_score < 60 else "medium",
+                "category": "data_quality",
+                "message": f"Data quality score is {overall_quality_score:.1f}/100 (Grade {quality_grade})",
+                "affected_fields_count": fields_with_issues,
+                "recommendation": f"Quality grade: {quality_grade}. {fields_with_issues} field(s) need improvement."
+            })
+        
+        # ==================== GENERATE ISSUES ====================
+        issues = []
+        
+        # Add field-level quality issues
+        for field in field_profiles:
+            field_quality = field.get("quality_score", 0)
+            field_name = field.get("field_name")
+            field_id = field.get("field_id")
+            properties = field.get("properties", {})
+            
+            if field_quality < 80:
+                issues.append({
+                    "issue_id": f"issue_quality_{field_id}",
+                    "agent_id": "unified-profiler",
+                    "field_name": field_name,
+                    "issue_type": "low_quality_score",
+                    "severity": "high" if field_quality < 60 else "medium",
+                    "message": f"Field quality score: {field_quality:.1f}/100"
+                })
+            
+            # Add outlier issues
+            if "statistics" in field and field["statistics"].get("type") == "numeric":
+                outlier_count = field["statistics"].get("outlier_count", 0)
+                outlier_percentage = field["statistics"].get("outlier_percentage", 0)
+                
+                if outlier_percentage > 5:
+                    issues.append({
+                        "issue_id": f"issue_outliers_{field_id}",
+                        "agent_id": "unified-profiler",
+                        "field_name": field_name,
+                        "issue_type": "high_outlier_count",
+                        "severity": "medium",
+                        "message": f"{outlier_count} outliers detected ({outlier_percentage:.1f}% of values)"
+                    })
+            
+            # Add missing value issues
+            missing_percentage = properties.get("null_percentage", 0)
+            if missing_percentage > 50:
+                issues.append({
+                    "issue_id": f"issue_missing_{field_id}",
+                    "agent_id": "unified-profiler",
+                    "field_name": field_name,
+                    "issue_type": "high_missing_rate",
+                    "severity": "high" if missing_percentage > 75 else "medium",
+                    "message": f"{missing_percentage:.1f}% missing values"
+                })
+            
+            # Add low uniqueness issues for potential ID/key fields
+            unique_percentage = properties.get("unique_percentage", 0)
+            if unique_percentage < 50 and field_name.lower() in ['id', 'key', 'identifier', 'uuid', 'guid']:
+                issues.append({
+                    "issue_id": f"issue_uniqueness_{field_id}",
+                    "agent_id": "unified-profiler",
+                    "field_name": field_name,
+                    "issue_type": "low_uniqueness_for_key_field",
+                    "severity": "high",
+                    "message": f"Expected unique identifier has only {unique_percentage:.1f}% unique values"
+                })
+        
+        # ==================== GENERATE RECOMMENDATIONS ====================
+        recommendations = []
+        
+        # Quality recommendations for top 5 low-quality fields
+        low_quality_fields = sorted([f for f in field_profiles if f.get("quality_score", 0) < 80], 
+                                   key=lambda x: x.get("quality_score", 0))[:5]
+        
+        for field in low_quality_fields:
+            field_quality = field.get("quality_score", 0)
+            field_name = field.get("field_name")
+            field_id = field.get("field_id")
+            properties = field.get("properties", {})
+            
+            # Determine specific recommendation based on issues
+            recommendation_text = f"Improve data quality for {field_name}"
+            timeline = "1-2 weeks"
+            priority = "high" if field_quality < 60 else "medium"
+            
+            # Make recommendation more specific
+            missing_pct = properties.get("null_percentage", 0)
+            if missing_pct > 50:
+                recommendation_text = f"Address {missing_pct:.1f}% missing values in {field_name} through imputation or validation"
+                priority = "high" if missing_pct > 75 else "medium"
+            
+            if "statistics" in field and field["statistics"].get("type") == "numeric":
+                outlier_pct = field["statistics"].get("outlier_percentage", 0)
+                if outlier_pct > 5:
+                    recommendation_text = f"Review and handle {outlier_pct:.1f}% outliers in {field_name}"
+                    timeline = "1 week"
+            
+            recommendations.append({
+                "recommendation_id": f"rec_quality_{field_id}",
+                "agent_id": "unified-profiler",
+                "field_name": field_name,
+                "priority": priority,
+                "recommendation": recommendation_text,
+                "timeline": timeline
+            })
+        
+        # Add overall data quality recommendation if score is low
+        if overall_quality_score < 70:
+            recommendations.append({
+                "recommendation_id": "rec_quality_overall",
+                "agent_id": "unified-profiler",
+                "field_name": f"{fields_with_issues} fields",
+                "priority": "critical" if overall_quality_score < 50 else "high",
+                "recommendation": f"Overall data quality is {quality_grade} grade ({overall_quality_score:.1f}/100). Run 'Clean My Data' tool to improve quality across {fields_with_issues} field(s)",
+                "timeline": "2-3 weeks"
+            })
+        
+        # Add completeness recommendation
+        avg_completeness = quality_summary.get("completeness_score", 100)
+        if avg_completeness < 80:
+            fields_with_nulls = len([f for f in field_profiles if f.get("properties", {}).get("null_percentage", 0) > 10])
+            recommendations.append({
+                "recommendation_id": "rec_completeness",
+                "agent_id": "unified-profiler",
+                "field_name": f"{fields_with_nulls} fields",
+                "priority": "high" if avg_completeness < 60 else "medium",
+                "recommendation": f"Data completeness is {avg_completeness:.1f}/100. Implement data validation rules and handle missing values in {fields_with_nulls} field(s)",
+                "timeline": "1-2 weeks"
+            })
+        
+        # ==================== GENERATE EXECUTIVE SUMMARY ====================
+        executive_summary = []
+        
+        # Overall Data Quality Score
+        executive_summary.append({
+            "summary_id": "exec_quality",
+            "title": "Overall Data Quality Score",
+            "value": str(round(overall_quality_score, 1)),
+            "status": "excellent" if overall_quality_score >= 90 else "good" if overall_quality_score >= 80 else "fair",
+            "description": f"Grade {quality_grade}: {overall_quality_score:.1f}/100"
+        })
+        
+        # ==================== GENERATE AI ANALYSIS TEXT ====================
+        ai_analysis_text_parts = []
+        ai_analysis_text_parts.append(f"DATA QUALITY: Overall score {overall_quality_score:.1f}/100 (Grade {quality_grade})")
+        ai_analysis_text_parts.append(f"- Completeness: {quality_summary.get('completeness_score', 0):.1f}/100")
+        ai_analysis_text_parts.append(f"- Validity: {quality_summary.get('validity_score', 0):.1f}/100")
+        ai_analysis_text_parts.append(f"- Consistency: {quality_summary.get('consistency_score', 0):.1f}/100")
+        
+        if fields_with_issues > 0:
+            ai_analysis_text_parts.append(f"- {fields_with_issues} field(s) require attention (quality score < 80)")
+        
+        if quality_summary.get("critical_issues", 0) > 0:
+            ai_analysis_text_parts.append(f"- {quality_summary.get('critical_issues', 0)} critical quality issue(s) detected")
+        
+        ai_analysis_text = "\n".join(ai_analysis_text_parts)
+        
         return {
             "status": "success",
             "agent_id": "unified-profiler",
@@ -275,7 +439,12 @@ def profile_data(
             "data": {
                 "fields": field_profiles,
                 "quality_summary": quality_summary
-            }
+            },
+            "alerts": alerts,
+            "issues": issues,
+            "recommendations": recommendations,
+            "executive_summary": executive_summary,
+            "ai_analysis_text": ai_analysis_text
         }
     
     except Exception as e:

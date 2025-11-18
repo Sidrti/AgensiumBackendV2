@@ -162,6 +162,191 @@ def execute_quarantine_agent(
             "summary": f"Quarantine agent completed. Identified {len(quarantined_data)} problematic records. Quality: {quality_status}.",
             "row_level_issues": _extract_row_level_issues(quarantined_data, quarantine_analysis)
         }
+        
+        # ==================== GENERATE EXECUTIVE SUMMARY ====================
+        executive_summary = [{
+            "summary_id": "exec_quarantine",
+            "title": "Data Quarantine Status",
+            "value": f"{quality_score['overall_score']:.1f}",
+            "status": "excellent" if quality_status == "excellent" else "good" if quality_status == "good" else "needs_improvement",
+            "description": f"Quality: {quality_status}, Quarantined: {len(quarantined_data)} records ({round((len(quarantined_data) / len(original_df) * 100) if len(original_df) > 0 else 0, 2):.1f}%), Clean: {len(df_clean)} records, {len(quarantine_analysis.get('issue_types', {}))} issue types"
+        }]
+        
+        # ==================== GENERATE AI ANALYSIS TEXT ====================
+        ai_analysis_parts = []
+        ai_analysis_parts.append(f"QUARANTINE AGENT ANALYSIS:")
+        ai_analysis_parts.append(f"- Quality Score: {quality_score['overall_score']:.1f}/100 (Quarantine Reduction: {quality_score['metrics']['quarantine_reduction_score']:.1f}, Data Integrity: {quality_score['metrics']['data_integrity_score']:.1f}, Processing Efficiency: {quality_score['metrics']['processing_efficiency_score']:.1f})")
+        
+        quarantine_pct = round((len(quarantined_data) / len(original_df) * 100) if len(original_df) > 0 else 0, 2)
+        ai_analysis_parts.append(f"- Quarantine Stats: {len(quarantined_data)} records quarantined ({quarantine_pct:.1f}%), {len(df_clean)} clean records ({100 - quarantine_pct:.1f}%)")
+        
+        issue_types = quarantine_analysis.get('issue_types', {})
+        ai_analysis_parts.append(f"- Issue Types: {len(issue_types)} distinct types - {', '.join([f'{k}: {v}' for k, v in list(issue_types.items())[:5]])}")
+        
+        severity_breakdown = quarantine_analysis.get('severity_breakdown', {})
+        ai_analysis_parts.append(f"- Severity Breakdown: Critical: {severity_breakdown.get('critical', 0)}, High: {severity_breakdown.get('high', 0)}, Medium: {severity_breakdown.get('medium', 0)}, Low: {severity_breakdown.get('low', 0)}")
+        ai_analysis_parts.append(f"- Data Integrity Rate: {quality_score['metrics']['data_integrity_rate']:.1f}%, Processing Efficiency: {quality_score['metrics']['processing_efficiency_rate']:.1f}%")
+        
+        if len(quarantined_data) > 0:
+            ai_analysis_parts.append(f"- Recommendation: Review {len(quarantined_data)} quarantined records and investigate root causes of data quality issues")
+        else:
+            ai_analysis_parts.append(f"- Recommendation: No data quality issues detected - dataset is clean and ready for processing")
+        
+        ai_analysis_text = "\n".join(ai_analysis_parts)
+        
+        # Add to quarantine_data
+        quarantine_data["executive_summary"] = executive_summary
+        quarantine_data["ai_analysis_text"] = ai_analysis_text
+        
+        # ==================== GENERATE ALERTS ====================
+        alerts = []
+        
+        # Critical quarantine alert
+        if len(quarantined_data) > len(original_df) * 0.3:
+            alerts.append({
+                "alert_id": "alert_quarantine_high_volume",
+                "severity": "critical",
+                "category": "data_quality",
+                "message": f"High quarantine volume: {len(quarantined_data)} records ({quarantine_pct:.1f}%) quarantined",
+                "affected_fields_count": len(quarantine_analysis.get('issue_types', {})),
+                "recommendation": "Review data source quality. High quarantine rate indicates systemic data quality issues."
+            })
+        elif len(quarantined_data) > len(original_df) * 0.1:
+            alerts.append({
+                "alert_id": "alert_quarantine_medium_volume",
+                "severity": "high",
+                "category": "data_quality",
+                "message": f"Moderate quarantine volume: {len(quarantined_data)} records ({quarantine_pct:.1f}%) quarantined",
+                "affected_fields_count": len(quarantine_analysis.get('issue_types', {})),
+                "recommendation": "Investigate quarantine patterns to identify root causes."
+            })
+        
+        # Severity breakdown alert
+        critical_issues = severity_breakdown.get('critical', 0)
+        if critical_issues > 0:
+            alerts.append({
+                "alert_id": "alert_quarantine_critical_issues",
+                "severity": "critical",
+                "category": "data_integrity",
+                "message": f"{critical_issues} critical data integrity issues detected",
+                "affected_fields_count": critical_issues,
+                "recommendation": "Address critical issues immediately. These indicate severe data quality problems."
+            })
+        
+        # Data integrity alert
+        if quality_score['metrics']['data_integrity_rate'] < 80:
+            alerts.append({
+                "alert_id": "alert_quarantine_integrity",
+                "severity": "high",
+                "category": "data_integrity",
+                "message": f"Data integrity rate: {quality_score['metrics']['data_integrity_rate']:.1f}% (below 80% threshold)",
+                "affected_fields_count": len(quarantined_data),
+                "recommendation": "Improve data validation at source to reduce quarantine requirements."
+            })
+        
+        # Quality score alert
+        if quality_score["overall_score"] < good_threshold:
+            alerts.append({
+                "alert_id": "alert_quarantine_quality",
+                "severity": "medium",
+                "category": "quality_score",
+                "message": f"Quarantine quality score: {quality_score['overall_score']:.1f}/100 ({quality_status})",
+                "affected_fields_count": len(quarantined_data),
+                "recommendation": "Review quarantine strategy and thresholds for optimization."
+            })
+        
+        # ==================== GENERATE ISSUES ====================
+        issues = []
+        
+        # Convert quarantine issues to standardized format
+        for q_issue in quarantine_analysis.get('quarantine_issues', [])[:100]:
+            issues.append({
+                "issue_id": f"issue_quarantine_{q_issue.get('row_index', 0)}_{q_issue.get('issue_type', 'unknown')}",
+                "agent_id": "quarantine-agent",
+                "field_name": q_issue.get('column', 'N/A'),
+                "issue_type": q_issue.get('issue_type', 'quarantine_issue'),
+                "severity": q_issue.get('severity', 'medium'),
+                "message": q_issue.get('description', 'Data quarantine issue detected')
+            })
+        
+        # ==================== GENERATE RECOMMENDATIONS ====================
+        agent_recommendations = []
+        
+        # Recommendation 1: Address critical issues
+        if critical_issues > 0:
+            agent_recommendations.append({
+                "recommendation_id": "rec_quarantine_critical",
+                "agent_id": "quarantine-agent",
+                "field_name": "multiple",
+                "priority": "critical",
+                "recommendation": f"Immediately review and fix {critical_issues} critical data integrity issues in quarantined records",
+                "timeline": "immediate"
+            })
+        
+        # Recommendation 2: Investigate data source
+        if len(quarantined_data) > len(original_df) * 0.2:
+            agent_recommendations.append({
+                "recommendation_id": "rec_quarantine_source",
+                "agent_id": "quarantine-agent",
+                "field_name": "all",
+                "priority": "high",
+                "recommendation": f"Investigate data source quality - {quarantine_pct:.1f}% quarantine rate is excessive",
+                "timeline": "1 week"
+            })
+        
+        # Recommendation 3: Top issue types
+        top_issue_types = sorted(issue_types.items(), key=lambda x: x[1], reverse=True)[:3]
+        for idx, (issue_type, count) in enumerate(top_issue_types):
+            agent_recommendations.append({
+                "recommendation_id": f"rec_quarantine_issue_{idx}",
+                "agent_id": "quarantine-agent",
+                "field_name": "various",
+                "priority": "high" if count > len(original_df) * 0.1 else "medium",
+                "recommendation": f"Address {issue_type} issues ({count} occurrences) with targeted validation rules",
+                "timeline": "1-2 weeks"
+            })
+        
+        # Recommendation 4: Schema validation
+        if 'schema_mismatch' in issue_types:
+            agent_recommendations.append({
+                "recommendation_id": "rec_quarantine_schema",
+                "agent_id": "quarantine-agent",
+                "field_name": "schema",
+                "priority": "high",
+                "recommendation": "Implement schema validation at data ingestion to prevent schema mismatches",
+                "timeline": "2 weeks"
+            })
+        
+        # Recommendation 5: Review quarantined data
+        if len(quarantined_data) > 0:
+            agent_recommendations.append({
+                "recommendation_id": "rec_quarantine_review",
+                "agent_id": "quarantine-agent",
+                "field_name": "all",
+                "priority": "medium",
+                "recommendation": f"Manually review quarantined data file to identify patterns and recovery opportunities",
+                "timeline": "2 weeks"
+            })
+        
+        # Recommendation 6: Update detection rules
+        agent_recommendations.append({
+            "recommendation_id": "rec_quarantine_rules",
+            "agent_id": "quarantine-agent",
+            "field_name": "configuration",
+            "priority": "medium",
+            "recommendation": "Fine-tune quarantine detection rules based on observed patterns to reduce false positives",
+            "timeline": "3 weeks"
+        })
+        
+        # Recommendation 7: Monitor trends
+        agent_recommendations.append({
+            "recommendation_id": "rec_quarantine_monitoring",
+            "agent_id": "quarantine-agent",
+            "field_name": "all",
+            "priority": "low",
+            "recommendation": "Establish quarantine rate monitoring and alerting to detect data quality degradation early",
+            "timeline": "3 weeks"
+        })
 
         return {
             "status": "success",
@@ -176,6 +361,9 @@ def execute_quarantine_agent(
                 "quarantine_issues_found": len(quarantine_analysis.get("quarantine_issues", []))
             },
             "data": quarantine_data,
+            "alerts": alerts,
+            "issues": issues,
+            "recommendations": agent_recommendations,
             "cleaned_file": {
                 "filename": f"cleaned_{filename}",
                 "content": cleaned_file_base64,

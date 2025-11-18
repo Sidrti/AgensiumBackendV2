@@ -163,6 +163,173 @@ def execute_field_standardization(
             "summary": f"Field standardization completed. Quality: {quality_status}. Processed {len(columns_to_process)} columns across {len(original_df)} rows.",
             "row_level_issues": standardization_issues[:100]  # Limit to first 100
         }
+        
+        # ==================== GENERATE EXECUTIVE SUMMARY ====================
+        values_changed = standardization_analysis["improvements"].get("total_values_standardized", 0)
+        variations_reduced = standardization_analysis["improvements"].get("total_variations_reduced", 0)
+        executive_summary = [{
+            "summary_id": "exec_field_standardization",
+            "title": "Field Standardization Status",
+            "value": f"{standardization_score['overall_score']:.1f}",
+            "status": "excellent" if quality_status == "excellent" else "good" if quality_status == "good" else "needs_improvement",
+            "description": f"Quality: {quality_status}, Values Changed: {values_changed}, {len(columns_to_process)} columns standardized, {variations_reduced} variations reduced, {standardization_score['metrics']['improvement_percentage']:.1f}% improvement"
+        }]
+        
+        # ==================== GENERATE AI ANALYSIS TEXT ====================
+        ai_analysis_parts = []
+        ai_analysis_parts.append(f"FIELD STANDARDIZATION ANALYSIS:")
+        ai_analysis_parts.append(f"- Standardization Score: {standardization_score['overall_score']:.1f}/100 (Consistency: {standardization_score['metrics']['consistency_score']:.1f}, Coverage: {standardization_score['metrics']['coverage_score']:.1f}, Effectiveness: {standardization_score['metrics']['effectiveness_score']:.1f})")
+        ai_analysis_parts.append(f"- Standardization Applied: {values_changed} values standardized, {variations_reduced} variations reduced, {standardization_score['metrics']['improvement_percentage']:.1f}% improvement")
+        
+        ai_analysis_parts.append(f"- Columns Processed: {len(columns_to_process)} columns standardized ({', '.join(list(columns_to_process)[:5])}{'...' if len(columns_to_process) > 5 else ''})")
+        ai_analysis_parts.append(f"- Data Quality: {standardization_score['metrics']['data_quality_percentage']:.1f}% data quality after standardization")
+        
+        col_improvements = standardization_analysis["improvements"].get("column_improvements", {})
+        if len(col_improvements) > 0:
+            avg_improvement = sum([v.get('improvement_percentage', 0) for v in col_improvements.values()]) / len(col_improvements)
+            ai_analysis_parts.append(f"- Average Improvement: {avg_improvement:.1f}% per column")
+        
+        if len(standardization_analysis.get('recommendations', [])) > 0:
+            ai_analysis_parts.append(f"- Top Recommendation: {standardization_analysis['recommendations'][0].get('recommendation', 'Review standardization strategy')}")
+        
+        ai_analysis_text = "\n".join(ai_analysis_parts)
+        
+        # Add to standardization_data
+        standardization_data["executive_summary"] = executive_summary
+        standardization_data["ai_analysis_text"] = ai_analysis_text
+        
+        # ==================== GENERATE ALERTS ====================
+        alerts = []
+        
+        # High variation alert
+        total_variations = pre_analysis.get('total_variations', 0)
+        if total_variations > len(columns_to_process) * 10:
+            alerts.append({
+                "alert_id": "alert_standardization_high_variations",
+                "severity": "high",
+                "category": "field_consistency",
+                "message": f"High field variation: {total_variations} variations detected across {len(columns_to_process)} columns",
+                "affected_fields_count": len(columns_to_process),
+                "recommendation": "Implement standardization rules and data entry validation to reduce field variations."
+            })
+        
+        # Columns needing standardization
+        cols_needing_std = pre_analysis.get('columns_needing_standardization', 0)
+        if cols_needing_std > len(columns_to_process) * 0.5:
+            alerts.append({
+                "alert_id": "alert_standardization_column_quality",
+                "severity": "high",
+                "category": "column_quality",
+                "message": f"{cols_needing_std} columns ({(cols_needing_std/len(columns_to_process)*100):.1f}%) need standardization",
+                "affected_fields_count": cols_needing_std,
+                "recommendation": "Apply comprehensive standardization strategies including case normalization and whitespace handling."
+            })
+        
+        # Low improvement alert
+        improvement_pct = standardization_score['metrics'].get('improvement_percentage', 0)
+        if improvement_pct < 10 and total_variations > 0:
+            alerts.append({
+                "alert_id": "alert_standardization_low_improvement",
+                "severity": "medium",
+                "category": "effectiveness",
+                "message": f"Low improvement: Only {improvement_pct:.1f}% variation reduction achieved",
+                "affected_fields_count": len(columns_to_process),
+                "recommendation": "Review standardization strategies. Consider synonym mapping and unit alignment."
+            })
+        
+        # Quality score alert
+        if standardization_score["overall_score"] < good_threshold:
+            alerts.append({
+                "alert_id": "alert_standardization_quality",
+                "severity": "medium",
+                "category": "quality_score",
+                "message": f"Standardization quality score: {standardization_score['overall_score']:.1f}/100 ({quality_status})",
+                "affected_fields_count": len(columns_to_process),
+                "recommendation": "Optimize standardization rules and apply advanced normalization techniques."
+            })
+        
+        # ==================== GENERATE ISSUES ====================
+        issues = []
+        
+        # Convert standardization issues to standardized format
+        for std_issue in standardization_issues[:100]:
+            issues.append({
+                "issue_id": f"issue_standardization_{std_issue.get('row_index', 0)}_{std_issue.get('column', 'unknown')}",
+                "agent_id": "field-standardization",
+                "field_name": std_issue.get('column', 'N/A'),
+                "issue_type": std_issue.get('issue_type', 'field_standardized'),
+                "severity": std_issue.get('severity', 'info'),
+                "message": f"Standardized: '{std_issue.get('original_value', '')}' → '{std_issue.get('standardized_value', '')}'"
+            })
+        
+        # ==================== GENERATE RECOMMENDATIONS ====================
+        agent_recommendations = []
+        
+        # Recommendation 1: Apply synonym mapping for high-variation columns
+        high_var_cols = [col for col, data in pre_analysis.get('column_analysis', {}).items() 
+                        if data.get('variation_score', 0) > 50]
+        if high_var_cols:
+            agent_recommendations.append({
+                "recommendation_id": "rec_standardization_synonyms",
+                "agent_id": "field-standardization",
+                "field_name": ", ".join(high_var_cols[:3]),
+                "priority": "high",
+                "recommendation": f"Apply synonym mapping to {len(high_var_cols)} high-variation column(s) to improve consistency",
+                "timeline": "1 week"
+            })
+        
+        # Recommendation 2: Column-specific strategies
+        for rec in standardization_analysis.get('recommendations', [])[:3]:
+            agent_recommendations.append({
+                "recommendation_id": f"rec_standardization_{rec.get('column', 'unknown')}",
+                "agent_id": "field-standardization",
+                "field_name": rec.get('column', 'N/A'),
+                "priority": rec.get('priority', 'medium'),
+                "recommendation": f"{rec.get('action', 'Review')}: {rec.get('reason', 'Improve standardization')}",
+                "timeline": "1 week" if rec.get('priority') == 'high' else "2 weeks"
+            })
+        
+        # Recommendation 3: Case strategy optimization
+        if case_strategy == 'none' and cols_needing_std > 0:
+            agent_recommendations.append({
+                "recommendation_id": "rec_standardization_case",
+                "agent_id": "field-standardization",
+                "field_name": "all",
+                "priority": "medium",
+                "recommendation": "Enable case normalization (lowercase/uppercase/titlecase) to reduce case variations",
+                "timeline": "2 weeks"
+            })
+        
+        # Recommendation 4: Whitespace handling
+        if not trim_whitespace or not normalize_internal_spacing:
+            agent_recommendations.append({
+                "recommendation_id": "rec_standardization_whitespace",
+                "agent_id": "field-standardization",
+                "field_name": "all",
+                "priority": "medium",
+                "recommendation": "Enable whitespace trimming and internal spacing normalization for better consistency",
+                "timeline": "2 weeks"
+            })
+        
+        # Recommendation 5: Data entry validation
+        agent_recommendations.append({
+            "recommendation_id": "rec_standardization_validation",
+            "agent_id": "field-standardization",
+            "field_name": "all",
+            "priority": "medium",
+            "recommendation": "Implement data entry validation rules to enforce standardization at source",
+            "timeline": "2-3 weeks"
+        })
+        
+        # Recommendation 6: Continuous monitoring
+        agent_recommendations.append({
+            "recommendation_id": "rec_standardization_monitoring",
+            "agent_id": "field-standardization",
+            "field_name": "all",
+            "priority": "low",
+            "recommendation": "Establish field variation monitoring to detect standardization drift over time",
+            "timeline": "3 weeks"
+        })
 
         # Generate cleaned file (CSV format)
         cleaned_file_bytes = _generate_cleaned_file(df_standardized, filename)
@@ -181,6 +348,9 @@ def execute_field_standardization(
                 "total_issues": len(standardization_issues)
             },
             "data": standardization_data,
+            "alerts": alerts,
+            "issues": issues,
+            "recommendations": agent_recommendations,
             "cleaned_file": {
                 "filename": f"cleaned_{filename}",
                 "content": cleaned_file_base64,

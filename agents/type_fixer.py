@@ -119,6 +119,163 @@ def execute_type_fixer(
             "summary": f"Type fixing completed. Quality: {quality_status}. Processed {len(original_df)} rows, fixed {len(fix_log)} type issues.",
             "row_level_issues": type_issues[:100]  # Limit to first 100
         }
+        
+        # ==================== GENERATE EXECUTIVE SUMMARY ====================
+        executive_summary = [{
+            "summary_id": "exec_type_fixing",
+            "title": "Type Fixing Status",
+            "value": f"{fixing_score['overall_score']:.1f}",
+            "status": "excellent" if quality_status == "excellent" else "good" if quality_status == "good" else "needs_improvement",
+            "description": f"Quality: {quality_status}, Issues Fixed: {len(fix_log)}, {len(type_analysis['columns_with_issues'])} columns had type issues, {fixing_score['metrics']['fix_success_percentage']:.1f}% success rate"
+        }]
+        
+        # ==================== GENERATE AI ANALYSIS TEXT ====================
+        ai_analysis_parts = []
+        ai_analysis_parts.append(f"TYPE FIXER ANALYSIS:")
+        ai_analysis_parts.append(f"- Fixing Score: {fixing_score['overall_score']:.1f}/100 (Fix Success: {fixing_score['metrics']['fix_success_score']:.1f}, Data Integrity: {fixing_score['metrics']['data_integrity_score']:.1f}, Type Coverage: {fixing_score['metrics']['type_coverage_score']:.1f})")
+        ai_analysis_parts.append(f"- Type Issues Fixed: {len(fix_log)} issues resolved across {len(type_analysis['columns_with_issues'])} columns, {fixing_score['metrics']['fix_success_percentage']:.1f}% success rate")
+        
+        cols_with_issues = type_analysis['columns_with_issues']
+        ai_analysis_parts.append(f"- Columns Fixed: {', '.join(list(cols_with_issues)[:5])}{'...' if len(cols_with_issues) > 5 else ''}")
+        ai_analysis_parts.append(f"- Data Integrity: {fixing_score['metrics']['data_integrity_percentage']:.1f}% data integrity maintained after type conversions")
+        ai_analysis_parts.append(f"- Conversions Applied: {', '.join(set([log.get('target_type', 'unknown') for log in fix_log]))}")
+        
+        if len(type_analysis.get('recommendations', [])) > 0:
+            ai_analysis_parts.append(f"- Top Recommendation: {type_analysis['recommendations'][0].get('recommendation', 'Review type conversion strategy')}")
+        
+        ai_analysis_text = "\n".join(ai_analysis_parts)
+        
+        # Add to type_fixing_data
+        type_fixing_data["executive_summary"] = executive_summary
+        type_fixing_data["ai_analysis_text"] = ai_analysis_text
+        
+        # ==================== GENERATE ALERTS ====================
+        alerts = []
+        
+        # High type mismatch alert
+        if type_analysis['total_issues'] > len(df.columns) * 0.3:
+            alerts.append({
+                "alert_id": "alert_types_high_mismatches",
+                "severity": "critical",
+                "category": "type_integrity",
+                "message": f"High type mismatch rate: {type_analysis['total_issues']} issues across {len(cols_with_issues)} columns ({(type_analysis['total_issues']/len(df.columns)*100):.1f}% of columns)",
+                "affected_fields_count": len(cols_with_issues),
+                "recommendation": "Review data schema and implement strict type validation at data ingestion."
+            })
+        
+        # Failed conversions alert
+        failed_fixes = type_analysis['total_issues'] - len(fix_log)
+        if failed_fixes > 0:
+            alerts.append({
+                "alert_id": "alert_types_conversion_failures",
+                "severity": "high",
+                "category": "type_conversion",
+                "message": f"{failed_fixes} type conversion(s) failed out of {type_analysis['total_issues']} attempted",
+                "affected_fields_count": failed_fixes,
+                "recommendation": "Review failed conversions and implement data cleaning before type conversion."
+            })
+        
+        # Data integrity after conversion
+        if fixing_score['metrics']['data_integrity_percentage'] < 95:
+            alerts.append({
+                "alert_id": "alert_types_data_integrity",
+                "severity": "high",
+                "category": "data_integrity",
+                "message": f"Data integrity: {fixing_score['metrics']['data_integrity_percentage']:.1f}% after type conversions (below 95% threshold)",
+                "affected_fields_count": len(cols_with_issues),
+                "recommendation": "Validate type conversions did not corrupt data values. Review conversion logs for errors."
+            })
+        
+        # Quality score alert
+        if fixing_score["overall_score"] < good_threshold:
+            alerts.append({
+                "alert_id": "alert_types_quality",
+                "severity": "medium",
+                "category": "quality_score",
+                "message": f"Type fixing quality score: {fixing_score['overall_score']:.1f}/100 ({quality_status})",
+                "affected_fields_count": len(cols_with_issues),
+                "recommendation": "Optimize type conversion strategies and handle edge cases."
+            })
+        
+        # ==================== GENERATE ISSUES ====================
+        issues = []
+        
+        # Convert type issues to standardized format
+        for type_issue in type_issues[:100]:
+            issues.append({
+                "issue_id": f"issue_types_{type_issue.get('column', 'unknown')}_type_mismatch",
+                "agent_id": "type-fixer",
+                "field_name": type_issue.get('column', 'N/A'),
+                "issue_type": type_issue.get('issue_type', 'type_mismatch'),
+                "severity": type_issue.get('severity', 'warning'),
+                "message": type_issue.get('description', 'Type mismatch detected')
+            })
+        
+        # ==================== GENERATE RECOMMENDATIONS ====================
+        agent_recommendations = []
+        
+        # Recommendation 1: Schema validation
+        if type_analysis['total_issues'] > 0:
+            agent_recommendations.append({
+                "recommendation_id": "rec_types_schema_validation",
+                "agent_id": "type-fixer",
+                "field_name": "all",
+                "priority": "critical" if type_analysis['total_issues'] > len(df.columns) * 0.5 else "high",
+                "recommendation": f"Implement schema validation at data ingestion to prevent {type_analysis['total_issues']} type mismatches",
+                "timeline": "immediate" if type_analysis['total_issues'] > len(df.columns) * 0.5 else "1 week"
+            })
+        
+        # Recommendation 2: Column-specific fixes
+        for rec in type_analysis.get('recommendations', [])[:3]:
+            agent_recommendations.append({
+                "recommendation_id": f"rec_types_{rec.get('column', 'unknown')}",
+                "agent_id": "type-fixer",
+                "field_name": rec.get('column', 'N/A'),
+                "priority": rec.get('priority', 'medium'),
+                "recommendation": f"{rec.get('action', 'Review')}: {rec.get('reason', 'Fix type mismatch')}",
+                "timeline": "1 week" if rec.get('priority') == 'high' else "2 weeks"
+            })
+        
+        # Recommendation 3: Handle failed conversions
+        if failed_fixes > 0:
+            agent_recommendations.append({
+                "recommendation_id": "rec_types_failed_conversions",
+                "agent_id": "type-fixer",
+                "field_name": "multiple",
+                "priority": "high",
+                "recommendation": f"Review and fix {failed_fixes} failed type conversions with pre-cleaning or custom conversion logic",
+                "timeline": "1-2 weeks"
+            })
+        
+        # Recommendation 4: Auto-conversion settings
+        agent_recommendations.append({
+            "recommendation_id": "rec_types_auto_conversion",
+            "agent_id": "type-fixer",
+            "field_name": "configuration",
+            "priority": "medium",
+            "recommendation": "Enable auto-conversion for numeric and datetime types to streamline type fixing process",
+            "timeline": "2 weeks"
+        })
+        
+        # Recommendation 5: Data validation
+        agent_recommendations.append({
+            "recommendation_id": "rec_types_validation",
+            "agent_id": "type-fixer",
+            "field_name": "all",
+            "priority": "medium",
+            "recommendation": "Add data validation rules to ensure converted values maintain semantic meaning",
+            "timeline": "2 weeks"
+        })
+        
+        # Recommendation 6: Type documentation
+        agent_recommendations.append({
+            "recommendation_id": "rec_types_documentation",
+            "agent_id": "type-fixer",
+            "field_name": "all",
+            "priority": "low",
+            "recommendation": "Document expected data types for each column to prevent future type mismatches",
+            "timeline": "3 weeks"
+        })
 
         # Generate cleaned file (CSV format)
         cleaned_file_bytes = _generate_cleaned_file(df_fixed, filename)
@@ -137,6 +294,9 @@ def execute_type_fixer(
                 "total_issues": len(type_issues)
             },
             "data": type_fixing_data,
+            "alerts": alerts,
+            "issues": issues,
+            "recommendations": agent_recommendations,
             "cleaned_file": {
                 "filename": f"cleaned_{filename}",
                 "content": cleaned_file_base64,
