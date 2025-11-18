@@ -13,6 +13,7 @@
       "outlier-remover",
       "type-fixer",
       "duplicate-resolver",
+      "field-standardization",
       "governance-checker",
       "test-coverage-agent"
     ],
@@ -594,6 +595,136 @@
           "resolution_log": "array",
           "summary": "string",
           "row_level_issues": "array"
+        }
+      }
+    },
+    "field-standardization": {
+      "id": "field-standardization",
+      "name": "Field Standardization",
+      "description": "Standardizes field values across datasets with comprehensive normalization strategies. Handles case normalization, whitespace trimming, synonym replacement, and unit alignment to ensure data consistency and uniformity.",
+      "icon": "✨",
+      "category": "Data Cleaning",
+      "accuracy": "98%",
+      "features": [
+        "Case Normalization (lowercase, uppercase, titlecase)",
+        "Whitespace Trimming & Internal Spacing Normalization",
+        "Synonym Replacement",
+        "Unit Alignment & Conversion",
+        "Column-Specific Standardization"
+      ],
+      "input": { "type": "CSV, JSON, XLSX" },
+      "version": "1.0.0",
+      "required_files": ["primary"],
+      "parameters": {
+        "case_strategy": {
+          "type": "string",
+          "description": "Case normalization strategy to apply",
+          "default": "lowercase",
+          "allowed": ["lowercase", "uppercase", "titlecase", "none"]
+        },
+        "trim_whitespace": {
+          "type": "boolean",
+          "description": "Remove leading and trailing whitespace",
+          "default": true
+        },
+        "normalize_internal_spacing": {
+          "type": "boolean",
+          "description": "Normalize internal spacing (collapse multiple spaces to single space)",
+          "default": true
+        },
+        "apply_synonyms": {
+          "type": "boolean",
+          "description": "Apply synonym replacement mappings",
+          "default": true
+        },
+        "synonym_mappings": {
+          "type": "object",
+          "description": "Column-specific synonym mappings (column -> {synonym -> standard_value}). Example: {'address': {'St.': 'Street', 'Ave.': 'Avenue', 'Rd.': 'Road'}}",
+          "default": {}
+        },
+        "unit_standardization": {
+          "type": "boolean",
+          "description": "Apply unit conversion and standardization",
+          "default": false
+        },
+        "unit_mappings": {
+          "type": "object",
+          "description": "Column-specific unit conversion mappings (column -> {unit_pattern -> {factor: number, target_unit: string}}). Example: {'height': {'ft': {'factor': 12, 'target_unit': 'inches'}}}",
+          "default": {}
+        },
+        "target_columns": {
+          "type": "array",
+          "description": "Specific columns to standardize (all columns if empty)",
+          "default": [],
+          "items": "string"
+        },
+        "preserve_columns": {
+          "type": "array",
+          "description": "Columns to exclude from standardization",
+          "default": [],
+          "items": "string"
+        },
+        "standardization_effectiveness_weight": {
+          "type": "float",
+          "description": "Weight for standardization effectiveness in scoring",
+          "default": 0.5,
+          "min": 0,
+          "max": 1
+        },
+        "data_retention_weight": {
+          "type": "float",
+          "description": "Weight for data retention in scoring",
+          "default": 0.3,
+          "min": 0,
+          "max": 1
+        },
+        "column_retention_weight": {
+          "type": "float",
+          "description": "Weight for column retention in scoring",
+          "default": 0.2,
+          "min": 0,
+          "max": 1
+        },
+        "excellent_threshold": {
+          "type": "integer",
+          "description": "Score threshold for excellent quality",
+          "default": 90,
+          "min": 0,
+          "max": 100
+        },
+        "good_threshold": {
+          "type": "integer",
+          "description": "Score threshold for good quality",
+          "default": 75,
+          "min": 0,
+          "max": 100
+        }
+      },
+      "output_structure": {
+        "agent_id": "string",
+        "agent_name": "string",
+        "status": "string",
+        "execution_time_ms": "integer",
+        "summary_metrics": {
+          "total_rows_processed": "integer",
+          "columns_standardized": "integer",
+          "values_changed": "integer",
+          "variations_reduced": "integer",
+          "total_issues": "integer"
+        },
+        "data": {
+          "standardization_score": "object",
+          "quality_status": "string",
+          "standardization_analysis": "object",
+          "standardization_log": "array",
+          "summary": "string",
+          "row_level_issues": "array"
+        },
+        "cleaned_file": {
+          "filename": "string",
+          "content": "string (base64)",
+          "size_bytes": "integer",
+          "format": "string"
         }
       }
     },

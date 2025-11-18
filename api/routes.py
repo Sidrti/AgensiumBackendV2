@@ -534,6 +534,23 @@ def execute_agent_flexible(
             parameters
         )
     
+    elif agent_id == "field-standardization":
+        if "primary" not in files_map:
+            return {
+                "status": "error",
+                "error": "Field standardization requires 'primary' file",
+                "execution_time_ms": 0
+            }
+        
+        primary_bytes, primary_filename = files_map["primary"]
+        
+        from agents import field_standardization
+        return field_standardization.execute_field_standardization(
+            primary_bytes,
+            primary_filename,
+            parameters
+        )
+    
     else:
         return {
             "status": "error",
