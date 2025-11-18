@@ -600,6 +600,90 @@ def transform_clean_my_data_response(
     
     # ==================== GENERATE EXECUTIVE SUMMARY ====================
     
+    # Count active agents (agents with successful execution)
+    active_agents = sum(1 for agent_output in agent_results.values() if agent_output.get("status") == "success")
+    total_possible_agents = len(agent_results)
+    
+    # Extract total records and fields from various agent outputs
+    total_records = 0
+    total_fields = 0
+    
+    # Try to get from cleanse-writeback first (final counts)
+    if cleanse_writeback_output.get("status") == "success":
+        writeback_analysis = cleanse_writeback_output.get("data", {}).get("writeback_analysis", {})
+        total_records = writeback_analysis.get("final_row_count", 0)
+        total_fields = writeback_analysis.get("final_column_count", 0)
+    # Fallback to null-handler or other agents
+    elif null_handler_output.get("status") == "success":
+        summary_metrics = null_handler_output.get("summary_metrics", {})
+        total_records = summary_metrics.get("total_rows", 0)
+        total_fields = summary_metrics.get("total_columns", 0)
+    elif outlier_output.get("status") == "success":
+        summary_metrics = outlier_output.get("summary_metrics", {})
+        total_records = summary_metrics.get("total_rows", 0)
+        total_fields = summary_metrics.get("total_columns", 0)
+    elif quarantine_output.get("status") == "success":
+        summary_metrics = quarantine_output.get("summary_metrics", {})
+        total_records = summary_metrics.get("total_records", 0)
+        total_fields = summary_metrics.get("total_fields", 0)
+    
+    # ==================== ALWAYS PRESENT EXECUTIVE SUMMARY ====================
+    
+    # 1. Dataset Overview
+    executive_summary.append({
+        "summary_id": "exec_dataset_overview",
+        "title": "Dataset Overview",
+        "value": f"{total_records:,}",
+        "status": "info",
+        "description": f"Total Records: {total_records:,} | Total Fields: {total_fields}"
+    })
+    
+    # 2. Agents Executed
+    executive_summary.append({
+        "summary_id": "exec_agents_used",
+        "title": "Agents Executed",
+        "value": f"{active_agents}/{total_possible_agents}",
+        "status": "success" if active_agents > 0 else "warning",
+        "description": f"{active_agents} of {total_possible_agents} agents executed successfully"
+    })
+    
+    # 3. Execution Time
+    execution_time_seconds = execution_time_ms / 1000
+    executive_summary.append({
+        "summary_id": "exec_execution_time",
+        "title": "Total Execution Time",
+        "value": f"{execution_time_seconds:.2f}s",
+        "status": "excellent" if execution_time_seconds < 30 else "good" if execution_time_seconds < 60 else "fair",
+        "description": f"Analysis completed in {execution_time_seconds:.2f} seconds"
+    })
+    
+    # 4. Total Alerts
+    executive_summary.append({
+        "summary_id": "exec_total_alerts",
+        "title": "Total Alerts",
+        "value": f"{len(all_alerts)}",
+        "status": "success" if len(all_alerts) == 0 else "warning" if len(all_alerts) < 5 else "critical",
+        "description": f"{len(all_alerts)} alert(s) requiring attention"
+    })
+    
+    # 5. Total Issues
+    executive_summary.append({
+        "summary_id": "exec_total_issues",
+        "title": "Total Issues",
+        "value": f"{len(all_issues)}",
+        "status": "success" if len(all_issues) == 0 else "warning" if len(all_issues) < 10 else "critical",
+        "description": f"{len(all_issues)} issue(s) detected across all fields"
+    })
+    
+    # 6. Total Recommendations
+    executive_summary.append({
+        "summary_id": "exec_total_recommendations",
+        "title": "Total Recommendations",
+        "value": f"{len(all_recommendations)}",
+        "status": "info",
+        "description": f"{len(all_recommendations)} actionable recommendation(s) generated"
+    })
+    
     # Overall cleaning quality summary
     overall_quality = 0
     quality_count = 0
