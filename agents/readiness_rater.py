@@ -239,6 +239,201 @@ def rate_readiness(
             }
         ]
         
+        # ==================== GENERATE ALERTS ====================
+        alerts = []
+        
+        if status != "ready":
+            issues_count = len(deductions)
+            
+            alerts.append({
+                "alert_id": "alert_readiness_001",
+                "severity": "critical" if status == "not_ready" else "high",
+                "category": "data_readiness",
+                "message": f"Data readiness: {readiness_score:.1f}/100 ({status.upper().replace('_', ' ')})",
+                "affected_fields_count": issues_count,
+                "recommendation": f"Fix {issues_count} issue(s) before production use."
+            })
+        
+        # Component-specific alerts
+        for component in component_scores:
+            comp_name = component["component"]
+            comp_score = component["score"]
+            comp_status = component["status"]
+            
+            if comp_status in ["poor", "fair"]:
+                alerts.append({
+                    "alert_id": f"alert_readiness_{comp_name}",
+                    "severity": "high" if comp_status == "poor" else "medium",
+                    "category": f"readiness_{comp_name}",
+                    "message": f"{comp_name.title()} score is {comp_status.upper()} ({comp_score:.1f}/100)",
+                    "affected_fields_count": 0,
+                    "recommendation": f"Improve {comp_name} to meet readiness standards"
+                })
+        
+        # Duplicate rows alert
+        if duplicate_count > 0:
+            alerts.append({
+                "alert_id": "alert_readiness_duplicates",
+                "severity": "high" if duplicate_pct > 10 else "medium",
+                "category": "data_quality_duplicates",
+                "message": f"{duplicate_count} duplicate rows detected ({duplicate_pct:.1f}%)",
+                "affected_fields_count": 0,
+                "recommendation": f"Remove or consolidate {duplicate_count} duplicate rows before analysis"
+            })
+        
+        # ==================== GENERATE ISSUES ====================
+        issues = []
+        
+        # Add deductions as issues
+        for deduction in deductions:
+            for field in deduction.get("fields_affected", []):
+                issue_id = f"issue_readiness_{field}_{deduction.get('deduction_reason')}"
+                
+                issues.append({
+                    "issue_id": issue_id,
+                    "agent_id": "readiness-rater",
+                    "field_name": field,
+                    "issue_type": deduction.get("deduction_reason"),
+                    "severity": deduction.get("severity", "medium"),
+                    "message": deduction.get("remediation", deduction.get("deduction_reason").replace("_", " ").title())
+                })
+        
+        # Add general deduction issues (not field-specific)
+        for deduction in deductions:
+            if not deduction.get("fields_affected"):
+                issue_id = f"issue_readiness_general_{deduction.get('deduction_reason')}"
+                
+                issues.append({
+                    "issue_id": issue_id,
+                    "agent_id": "readiness-rater",
+                    "field_name": "N/A",
+                    "issue_type": deduction.get("deduction_reason"),
+                    "severity": deduction.get("severity", "medium"),
+                    "message": deduction.get("remediation", deduction.get("deduction_reason").replace("_", " ").title())
+                })
+        
+        # ==================== GENERATE RECOMMENDATIONS ====================
+        recommendations = []
+        
+        # Readiness recommendations based on status
+        if status != "ready":
+            # Top deductions
+            sorted_deductions = sorted(deductions, key=lambda x: x.get("deduction_amount", 0), reverse=True)[:3]
+            
+            for deduction in sorted_deductions:
+                rec_id = f"rec_readiness_{deduction.get('deduction_reason')}"
+                fields_affected = deduction.get("fields_affected", [])
+                field_names = ", ".join(fields_affected[:3]) if fields_affected else "N/A"
+                
+                recommendations.append({
+                    "recommendation_id": rec_id,
+                    "agent_id": "readiness-rater",
+                    "field_name": field_names,
+                    "priority": "high" if deduction.get("severity") == "critical" or deduction.get("severity") == "high" else "medium",
+                    "recommendation": deduction.get("remediation", f"Fix readiness issue: {deduction.get('deduction_reason', '').replace('_', ' ').title()}"),
+                    "timeline": "1-2 weeks" if deduction.get("severity") in ["high", "critical"] else "2-3 weeks"
+                })
+        
+        # Overall readiness recommendation
+        if status == "not_ready":
+            recommendations.append({
+                "recommendation_id": "rec_readiness_overall",
+                "agent_id": "readiness-rater",
+                "field_name": "entire dataset",
+                "priority": "critical",
+                "recommendation": f"Dataset is not production-ready (score: {readiness_score:.1f}/100). Use 'Clean My Data' tool to improve quality before analysis",
+                "timeline": "2-4 weeks"
+            })
+        elif status == "needs_review":
+            recommendations.append({
+                "recommendation_id": "rec_readiness_review",
+                "agent_id": "readiness-rater",
+                "field_name": "entire dataset",
+                "priority": "high",
+                "recommendation": f"Dataset needs review (score: {readiness_score:.1f}/100). Address identified issues before production deployment",
+                "timeline": "1-2 weeks"
+            })
+        
+        # Component-specific recommendations
+        for component in component_scores:
+            comp_name = component["component"]
+            comp_score = component["score"]
+            comp_status = component["status"]
+            
+            if comp_status in ["poor", "fair"]:
+                if comp_name == "completeness":
+                    recommendations.append({
+                        "recommendation_id": "rec_completeness_improvement",
+                        "agent_id": "readiness-rater",
+                        "field_name": f"{len([f for f in df.columns if (df[f].isna().sum() / len(df) * 100) > 10])} fields",
+                        "priority": "high" if comp_status == "poor" else "medium",
+                        "recommendation": f"Improve completeness score ({comp_score:.1f}/100): implement validation rules, impute missing values, or remove incomplete records",
+                        "timeline": "1-2 weeks"
+                    })
+                elif comp_name == "consistency":
+                    recommendations.append({
+                        "recommendation_id": "rec_consistency_improvement",
+                        "agent_id": "readiness-rater",
+                        "field_name": "data types",
+                        "priority": "medium",
+                        "recommendation": f"Improve consistency score ({comp_score:.1f}/100): standardize data types and formats across fields",
+                        "timeline": "1 week"
+                    })
+                elif comp_name == "schema_health":
+                    recommendations.append({
+                        "recommendation_id": "rec_schema_improvement",
+                        "agent_id": "readiness-rater",
+                        "field_name": f"{unnamed_columns + null_columns} fields",
+                        "priority": "high" if comp_status == "poor" else "medium",
+                        "recommendation": f"Improve schema health ({comp_score:.1f}/100): rename unnamed columns, remove null-only columns, fix data type inconsistencies",
+                        "timeline": "1 week"
+                    })
+        
+        # Duplicate handling recommendation
+        if duplicate_count > 0:
+            recommendations.append({
+                "recommendation_id": "rec_duplicates",
+                "agent_id": "readiness-rater",
+                "field_name": "N/A",
+                "priority": "high" if duplicate_pct > 10 else "medium",
+                "recommendation": f"Remove or consolidate {duplicate_count} duplicate rows ({duplicate_pct:.1f}%) to improve data quality",
+                "timeline": "1 week"
+            })
+        
+        # ==================== GENERATE EXECUTIVE SUMMARY ====================
+        executive_summary = []
+        
+        # Data Readiness Status
+        executive_summary.append({
+            "summary_id": "exec_readiness",
+            "title": "Data Readiness Status",
+            "value": str(round(readiness_score, 1)),
+            "status": "ready" if status == "ready" else "needs_review" if status == "needs_review" else "not_ready",
+            "description": f"{readiness_score:.1f}/100 - {'Production ready' if status == 'ready' else 'Needs improvement'}"
+        })
+        
+        # ==================== GENERATE AI ANALYSIS TEXT ====================
+        ai_analysis_text_parts = []
+        ai_analysis_text_parts.append(f"DATA READINESS: {status.upper().replace('_', ' ')} ({readiness_score:.1f}/100)")
+        ai_analysis_text_parts.append(f"- Completeness: {completeness_score:.1f}/100")
+        ai_analysis_text_parts.append(f"- Consistency: {consistency_score:.1f}/100")
+        ai_analysis_text_parts.append(f"- Schema Health: {schema_health:.1f}/100")
+        
+        if len(deductions) > 0:
+            ai_analysis_text_parts.append(f"- {len(deductions)} issue(s) affecting readiness")
+            
+            # Top deductions
+            top_deductions = sorted(deductions, key=lambda x: x.get("deduction_amount", 0), reverse=True)[:3]
+            for deduction in top_deductions:
+                ai_analysis_text_parts.append(f"  • {deduction.get('deduction_reason', '').replace('_', ' ').title()}: -{deduction.get('deduction_amount', 0):.1f} points")
+        
+        if status == "ready":
+            ai_analysis_text_parts.append("- Dataset is production-ready for analysis")
+        else:
+            ai_analysis_text_parts.append(f"- {status_description}")
+        
+        ai_analysis_text = "\n".join(ai_analysis_text_parts)
+        
         return {
             "status": "success",
             "agent_id": "readiness-rater",
@@ -260,7 +455,12 @@ def rate_readiness(
                 },
                 "component_scores": component_scores,
                 "deductions": deductions
-            }
+            },
+            "alerts": alerts,
+            "issues": issues,
+            "recommendations": recommendations,
+            "executive_summary": executive_summary,
+            "ai_analysis_text": ai_analysis_text
         }
     
     except Exception as e:

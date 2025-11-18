@@ -120,6 +120,167 @@ def execute_null_handler(
             "summary": f"Null handling completed. Quality: {quality_status}. Processed {len(original_df)} rows, handled {null_analysis['total_nulls_detected']} null values.",
             "row_level_issues": null_issues[:100]  # Limit to first 100
         }
+        
+        # ==================== GENERATE EXECUTIVE SUMMARY ====================
+        executive_summary = [{
+            "summary_id": "exec_null_handling",
+            "title": "Null Handling Status",
+            "value": f"{cleaning_score['overall_score']:.1f}",
+            "status": "excellent" if quality_status == "excellent" else "good" if quality_status == "good" else "fair",
+            "description": f"Quality: {quality_status}, Nulls Handled: {null_analysis['total_nulls_detected']}, {len(null_analysis['columns_with_nulls'])} columns affected, {cleaning_score['metrics']['null_reduction_percentage']:.1f}% reduction"
+        }]
+        
+        # ==================== GENERATE AI ANALYSIS TEXT ====================
+        ai_analysis_parts = []
+        ai_analysis_parts.append(f"NULL HANDLER ANALYSIS:")
+        ai_analysis_parts.append(f"- Cleaning Score: {cleaning_score['overall_score']:.1f}/100 (Null Reduction: {cleaning_score['metrics']['null_reduction_score']:.1f}, Data Retention: {cleaning_score['metrics']['data_retention_score']:.1f}, Column Retention: {cleaning_score['metrics']['column_retention_score']:.1f})")
+        ai_analysis_parts.append(f"- Null Reduction: {null_analysis['total_nulls_detected']} nulls handled, {cleaning_score['metrics']['null_reduction_percentage']:.1f}% reduction achieved")
+        
+        cols_with_nulls = null_analysis['columns_with_nulls']
+        ai_analysis_parts.append(f"- Columns Affected: {len(cols_with_nulls)} columns had nulls ({', '.join(list(cols_with_nulls)[:5])}{'...' if len(cols_with_nulls) > 5 else ''})")
+        ai_analysis_parts.append(f"- Data Retention: {cleaning_score['metrics']['row_retention_percentage']:.1f}% rows retained, {cleaning_score['metrics']['column_retention_percentage']:.1f}% columns retained")
+        ai_analysis_parts.append(f"- Imputation Applied: {len(imputation_log)} strategies used across columns")
+        
+        if len(null_analysis.get('recommendations', [])) > 0:
+            ai_analysis_parts.append(f"- Top Recommendation: {null_analysis['recommendations'][0].get('recommendation', 'Review null handling strategy')}")
+        
+        ai_analysis_text = "\n".join(ai_analysis_parts)
+        
+        # Add to null_handling_data
+        null_handling_data["executive_summary"] = executive_summary
+        null_handling_data["ai_analysis_text"] = ai_analysis_text
+        
+        # ==================== GENERATE ALERTS ====================
+        alerts = []
+        
+        # High null volume alert
+        if null_analysis['total_nulls_detected'] > len(original_df) * len(original_df.columns) * 0.3:
+            alerts.append({
+                "alert_id": "alert_nulls_high_volume",
+                "severity": "critical",
+                "category": "missing_data",
+                "message": f"High null volume: {null_analysis['total_nulls_detected']} null values detected ({(null_analysis['total_nulls_detected']/(len(original_df)*len(original_df.columns))*100):.1f}% of dataset)",
+                "affected_fields_count": len(cols_with_nulls),
+                "recommendation": "Review data collection process. High null rate indicates systemic data completeness issues."
+            })
+        
+        # Column-level null alerts
+        high_null_cols = [col for col, data in null_analysis.get('null_summary', {}).items() 
+                         if data.get('null_percentage', 0) > 50]
+        if high_null_cols:
+            alerts.append({
+                "alert_id": "alert_nulls_column_critical",
+                "severity": "high",
+                "category": "column_quality",
+                "message": f"{len(high_null_cols)} column(s) have >50% null values: {', '.join(high_null_cols[:3])}{'...' if len(high_null_cols) > 3 else ''}",
+                "affected_fields_count": len(high_null_cols),
+                "recommendation": "Consider dropping columns with excessive nulls or implementing advanced imputation strategies."
+            })
+        
+        # Data retention alert
+        if cleaning_score['metrics']['row_retention_percentage'] < 90:
+            alerts.append({
+                "alert_id": "alert_nulls_data_loss",
+                "severity": "high",
+                "category": "data_retention",
+                "message": f"Data retention: {cleaning_score['metrics']['row_retention_percentage']:.1f}% rows retained (below 90% threshold)",
+                "affected_fields_count": len(original_df) - len(df_cleaned),
+                "recommendation": "Review null handling strategy to minimize data loss. Consider alternative imputation methods."
+            })
+        
+        # Quality score alert
+        if cleaning_score["overall_score"] < good_threshold:
+            alerts.append({
+                "alert_id": "alert_nulls_quality",
+                "severity": "medium",
+                "category": "quality_score",
+                "message": f"Null handling quality score: {cleaning_score['overall_score']:.1f}/100 ({quality_status})",
+                "affected_fields_count": len(cols_with_nulls),
+                "recommendation": "Optimize null handling strategy and imputation methods for better results."
+            })
+        
+        # ==================== GENERATE ISSUES ====================
+        issues = []
+        
+        # Convert null issues to standardized format
+        for null_issue in null_issues[:100]:
+            issues.append({
+                "issue_id": f"issue_nulls_{null_issue.get('row_index', 0)}_{null_issue.get('column', 'unknown')}",
+                "agent_id": "null-handler",
+                "field_name": null_issue.get('column', 'N/A'),
+                "issue_type": null_issue.get('issue_type', 'null_value'),
+                "severity": null_issue.get('severity', 'warning'),
+                "message": null_issue.get('description', 'Null value detected')
+            })
+        
+        # ==================== GENERATE RECOMMENDATIONS ====================
+        agent_recommendations = []
+        
+        # Recommendation 1: Drop high-null columns
+        if high_null_cols:
+            agent_recommendations.append({
+                "recommendation_id": "rec_nulls_drop_columns",
+                "agent_id": "null-handler",
+                "field_name": ", ".join(high_null_cols[:3]),
+                "priority": "high",
+                "recommendation": f"Consider dropping {len(high_null_cols)} column(s) with >50% null values to improve data quality",
+                "timeline": "1 week"
+            })
+        
+        # Recommendation 2: Advanced imputation for specific columns
+        medium_null_cols = [col for col, data in null_analysis.get('null_summary', {}).items() 
+                           if 20 < data.get('null_percentage', 0) <= 50]
+        if medium_null_cols:
+            agent_recommendations.append({
+                "recommendation_id": "rec_nulls_advanced_imputation",
+                "agent_id": "null-handler",
+                "field_name": ", ".join(medium_null_cols[:3]),
+                "priority": "medium",
+                "recommendation": f"Apply KNN or advanced imputation to {len(medium_null_cols)} column(s) with 20-50% null values",
+                "timeline": "2 weeks"
+            })
+        
+        # Recommendation 3: Imputation strategy review
+        agent_recommendations.append({
+            "recommendation_id": "rec_nulls_strategy_review",
+            "agent_id": "null-handler",
+            "field_name": "all",
+            "priority": "medium",
+            "recommendation": f"Review imputation strategies for {len(imputation_log)} columns to optimize null handling effectiveness",
+            "timeline": "2 weeks"
+        })
+        
+        # Recommendation 4: Data source improvement
+        if null_analysis['total_nulls_detected'] > len(original_df) * len(original_df.columns) * 0.2:
+            agent_recommendations.append({
+                "recommendation_id": "rec_nulls_source_quality",
+                "agent_id": "null-handler",
+                "field_name": "all",
+                "priority": "high",
+                "recommendation": "Improve data collection completeness at source to reduce null value prevalence",
+                "timeline": "1-2 weeks"
+            })
+        
+        # Recommendation 5: Column-specific strategies
+        for rec in null_analysis.get('recommendations', [])[:3]:
+            agent_recommendations.append({
+                "recommendation_id": f"rec_nulls_{rec.get('column', 'unknown')}",
+                "agent_id": "null-handler",
+                "field_name": rec.get('column', 'N/A'),
+                "priority": rec.get('priority', 'medium'),
+                "recommendation": f"{rec.get('action', 'Review')}: {rec.get('reason', 'Optimize null handling')}",
+                "timeline": "2 weeks" if rec.get('priority') == 'high' else "3 weeks"
+            })
+        
+        # Recommendation 6: Validation rules
+        agent_recommendations.append({
+            "recommendation_id": "rec_nulls_validation",
+            "agent_id": "null-handler",
+            "field_name": "all",
+            "priority": "low",
+            "recommendation": "Implement validation rules to prevent null values in critical fields at data entry",
+            "timeline": "3 weeks"
+        })
 
         return {
             "status": "success",
@@ -134,6 +295,9 @@ def execute_null_handler(
                 "total_issues": len(null_issues)
             },
             "data": null_handling_data,
+            "alerts": alerts,
+            "issues": issues,
+            "recommendations": agent_recommendations,
             "cleaned_file": {
                 "filename": f"cleaned_{filename}",
                 "content": cleaned_file_base64,

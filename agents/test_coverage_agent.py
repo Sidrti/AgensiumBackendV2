@@ -103,6 +103,236 @@ def execute_test_coverage(
             "fields_analyzed": list(df.columns),
             "test_coverage_issues": test_issues
         }
+        
+        # ==================== GENERATE ALERTS ====================
+        alerts = []
+        
+        if coverage_status != "excellent":
+            issues_found = len(test_issues)
+            
+            alerts.append({
+                "alert_id": "alert_test_coverage_001",
+                "severity": "high" if coverage_status == "needs_improvement" else "medium",
+                "category": "test_coverage",
+                "message": f"Test coverage: {overall_score:.1f}/100 ({coverage_status.upper().replace('_', ' ')})",
+                "affected_fields_count": issues_found,
+                "recommendation": f"Improve test coverage. {issues_found} test(s) failing or missing."
+            })
+        
+        # Component-specific alerts
+        if uniqueness_score < 80:
+            uniqueness_issues = len([i for i in test_issues if i.get("type") in ["uniqueness_violation", "missing_unique_column"]])
+            alerts.append({
+                "alert_id": "alert_test_uniqueness",
+                "severity": "critical" if uniqueness_score < 60 else "high",
+                "category": "uniqueness_tests",
+                "message": f"Uniqueness test score: {uniqueness_score:.1f}/100",
+                "affected_fields_count": uniqueness_issues,
+                "recommendation": "Address uniqueness constraint violations to ensure data integrity"
+            })
+        
+        if range_score < 80:
+            range_issues = len([i for i in test_issues if i.get("type") in ["range_violation", "missing_range_column"]])
+            alerts.append({
+                "alert_id": "alert_test_range",
+                "severity": "high" if range_score < 60 else "medium",
+                "category": "range_tests",
+                "message": f"Range test score: {range_score:.1f}/100",
+                "affected_fields_count": range_issues,
+                "recommendation": "Review and correct values outside expected ranges"
+            })
+        
+        if format_score < 80:
+            format_issues = len([i for i in test_issues if i.get("type") in ["format_violation", "missing_format_column"]])
+            alerts.append({
+                "alert_id": "alert_test_format",
+                "severity": "high" if format_score < 60 else "medium",
+                "category": "format_tests",
+                "message": f"Format test score: {format_score:.1f}/100",
+                "affected_fields_count": format_issues,
+                "recommendation": "Standardize data formats to match expected patterns"
+            })
+        
+        # ==================== GENERATE ISSUES ====================
+        issues = []
+        
+        # Add test coverage issues
+        for issue in test_issues:
+            issue_type = issue.get("type", "test_coverage_issue")
+            field = issue.get("field", "N/A")
+            severity = issue.get("severity", "warning")
+            message = issue.get("message", "Test coverage issue detected")
+            
+            issues.append({
+                "issue_id": f"issue_test_coverage_{issue_type}_{field}",
+                "agent_id": "test-coverage-agent",
+                "field_name": field,
+                "issue_type": issue_type,
+                "severity": severity,
+                "message": message
+            })
+        
+        # ==================== GENERATE RECOMMENDATIONS ====================
+        recommendations = []
+        
+        # Test coverage recommendations based on critical/high severity issues
+        critical_issues = [i for i in test_issues if i.get("severity") == "critical"][:5]
+        for issue in critical_issues:
+            field = issue.get("field", "N/A")
+            issue_type = issue.get("type", "test_coverage_issue")
+            message = issue.get("message", "")
+            
+            recommendations.append({
+                "recommendation_id": f"rec_test_{issue_type}_{field}",
+                "agent_id": "test-coverage-agent",
+                "field_name": field,
+                "priority": "high",
+                "recommendation": f"Fix test coverage issue: {message}",
+                "timeline": "1 week"
+            })
+        
+        # Component-based recommendations
+        if uniqueness_score < 80:
+            uniqueness_violations = [i for i in test_issues if i.get("type") == "uniqueness_violation"]
+            if uniqueness_violations:
+                fields_affected = [i.get("field") for i in uniqueness_violations]
+                duplicate_counts = [i.get("duplicate_count", 0) for i in uniqueness_violations]
+                total_duplicates = sum(duplicate_counts)
+                
+                recommendations.append({
+                    "recommendation_id": "rec_test_uniqueness",
+                    "agent_id": "test-coverage-agent",
+                    "field_name": ", ".join(fields_affected[:3]),
+                    "priority": "critical",
+                    "recommendation": f"Remove {total_duplicates} duplicate value(s) from {len(uniqueness_violations)} field(s) that should be unique",
+                    "timeline": "1 week"
+                })
+        
+        if range_score < 80:
+            range_violations = [i for i in test_issues if i.get("type") == "range_violation"]
+            if range_violations:
+                fields_affected = [i.get("field") for i in range_violations]
+                violation_counts = [i.get("violations", 0) for i in range_violations]
+                total_violations = sum(violation_counts)
+                
+                recommendations.append({
+                    "recommendation_id": "rec_test_range",
+                    "agent_id": "test-coverage-agent",
+                    "field_name": ", ".join(fields_affected[:3]),
+                    "priority": "high",
+                    "recommendation": f"Correct {total_violations} value(s) in {len(range_violations)} field(s) that are outside expected ranges",
+                    "timeline": "1-2 weeks"
+                })
+        
+        if format_score < 80:
+            format_violations = [i for i in test_issues if i.get("type") == "format_violation"]
+            if format_violations:
+                fields_affected = [i.get("field") for i in format_violations]
+                violation_counts = [i.get("violations", 0) for i in format_violations]
+                total_violations = sum(violation_counts)
+                
+                recommendations.append({
+                    "recommendation_id": "rec_test_format",
+                    "agent_id": "test-coverage-agent",
+                    "field_name": ", ".join(fields_affected[:3]),
+                    "priority": "high",
+                    "recommendation": f"Standardize {total_violations} value(s) in {len(format_violations)} field(s) to match expected formats",
+                    "timeline": "1-2 weeks"
+                })
+        
+        # Overall test coverage recommendation
+        if coverage_status == "needs_improvement":
+            recommendations.append({
+                "recommendation_id": "rec_test_coverage_overall",
+                "agent_id": "test-coverage-agent",
+                "field_name": "entire dataset",
+                "priority": "high",
+                "recommendation": f"Test coverage needs improvement ({overall_score:.1f}/100). Implement data validation rules and quality checks to ensure data integrity",
+                "timeline": "2-3 weeks"
+            })
+        
+        # Missing column recommendations
+        missing_unique_cols = [i for i in test_issues if i.get("type") == "missing_unique_column"]
+        if missing_unique_cols:
+            recommendations.append({
+                "recommendation_id": "rec_test_missing_unique",
+                "agent_id": "test-coverage-agent",
+                "field_name": ", ".join([i.get("field") for i in missing_unique_cols]),
+                "priority": "high",
+                "recommendation": f"{len(missing_unique_cols)} expected unique column(s) not found. Verify schema and add missing fields",
+                "timeline": "1 week"
+            })
+        
+        missing_range_cols = [i for i in test_issues if i.get("type") == "missing_range_column"]
+        if missing_range_cols:
+            recommendations.append({
+                "recommendation_id": "rec_test_missing_range",
+                "agent_id": "test-coverage-agent",
+                "field_name": ", ".join([i.get("field") for i in missing_range_cols]),
+                "priority": "medium",
+                "recommendation": f"{len(missing_range_cols)} expected range test column(s) not found. Verify schema and add missing fields",
+                "timeline": "1-2 weeks"
+            })
+        
+        missing_format_cols = [i for i in test_issues if i.get("type") == "missing_format_column"]
+        if missing_format_cols:
+            recommendations.append({
+                "recommendation_id": "rec_test_missing_format",
+                "agent_id": "test-coverage-agent",
+                "field_name": ", ".join([i.get("field") for i in missing_format_cols]),
+                "priority": "medium",
+                "recommendation": f"{len(missing_format_cols)} expected format test column(s) not found. Verify schema and add missing fields",
+                "timeline": "1-2 weeks"
+            })
+
+        # ==================== GENERATE EXECUTIVE SUMMARY ====================
+        executive_summary = []
+        
+        # Test Coverage
+        executive_summary.append({
+            "summary_id": "exec_test_coverage",
+            "title": "Test Coverage",
+            "value": str(round(overall_score, 1)),
+            "status": "excellent" if coverage_status == "excellent" else "good" if coverage_status == "good" else "needs_improvement",
+            "description": f"{overall_score:.1f}/100 - {coverage_status.upper().replace('_', ' ')}"
+        })
+        
+        # ==================== GENERATE AI ANALYSIS TEXT ====================
+        ai_analysis_text_parts = []
+        ai_analysis_text_parts.append(f"TEST COVERAGE: {coverage_status.upper().replace('_', ' ')} ({overall_score:.1f}/100)")
+        ai_analysis_text_parts.append(f"- Uniqueness Tests: {uniqueness_score:.1f}/100")
+        ai_analysis_text_parts.append(f"- Range Tests: {range_score:.1f}/100")
+        ai_analysis_text_parts.append(f"- Format Tests: {format_score:.1f}/100")
+        
+        if len(test_issues) > 0:
+            ai_analysis_text_parts.append(f"- {len(test_issues)} test issue(s) detected")
+            
+            # Critical issues
+            critical_test_issues = [i for i in test_issues if i.get("severity") == "critical"]
+            if critical_test_issues:
+                ai_analysis_text_parts.append(f"  • {len(critical_test_issues)} critical test failure(s)")
+            
+            # Uniqueness violations
+            uniqueness_issues = [i for i in test_issues if i.get("type") == "uniqueness_violation"]
+            if uniqueness_issues:
+                ai_analysis_text_parts.append(f"  • {len(uniqueness_issues)} uniqueness constraint violation(s)")
+            
+            # Range violations
+            range_issues = [i for i in test_issues if i.get("type") == "range_violation"]
+            if range_issues:
+                ai_analysis_text_parts.append(f"  • {len(range_issues)} range constraint violation(s)")
+            
+            # Format violations
+            format_issues = [i for i in test_issues if i.get("type") == "format_violation"]
+            if format_issues:
+                ai_analysis_text_parts.append(f"  • {len(format_issues)} format constraint violation(s)")
+        
+        if coverage_status == "excellent":
+            ai_analysis_text_parts.append("- All test validations passed")
+        else:
+            ai_analysis_text_parts.append("- Data validation improvements required")
+        
+        ai_analysis_text = "\n".join(ai_analysis_text_parts)
 
         return {
             "status": "success",
@@ -116,7 +346,12 @@ def execute_test_coverage(
                 "coverage_status": coverage_status,
                 "issues_found": len(test_issues)
             },
-            "data": test_coverage_data
+            "data": test_coverage_data,
+            "alerts": alerts,
+            "issues": issues,
+            "recommendations": recommendations,
+            "executive_summary": executive_summary,
+            "ai_analysis_text": ai_analysis_text
         }
 
     except Exception as e:

@@ -183,6 +183,194 @@ def execute_cleanse_writeback(
             "summary": f"Cleanse writeback completed. Quality: {quality_status}. Data ready: {integrity_results['all_checks_passed']}. Verified {len(df)} rows across {len(df.columns)} columns.",
             "integrity_issues": _extract_integrity_issues(integrity_results)
         }
+        
+        # ==================== GENERATE EXECUTIVE SUMMARY ====================
+        checks_passed = int(integrity_results["checks_passed"])
+        total_checks = checks_passed + int(integrity_results["checks_failed"])
+        data_ready = bool(integrity_results["all_checks_passed"])
+        executive_summary = [{
+            "summary_id": "exec_cleanse_writeback",
+            "title": "Cleanse Writeback Status",
+            "value": f"{writeback_score['overall_score']:.1f}",
+            "status": "excellent" if quality_status == "excellent" else "good" if quality_status == "good" else "needs_review",
+            "description": f"Quality: {quality_status}, Integrity: {checks_passed}/{total_checks} checks passed, {len(agent_manifests)} agents processed, Data Ready: {'Yes' if data_ready else 'No'}, {comprehensive_manifest.get('total_transformations', 0)} transformations logged"
+        }]
+        
+        # ==================== GENERATE AI ANALYSIS TEXT ====================
+        ai_analysis_parts = []
+        ai_analysis_parts.append(f"CLEANSE WRITEBACK ANALYSIS:")
+        ai_analysis_parts.append(f"- Writeback Score: {writeback_score['overall_score']:.1f}/100 (Integrity: {writeback_score['metrics']['integrity_score']:.1f}, Completeness: {writeback_score['metrics']['completeness_score']:.1f}, Readiness: {writeback_score['metrics']['readiness_score']:.1f})")
+        ai_analysis_parts.append(f"- Integrity Verification: {checks_passed}/{total_checks} checks passed ({(checks_passed/total_checks*100):.1f}% success rate), All Checks Passed: {'Yes' if data_ready else 'No'}")
+        
+        ai_analysis_parts.append(f"- Data Package: {len(df)} rows, {len(df.columns)} columns verified and ready for pipeline")
+        ai_analysis_parts.append(f"- Agent Processing: {len(agent_manifests)} agents processed with complete audit trail")
+        ai_analysis_parts.append(f"- Manifest Completeness: {comprehensive_manifest.get('total_transformations', 0)} transformations logged across all agents")
+        
+        if data_ready:
+            ai_analysis_parts.append(f"- Recommendation: Data package is production-ready. Safe to proceed to 'Master My Data' tool with complete lineage tracking")
+        else:
+            ai_analysis_parts.append(f"- Recommendation: Review {int(integrity_results['checks_failed'])} failed integrity checks before proceeding to next pipeline stage")
+        
+        ai_analysis_text = "\n".join(ai_analysis_parts)
+        
+        # Add to writeback_data
+        writeback_data["executive_summary"] = executive_summary
+        writeback_data["ai_analysis_text"] = ai_analysis_text
+        
+        # ==================== GENERATE ALERTS ====================
+        alerts = []
+        
+        # Critical integrity failure alert
+        if not data_ready:
+            alerts.append({
+                "alert_id": "alert_writeback_integrity_failure",
+                "severity": "critical",
+                "category": "data_integrity",
+                "message": f"Data integrity verification FAILED: {int(integrity_results['checks_failed'])} critical checks failed",
+                "affected_fields_count": int(integrity_results['checks_failed']),
+                "recommendation": "Data is NOT ready for pipeline. Address all integrity failures immediately before proceeding."
+            })
+        
+        # Manifest completeness alert
+        if comprehensive_manifest.get('total_transformations', 0) == 0:
+            alerts.append({
+                "alert_id": "alert_writeback_manifest_incomplete",
+                "severity": "high",
+                "category": "auditability",
+                "message": "Manifest is incomplete: No transformations logged",
+                "affected_fields_count": len(agent_manifests),
+                "recommendation": "Verify that all cleaning agents executed properly and logged their transformations."
+            })
+        
+        # Data retention alert
+        retention_check = integrity_results.get('checks', {}).get('data_retention', {})
+        if not retention_check.get('passed', True):
+            row_loss = retention_check.get('original_rows', 0) - retention_check.get('current_rows', 0)
+            alerts.append({
+                "alert_id": "alert_writeback_data_loss",
+                "severity": "high",
+                "category": "data_retention",
+                "message": f"Significant data loss: {row_loss} rows lost during cleaning ({100 - retention_check.get('row_retention_percentage', 100):.1f}%)",
+                "affected_fields_count": row_loss,
+                "recommendation": "Review cleaning strategies to minimize data loss. Investigate if loss is acceptable."
+            })
+        
+        # Quality score alert
+        if writeback_score["overall_score"] < good_threshold:
+            alerts.append({
+                "alert_id": "alert_writeback_quality",
+                "severity": "high" if writeback_score["overall_score"] < 70 else "medium",
+                "category": "quality_score",
+                "message": f"Writeback quality score: {writeback_score['overall_score']:.1f}/100 ({quality_status})",
+                "affected_fields_count": total_checks,
+                "recommendation": "Review integrity checks and manifest completeness. Data may not be production-ready."
+            })
+        
+        # Success alert
+        if data_ready and writeback_score["overall_score"] >= excellent_threshold:
+            alerts.append({
+                "alert_id": "alert_writeback_success",
+                "severity": "low",
+                "category": "quality_validation",
+                "message": f"Data package verified: All {checks_passed} integrity checks passed. Ready for pipeline.",
+                "affected_fields_count": checks_passed,
+                "recommendation": "Data is production-ready. Safe to proceed to 'Master My Data' or next pipeline step."
+            })
+        
+        # ==================== GENERATE ISSUES ====================
+        issues = []
+        
+        # Convert integrity issues to standardized format
+        integrity_issues = _extract_integrity_issues(integrity_results)
+        for int_issue in integrity_issues[:100]:
+            issues.append({
+                "issue_id": f"issue_writeback_{int_issue.get('check_name', 'unknown')}",
+                "agent_id": "cleanse-writeback",
+                "field_name": int_issue.get('check_name', 'N/A'),
+                "issue_type": int_issue.get('issue_type', 'integrity_issue'),
+                "severity": int_issue.get('severity', 'high'),
+                "message": int_issue.get('message', 'Integrity verification issue')
+            })
+        
+        # ==================== GENERATE RECOMMENDATIONS ====================
+        agent_recommendations = []
+        
+        # Recommendation 1: Address integrity failures (critical)
+        if not data_ready:
+            failed_checks = [check_name for check_name, check_data in integrity_results.get('checks', {}).items()
+                           if not check_data.get('passed', False)]
+            agent_recommendations.append({
+                "recommendation_id": "rec_writeback_integrity_failures",
+                "agent_id": "cleanse-writeback",
+                "field_name": ", ".join(failed_checks[:3]),
+                "priority": "critical",
+                "recommendation": f"CRITICAL: Fix {len(failed_checks)} failed integrity check(s) before proceeding: {', '.join(failed_checks)}",
+                "timeline": "immediate"
+            })
+        
+        # Recommendation 2: Review manifest completeness
+        if comprehensive_manifest.get('total_transformations', 0) < len(agent_manifests) * 2:
+            agent_recommendations.append({
+                "recommendation_id": "rec_writeback_manifest",
+                "agent_id": "cleanse-writeback",
+                "field_name": "manifest",
+                "priority": "high",
+                "recommendation": f"Review manifest completeness: Only {comprehensive_manifest.get('total_transformations', 0)} transformations logged from {len(agent_manifests)} agents",
+                "timeline": "1 week"
+            })
+        
+        # Recommendation 3: Data retention review
+        if retention_check and not retention_check.get('passed', True):
+            agent_recommendations.append({
+                "recommendation_id": "rec_writeback_retention",
+                "agent_id": "cleanse-writeback",
+                "field_name": "all",
+                "priority": "high",
+                "recommendation": f"Review data retention: {retention_check.get('row_retention_percentage', 0):.1f}% row retention is below acceptable threshold",
+                "timeline": "1 week"
+            })
+        
+        # Recommendation 4: Specific check failures
+        for check_name, check_data in integrity_results.get('checks', {}).items():
+            if not check_data.get('passed', False) and len(agent_recommendations) < 6:
+                agent_recommendations.append({
+                    "recommendation_id": f"rec_writeback_{check_name}",
+                    "agent_id": "cleanse-writeback",
+                    "field_name": check_name,
+                    "priority": "high",
+                    "recommendation": f"Address {check_name} failure: {check_data.get('message', 'Check failed')}",
+                    "timeline": "1 week"
+                })
+        
+        # Recommendation 5: Pipeline readiness
+        if data_ready:
+            agent_recommendations.append({
+                "recommendation_id": "rec_writeback_proceed",
+                "agent_id": "cleanse-writeback",
+                "field_name": "all",
+                "priority": "low",
+                "recommendation": "Data package is verified and production-ready. Proceed to 'Master My Data' with confidence in data quality and lineage.",
+                "timeline": "immediate"
+            })
+        else:
+            agent_recommendations.append({
+                "recommendation_id": "rec_writeback_review",
+                "agent_id": "cleanse-writeback",
+                "field_name": "all",
+                "priority": "critical",
+                "recommendation": "DO NOT proceed to next pipeline step. Address all integrity failures and re-run writeback verification.",
+                "timeline": "immediate"
+            })
+        
+        # Recommendation 6: Audit trail
+        agent_recommendations.append({
+            "recommendation_id": "rec_writeback_audit",
+            "agent_id": "cleanse-writeback",
+            "field_name": "manifest",
+            "priority": "low",
+            "recommendation": "Archive comprehensive manifest for compliance and auditability requirements",
+            "timeline": "2 weeks"
+        })
 
         return {
             "status": "success",
@@ -198,7 +386,10 @@ def execute_cleanse_writeback(
                 "data_ready_for_pipeline": bool(integrity_results["all_checks_passed"]),
                 "total_transformations_logged": int(comprehensive_manifest.get("total_transformations", 0))
             },
-            "data": writeback_data
+            "data": writeback_data,
+            "alerts": alerts,
+            "issues": issues,
+            "recommendations": agent_recommendations
         }
 
     except Exception as e:

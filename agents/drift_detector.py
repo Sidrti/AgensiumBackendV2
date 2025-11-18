@@ -224,6 +224,212 @@ def detect_drift(
         overall_drift_score = drift_detected_count / max(len(common_cols), 1)
         average_psi_score = np.mean(psi_scores) if psi_scores else 0
         drift_percentage = (drift_detected_count / len(common_cols) * 100) if len(common_cols) > 0 else 0
+        dataset_stability = "warning" if overall_drift_score > 0.1 else "stable"
+        
+        # ==================== GENERATE ALERTS ====================
+        alerts = []
+        
+        if dataset_stability == "warning":
+            alerts.append({
+                "alert_id": "alert_drift_001",
+                "severity": "high",
+                "category": "drift",
+                "message": f"Distribution drift in {drift_detected_count}/{len(common_cols)} fields ({drift_percentage:.1f}% affected)",
+                "affected_fields_count": drift_detected_count,
+                "recommendation": f"{drift_detected_count} field(s) showing drift. Retrain ML models with current data."
+            })
+        
+        # Add severity-based alerts
+        if drift_severity_high > 0:
+            alerts.append({
+                "alert_id": "alert_drift_high_severity",
+                "severity": "critical",
+                "category": "drift_high_severity",
+                "message": f"{drift_severity_high} field(s) with high-severity drift detected",
+                "affected_fields_count": drift_severity_high,
+                "recommendation": f"Immediate attention required for {drift_severity_high} field(s) with significant distribution changes"
+            })
+        
+        if average_psi_score > 0.25:
+            alerts.append({
+                "alert_id": "alert_drift_psi_high",
+                "severity": "critical",
+                "category": "drift_psi",
+                "message": f"Average PSI score is {average_psi_score:.4f} (>0.25 indicates significant drift)",
+                "affected_fields_count": drift_detected_count,
+                "recommendation": "Model retraining strongly recommended due to significant population shift"
+            })
+        
+        # ==================== GENERATE ISSUES ====================
+        issues = []
+        
+        # Add field drift issues
+        for field in field_drift_details:
+            if field.get("drift_analysis", {}).get("drift_detected", False):
+                field_name = field.get("field_name")
+                field_id = field.get("field_id")
+                drift_analysis = field.get("drift_analysis", {})
+                psi_score = drift_analysis.get("psi_score", 0)
+                severity = drift_analysis.get("severity", "medium")
+                
+                issues.append({
+                    "issue_id": f"issue_drift_{field_id}",
+                    "agent_id": "drift-detector",
+                    "field_name": field_name,
+                    "issue_type": "distribution_drift",
+                    "severity": severity,
+                    "message": f"Significant distribution drift detected (PSI: {psi_score:.4f})"
+                })
+                
+                # Add specific drift type issues
+                change_in_mean = drift_analysis.get("change_in_mean", 0)
+                change_in_variance = drift_analysis.get("change_in_variance", 0)
+                
+                if change_in_mean > 0:
+                    # Determine if mean shift is significant (>10% of baseline)
+                    baseline_mean = field.get("baseline_statistics", {}).get("mean", 0)
+                    if baseline_mean != 0 and (change_in_mean / abs(baseline_mean)) > 0.1:
+                        issues.append({
+                            "issue_id": f"issue_drift_mean_{field_id}",
+                            "agent_id": "drift-detector",
+                            "field_name": field_name,
+                            "issue_type": "mean_shift",
+                            "severity": "high" if (change_in_mean / abs(baseline_mean)) > 0.25 else "medium",
+                            "message": f"Mean shifted by {change_in_mean:.2f} ({(change_in_mean / abs(baseline_mean) * 100):.1f}%)"
+                        })
+                
+                if change_in_variance > 0:
+                    baseline_std = field.get("baseline_statistics", {}).get("stddev", 0)
+                    if baseline_std != 0 and (change_in_variance / abs(baseline_std)) > 0.2:
+                        issues.append({
+                            "issue_id": f"issue_drift_variance_{field_id}",
+                            "agent_id": "drift-detector",
+                            "field_name": field_name,
+                            "issue_type": "variance_shift",
+                            "severity": "medium",
+                            "message": f"Variance shifted by {change_in_variance:.2f} ({(change_in_variance / abs(baseline_std) * 100):.1f}%)"
+                        })
+        
+        # Check for missing/new columns
+        missing_cols = baseline_cols - current_cols
+        new_cols = current_cols - baseline_cols
+        
+        if missing_cols:
+            for col in missing_cols:
+                issues.append({
+                    "issue_id": f"issue_drift_missing_col_{col}",
+                    "agent_id": "drift-detector",
+                    "field_name": col,
+                    "issue_type": "missing_column",
+                    "severity": "critical",
+                    "message": f"Column '{col}' present in baseline but missing in current dataset"
+                })
+        
+        if new_cols:
+            for col in new_cols:
+                issues.append({
+                    "issue_id": f"issue_drift_new_col_{col}",
+                    "agent_id": "drift-detector",
+                    "field_name": col,
+                    "issue_type": "new_column",
+                    "severity": "warning",
+                    "message": f"New column '{col}' present in current dataset but not in baseline"
+                })
+        
+        # ==================== GENERATE RECOMMENDATIONS ====================
+        recommendations = []
+        
+        # Drift recommendations
+        if dataset_stability == "warning":
+            drifted_fields = [f for f in field_drift_details if f.get("drift_analysis", {}).get("drift_detected", False)]
+            recommendations.append({
+                "recommendation_id": "rec_drift_001",
+                "agent_id": "drift-detector",
+                "field_name": f"{len(drifted_fields)} fields",
+                "priority": "high",
+                "recommendation": f"Retrain ML models. {len(drifted_fields)} field(s) show significant distribution drift.",
+                "timeline": "1 week"
+            })
+        
+        # High-severity drift fields
+        high_severity_fields = [f for f in field_drift_details if f.get("drift_analysis", {}).get("severity") == "high"][:3]
+        for field in high_severity_fields:
+            field_name = field.get("field_name")
+            field_id = field.get("field_id")
+            psi_score = field.get("drift_analysis", {}).get("psi_score", 0)
+            
+            recommendations.append({
+                "recommendation_id": f"rec_drift_high_{field_id}",
+                "agent_id": "drift-detector",
+                "field_name": field_name,
+                "priority": "critical",
+                "recommendation": f"Investigate {field_name} - High drift detected (PSI: {psi_score:.4f}). Review data collection process.",
+                "timeline": "immediate"
+            })
+        
+        # Model monitoring recommendation
+        if drift_detected_count > 0:
+            recommendations.append({
+                "recommendation_id": "rec_drift_monitoring",
+                "agent_id": "drift-detector",
+                "field_name": "all fields",
+                "priority": "medium",
+                "recommendation": f"Implement continuous monitoring for {drift_detected_count} drifting field(s) to detect future changes",
+                "timeline": "2-3 weeks"
+            })
+        
+        # Schema change recommendations
+        if missing_cols:
+            recommendations.append({
+                "recommendation_id": "rec_drift_missing_cols",
+                "agent_id": "drift-detector",
+                "field_name": ", ".join(list(missing_cols)[:3]),
+                "priority": "critical",
+                "recommendation": f"{len(missing_cols)} column(s) missing from current dataset. Update data pipeline or impute missing columns",
+                "timeline": "immediate"
+            })
+        
+        if new_cols:
+            recommendations.append({
+                "recommendation_id": "rec_drift_new_cols",
+                "agent_id": "drift-detector",
+                "field_name": ", ".join(list(new_cols)[:3]),
+                "priority": "medium",
+                "recommendation": f"{len(new_cols)} new column(s) detected. Review schema changes and update models if needed",
+                "timeline": "1-2 weeks"
+            })
+        
+        # ==================== GENERATE EXECUTIVE SUMMARY ====================
+        executive_summary = []
+        
+        # Only add if drift detected
+        if drift_detected_count > 0:
+            executive_summary.append({
+                "summary_id": "exec_drift",
+                "title": "Distribution Drift",
+                "value": f"{drift_detected_count}/{len(common_cols)}",
+                "status": "critical" if drift_severity_high > 0 else "warning",
+                "description": f"{drift_detected_count} field(s) with drift detected - {dataset_stability.upper()}"
+            })
+        
+        # ==================== GENERATE AI ANALYSIS TEXT ====================
+        ai_analysis_text_parts = []
+        
+        if drift_detected_count > 0:
+            ai_analysis_text_parts.append(f"DRIFT DETECTION: {drift_detected_count}/{len(common_cols)} fields showing distribution drift ({drift_percentage:.1f}%)")
+            ai_analysis_text_parts.append(f"- Average PSI score: {average_psi_score:.4f}")
+            ai_analysis_text_parts.append(f"- Dataset stability: {dataset_stability.upper()}")
+            
+            if drift_severity_high > 0:
+                ai_analysis_text_parts.append(f"- {drift_severity_high} field(s) with HIGH severity drift")
+            if drift_severity_medium > 0:
+                ai_analysis_text_parts.append(f"- {drift_severity_medium} field(s) with MEDIUM severity drift")
+            
+            ai_analysis_text_parts.append("- Model retraining recommended due to significant drift")
+        else:
+            ai_analysis_text_parts.append(f"DRIFT DETECTION: No significant drift detected. Dataset is stable.")
+        
+        ai_analysis_text = "\n".join(ai_analysis_text_parts)
         
         return {
             "status": "success",
@@ -244,9 +450,14 @@ def detect_drift(
                     "overall_drift_score": round(overall_drift_score, 4),
                     "drift_percentage": round(drift_percentage, 2),
                     "fields_with_drift": drift_detected_count,
-                    "dataset_stability": "warning" if overall_drift_score > 0.1 else "stable"
+                    "dataset_stability": dataset_stability
                 }
-            }
+            },
+            "alerts": alerts,
+            "issues": issues,
+            "recommendations": recommendations,
+            "executive_summary": executive_summary,
+            "ai_analysis_text": ai_analysis_text
         }
     
     except Exception as e:

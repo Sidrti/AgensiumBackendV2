@@ -127,6 +127,179 @@ def execute_duplicate_resolver(
             "summary": f"Duplicate resolution completed. Quality: {quality_status}. Processed {len(original_df)} rows, resolved {duplicate_analysis.get('total_duplicates', 0)} duplicate records.",
             "row_level_issues": duplicate_issues[:100]  # Limit to first 100
         }
+        
+        # ==================== GENERATE EXECUTIVE SUMMARY ====================
+        total_dups = duplicate_analysis.get('total_duplicates', 0)
+        executive_summary = [{
+            "summary_id": "exec_duplicate_resolution",
+            "title": "Duplicate Resolution Status",
+            "value": f"{dedup_score['overall_score']:.1f}",
+            "status": "excellent" if quality_status == "excellent" else "good" if quality_status == "good" else "needs_improvement",
+            "description": f"Quality: {quality_status}, Duplicates Resolved: {total_dups}, {len(original_df) - len(df_deduplicated)} rows removed, {dedup_score['metrics']['dedup_effectiveness_percentage']:.1f}% effectiveness"
+        }]
+        
+        # ==================== GENERATE AI ANALYSIS TEXT ====================
+        ai_analysis_parts = []
+        ai_analysis_parts.append(f"DUPLICATE RESOLVER ANALYSIS:")
+        ai_analysis_parts.append(f"- Deduplication Score: {dedup_score['overall_score']:.1f}/100 (Effectiveness: {dedup_score['metrics']['dedup_effectiveness_score']:.1f}, Data Integrity: {dedup_score['metrics']['data_integrity_score']:.1f}, Detection Accuracy: {dedup_score['metrics']['detection_accuracy_score']:.1f})")
+        ai_analysis_parts.append(f"- Duplicates Resolved: {total_dups} duplicate records detected, {len(original_df) - len(df_deduplicated)} rows removed, {dedup_score['metrics']['dedup_effectiveness_percentage']:.1f}% effectiveness")
+        
+        dup_methods = duplicate_analysis.get('duplicate_summary', {})
+        ai_analysis_parts.append(f"- Detection Methods: {len(dup_methods)} methods used - {', '.join(dup_methods.keys())}")
+        ai_analysis_parts.append(f"- Data Retention: {len(df_deduplicated)} rows retained ({(len(df_deduplicated) / len(original_df) * 100):.1f}% of original)")
+        ai_analysis_parts.append(f"- Resolution Strategy: {resolution_log[0].get('strategy', 'unknown') if len(resolution_log) > 0 else 'N/A'}")
+        
+        if len(duplicate_analysis.get('recommendations', [])) > 0:
+            ai_analysis_parts.append(f"- Top Recommendation: {duplicate_analysis['recommendations'][0].get('recommendation', 'Review duplicate resolution strategy')}")
+        
+        ai_analysis_text = "\n".join(ai_analysis_parts)
+        
+        # Add to dedup_data
+        dedup_data["executive_summary"] = executive_summary
+        dedup_data["ai_analysis_text"] = ai_analysis_text
+        
+        # ==================== GENERATE ALERTS ====================
+        alerts = []
+        
+        # High duplicate volume alert
+        duplicate_pct = (total_dups / len(original_df) * 100) if len(original_df) > 0 else 0
+        if duplicate_pct > 30:
+            alerts.append({
+                "alert_id": "alert_duplicates_high_volume",
+                "severity": "critical",
+                "category": "data_uniqueness",
+                "message": f"High duplicate volume: {total_dups} duplicates detected ({duplicate_pct:.1f}% of dataset)",
+                "affected_fields_count": len(dup_methods),
+                "recommendation": "Review data collection process. High duplicate rate indicates systemic data entry issues or inadequate uniqueness constraints."
+            })
+        elif duplicate_pct > 10:
+            alerts.append({
+                "alert_id": "alert_duplicates_medium_volume",
+                "severity": "high",
+                "category": "data_uniqueness",
+                "message": f"Moderate duplicate volume: {total_dups} duplicates detected ({duplicate_pct:.1f}% of dataset)",
+                "affected_fields_count": len(dup_methods),
+                "recommendation": "Implement deduplication strategies and unique key constraints."
+            })
+        
+        # Data loss from deduplication
+        rows_removed = len(original_df) - len(df_deduplicated)
+        if rows_removed > len(original_df) * 0.2:
+            alerts.append({
+                "alert_id": "alert_duplicates_data_loss",
+                "severity": "high",
+                "category": "data_retention",
+                "message": f"Significant data loss: {rows_removed} rows removed ({(rows_removed/len(original_df)*100):.1f}% of dataset)",
+                "affected_fields_count": rows_removed,
+                "recommendation": "Review deduplication strategy. Consider merge strategies instead of removal to preserve information."
+            })
+        
+        # Conflicting duplicates alert
+        conflicting_dups = dup_methods.get('conflicting', {}).get('duplicate_count', 0)
+        if conflicting_dups > 0:
+            alerts.append({
+                "alert_id": "alert_duplicates_conflicts",
+                "severity": "high",
+                "category": "data_integrity",
+                "message": f"{conflicting_dups} conflicting duplicate(s) detected with same keys but different values",
+                "affected_fields_count": conflicting_dups,
+                "recommendation": "Review conflicting duplicates manually to determine correct values and resolution strategy."
+            })
+        
+        # Quality score alert
+        if dedup_score["overall_score"] < good_threshold:
+            alerts.append({
+                "alert_id": "alert_duplicates_quality",
+                "severity": "medium",
+                "category": "quality_score",
+                "message": f"Deduplication quality score: {dedup_score['overall_score']:.1f}/100 ({quality_status})",
+                "affected_fields_count": total_dups,
+                "recommendation": "Optimize duplicate detection and resolution strategies."
+            })
+        
+        # ==================== GENERATE ISSUES ====================
+        issues = []
+        
+        # Convert duplicate issues to standardized format
+        for dup_issue in duplicate_issues[:100]:
+            issues.append({
+                "issue_id": f"issue_duplicates_{dup_issue.get('row_index', 0)}_duplicate",
+                "agent_id": "duplicate-resolver",
+                "field_name": "record",
+                "issue_type": dup_issue.get('issue_type', 'duplicate_record'),
+                "severity": dup_issue.get('severity', 'warning'),
+                "message": dup_issue.get('description', 'Duplicate record detected')
+            })
+        
+        # ==================== GENERATE RECOMMENDATIONS ====================
+        agent_recommendations = []
+        
+        # Recommendation 1: Address conflicting duplicates
+        if conflicting_dups > 0:
+            agent_recommendations.append({
+                "recommendation_id": "rec_duplicates_conflicts",
+                "agent_id": "duplicate-resolver",
+                "field_name": "multiple",
+                "priority": "critical",
+                "recommendation": f"Manually review and resolve {conflicting_dups} conflicting duplicate(s) with different values for same keys",
+                "timeline": "immediate"
+            })
+        
+        # Recommendation 2: Unique constraints
+        if total_dups > len(original_df) * 0.1:
+            agent_recommendations.append({
+                "recommendation_id": "rec_duplicates_constraints",
+                "agent_id": "duplicate-resolver",
+                "field_name": "all",
+                "priority": "high",
+                "recommendation": "Implement unique key constraints at database level to prevent duplicate entry",
+                "timeline": "1 week"
+            })
+        
+        # Recommendation 3: Detection method optimization
+        for method, data in dup_methods.items():
+            if data.get('duplicate_count', 0) > 0:
+                agent_recommendations.append({
+                    "recommendation_id": f"rec_duplicates_{method}",
+                    "agent_id": "duplicate-resolver",
+                    "field_name": "various",
+                    "priority": "high" if data.get('duplicate_count', 0) > len(original_df) * 0.05 else "medium",
+                    "recommendation": f"Address {data.get('duplicate_count', 0)} {method} duplicate(s) with targeted resolution strategy",
+                    "timeline": "1-2 weeks"
+                })
+                if len(agent_recommendations) >= 5:
+                    break
+        
+        # Recommendation 4: Merge strategy
+        if merge_strategy == 'remove_duplicates' and rows_removed > len(original_df) * 0.1:
+            agent_recommendations.append({
+                "recommendation_id": "rec_duplicates_merge_strategy",
+                "agent_id": "duplicate-resolver",
+                "field_name": "all",
+                "priority": "medium",
+                "recommendation": "Consider smart merge strategy instead of removal to preserve valuable information from duplicate records",
+                "timeline": "2 weeks"
+            })
+        
+        # Recommendation 5: Data source improvement
+        agent_recommendations.append({
+            "recommendation_id": "rec_duplicates_source",
+            "agent_id": "duplicate-resolver",
+            "field_name": "all",
+            "priority": "medium",
+            "recommendation": "Review data entry and import processes to prevent duplicate creation at source",
+            "timeline": "2 weeks"
+        })
+        
+        # Recommendation 6: Monitoring
+        agent_recommendations.append({
+            "recommendation_id": "rec_duplicates_monitoring",
+            "agent_id": "duplicate-resolver",
+            "field_name": "all",
+            "priority": "low",
+            "recommendation": "Establish duplicate rate monitoring and alerting to detect data quality degradation",
+            "timeline": "3 weeks"
+        })
 
         # Generate cleaned file (CSV format)
         cleaned_file_bytes = _generate_cleaned_file(df_deduplicated, filename)
@@ -146,6 +319,9 @@ def execute_duplicate_resolver(
                 "total_issues": len(duplicate_issues)
             },
             "data": dedup_data,
+            "alerts": alerts,
+            "issues": issues,
+            "recommendations": agent_recommendations,
             "cleaned_file": {
                 "filename": f"cleaned_{filename}",
                 "content": cleaned_file_base64,
