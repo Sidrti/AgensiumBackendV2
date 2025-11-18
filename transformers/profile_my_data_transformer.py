@@ -284,6 +284,38 @@ def transform_profile_my_data_response(
     
     # ==================== GENERATE EXECUTIVE SUMMARY ====================
     
+    # Count active agents (agents with successful execution)
+    active_agents = sum(1 for agent_output in agent_results.values() if agent_output.get("status") == "success")
+    total_possible_agents = len(agent_results)
+    
+    # Always present: Agents used summary
+    executive_summary.append({
+        "summary_id": "exec_agents_used",
+        "title": "Agents Executed",
+        "value": f"{active_agents}/{total_possible_agents}",
+        "status": "success" if active_agents > 0 else "warning",
+        "description": f"{active_agents} of {total_possible_agents} agents executed successfully"
+    })
+    
+    # Always present: Execution time summary
+    execution_time_seconds = execution_time_ms / 1000
+    executive_summary.append({
+        "summary_id": "exec_execution_time",
+        "title": "Total Execution Time",
+        "value": f"{execution_time_seconds:.2f}s",
+        "status": "excellent" if execution_time_seconds < 30 else "good" if execution_time_seconds < 60 else "fair",
+        "description": f"Analysis completed in {execution_time_seconds:.2f} seconds"
+    })
+    
+    # Always present: Analysis metrics summary
+    executive_summary.append({
+        "summary_id": "exec_analysis_metrics",
+        "title": "Analysis Metrics",
+        "value": f"{len(all_alerts)}",
+        "status": "success" if len(all_alerts) == 0 else "warning",
+        "description": f"{len(all_alerts)} alerts | {len(all_issues)} issues | {len(all_recommendations)} recommendations"
+    })
+    
     if profiler_output.get("status") == "success":
         quality_score = profiler_output.get("data", {}).get("quality_summary", {}).get("overall_quality_score", 0)
         grade = "A" if quality_score >= 90 else "B" if quality_score >= 80 else "C" if quality_score >= 70 else "D" if quality_score >= 60 else "F"
@@ -410,9 +442,9 @@ def transform_profile_my_data_response(
             "issues": all_issues,
             "recommendations": all_recommendations,
             "executiveSummary": executive_summary,
-            # "analysisSummary": analysis_summary,
+            "analysisSummary": analysis_summary,
             "visualizations": [],
-            # "routing_decisions": routing_decisions,
+            "routing_decisions": routing_decisions,
             # Individual agent outputs (for detailed inspection)
             **{agent_id: output for agent_id, output in agent_results.items() if output.get("status") == "success"},
             # Downloads with Excel and JSON exports
