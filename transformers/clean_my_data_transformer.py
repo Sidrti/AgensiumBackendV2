@@ -46,6 +46,7 @@ def transform_clean_my_data_response(
     outlier_output = agent_results.get("outlier-remover", {})
     type_fixer_output = agent_results.get("type-fixer", {})
     duplicate_resolver_output = agent_results.get("duplicate-resolver", {})
+    field_standardization_output = agent_results.get("field-standardization", {})
     quarantine_output = agent_results.get("quarantine-agent", {})
     governance_output = agent_results.get("governance-checker", {})
     test_coverage_output = agent_results.get("test-coverage-agent", {})
@@ -239,6 +240,43 @@ def transform_clean_my_data_response(
                     "message": f"{method.replace('_', ' ').title()}: {method_data.get('duplicate_count', 0)} duplicates ({method_data.get('duplicate_percentage', 0):.2f}%)"
                 })
     
+    # ==================== FIELD STANDARDIZATION ALERTS & ISSUES ====================
+    if field_standardization_output.get("status") == "success":
+        standardization_data = field_standardization_output.get("data", {})
+        standardization_score = standardization_data.get("standardization_score", {})
+        standardization_analysis = standardization_data.get("standardization_analysis", {})
+        
+        overall_score = standardization_score.get("overall_score", 0)
+        columns_standardized = standardization_analysis.get("columns_standardized", 0)
+        improvements = standardization_analysis.get("improvements", {})
+        variations_reduced = improvements.get("total_variations_reduced", 0)
+        
+        if overall_score < 80:
+            severity = "high" if overall_score < 60 else "medium"
+            all_alerts.append({
+                "alert_id": "alert_field_standardization",
+                "severity": severity,
+                "category": "data_cleaning",
+                "message": f"Field standardization quality: {overall_score:.1f}/100 ({standardization_data.get('quality_status', 'unknown')})",
+                "affected_fields_count": columns_standardized,
+                "recommendation": f"Review standardization strategy. {columns_standardized} columns processed with {variations_reduced} variations reduced."
+            })
+        
+        # Add field-level standardization issues
+        pre_analysis = standardization_analysis.get("pre_standardization", {})
+        post_analysis = standardization_analysis.get("post_standardization", {})
+        
+        for col, col_improvements in improvements.get("column_improvements", {}).items():
+            if col_improvements.get("improvement_percentage", 0) < 50:
+                all_issues.append({
+                    "issue_id": f"issue_standardization_{col}",
+                    "agent_id": "field-standardization",
+                    "field_name": col,
+                    "issue_type": "standardization_incomplete",
+                    "severity": "medium",
+                    "message": f"Limited improvement in standardization: {col_improvements.get('improvement_percentage', 0):.1f}% improvement. Consider additional synonym mappings."
+                })
+    
     # ==================== GOVERNANCE ALERTS & ISSUES ====================
     if governance_output.get("status") == "success":
         governance_data = governance_output.get("data", {})
@@ -400,6 +438,21 @@ def transform_clean_my_data_response(
                 "timeline": "1 week" if rec.get("priority") == "high" else "2 weeks"
             })
     
+    # Field standardization recommendations
+    if field_standardization_output.get("status") == "success":
+        standardization_data = field_standardization_output.get("data", {})
+        standardization_analysis = standardization_data.get("standardization_analysis", {})
+        
+        for rec in standardization_analysis.get("recommendations", [])[:5]:
+            all_recommendations.append({
+                "recommendation_id": f"rec_standardization_{rec.get('column', 'unknown')}",
+                "agent_id": "field-standardization",
+                "field_name": rec.get("column", ""),
+                "priority": rec.get("priority", "medium"),
+                "recommendation": f"{rec.get('action', 'Unknown action')}: {rec.get('reason', '')}",
+                "timeline": "1 week" if rec.get("priority") == "high" else "2 weeks" if rec.get("priority") == "medium" else "3 weeks"
+            })
+    
     # ==================== GENERATE EXECUTIVE SUMMARY ====================
     
     # Overall cleaning quality summary
@@ -424,6 +477,11 @@ def transform_clean_my_data_response(
     if duplicate_resolver_output.get("status") == "success":
         dedup_score = duplicate_resolver_output.get("data", {}).get("dedup_score", {}).get("overall_score", 0)
         overall_quality += dedup_score
+        quality_count += 1
+    
+    if field_standardization_output.get("status") == "success":
+        standardization_score = field_standardization_output.get("data", {}).get("standardization_score", {}).get("overall_score", 0)
+        overall_quality += standardization_score
         quality_count += 1
     
     if quality_count > 0:
@@ -535,6 +593,12 @@ def transform_clean_my_data_response(
         type_issues_fixed = type_fixer_output.get("summary_metrics", {}).get("type_issues_fixed", 0)
         analysis_text_parts.append(f"- Type Fixer: Quality Score {type_score:.1f}/100 ({type_issues_fixed} type issues fixed)")
     
+    if field_standardization_output.get("status") == "success":
+        standardization_score = field_standardization_output.get("data", {}).get("standardization_score", {}).get("overall_score", 0)
+        values_changed = field_standardization_output.get("summary_metrics", {}).get("values_changed", 0)
+        variations_reduced = field_standardization_output.get("summary_metrics", {}).get("variations_reduced", 0)
+        analysis_text_parts.append(f"- Field Standardization: Quality Score {standardization_score:.1f}/100 ({values_changed} values standardized, {variations_reduced} variations reduced)")
+    
     if governance_output.get("status") == "success":
         gov_score = governance_output.get("data", {}).get("governance_scores", {}).get("overall", 0)
         compliance = governance_output.get("data", {}).get("compliance_status", "unknown")
@@ -609,7 +673,7 @@ def transform_clean_my_data_response(
     
     # Collect cleaned files from agents
     cleaned_files = {}
-    for agent_id in ["null-handler", "outlier-remover", "type-fixer", "duplicate-resolver", "quarantine-agent"]:
+    for agent_id in ["null-handler", "outlier-remover", "type-fixer", "duplicate-resolver", "field-standardization", "quarantine-agent"]:
         agent_output = agent_results.get(agent_id, {})
         if agent_output.get("status") == "success":
             if agent_id == "quarantine-agent":

@@ -99,6 +99,7 @@ class CleanMyDataDownloads:
             "outlier-remover": "Outlier Remover",
             "type-fixer": "Type Fixer",
             "duplicate-resolver": "Duplicate Resolver",
+            "field-standardization": "Field Standardization",
             "quarantine-agent": "Quarantine Agent"
         }
         
@@ -190,27 +191,32 @@ class CleanMyDataDownloads:
             if duplicate_output.get("status") == "success":
                 self._create_duplicate_resolver_sheet(wb, duplicate_output)
             
-            # 6. QUARANTINE AGENT SHEET
+            # 6. FIELD STANDARDIZATION SHEET
+            field_standardization_output = agent_results.get("field-standardization", {})
+            if field_standardization_output.get("status") == "success":
+                self._create_field_standardization_sheet(wb, field_standardization_output)
+            
+            # 7. QUARANTINE AGENT SHEET
             if quarantine_output.get("status") == "success":
                 self._create_quarantine_sheet(wb, quarantine_output)
             
-            # 7. GOVERNANCE CHECKER SHEET
+            # 8. GOVERNANCE CHECKER SHEET
             if governance_output.get("status") == "success":
                 self._create_governance_sheet(wb, governance_output)
             
-            # 8. TEST COVERAGE SHEET
+            # 9. TEST COVERAGE SHEET
             if test_output.get("status") == "success":
                 self._create_test_coverage_sheet(wb, test_output)
             
-            # 9. ALERTS SHEET
+            # 10. ALERTS SHEET
             if alerts:
                 self._create_alerts_sheet(wb, alerts)
             
-            # 8. ISSUES SHEET
+            # 11. ISSUES SHEET
             if issues:
                 self._create_issues_sheet(wb, issues)
             
-            # 9. RECOMMENDATIONS SHEET
+            # 12. RECOMMENDATIONS SHEET
             if recommendations:
                 self._create_recommendations_sheet(wb, recommendations)
             
@@ -791,6 +797,115 @@ class CleanMyDataDownloads:
                     ws.cell(row=row, column=col_idx).border = self.border
                     ws.cell(row=row, column=col_idx).alignment = self.left_alignment
                 row += 1
+    
+    def _create_field_standardization_sheet(self, wb, agent_output):
+        """Create field standardization detailed sheet."""
+        ws = wb.create_sheet("Field Standardization", 7)
+        self._set_column_widths(ws, [30, 15, 15, 15, 50])
+        
+        row = 1
+        ws[f'A{row}'] = "FIELD STANDARDIZATION ANALYSIS"
+        ws[f'A{row}'].font = Font(bold=True, size=12, color="FFFFFF")
+        ws[f'A{row}'].fill = self.header_fill
+        row += 2
+        
+        data = agent_output.get("data", {})
+        summary_metrics = agent_output.get("summary_metrics", {})
+        
+        metadata = [
+            ["Status", agent_output.get("status")],
+            ["Execution Time (ms)", agent_output.get("execution_time_ms", 0)],
+            ["Columns Standardized", summary_metrics.get("columns_standardized", 0)],
+            ["Values Changed", summary_metrics.get("values_changed", 0)],
+            ["Variations Reduced", summary_metrics.get("variations_reduced", 0)],
+            ["Total Rows", summary_metrics.get("total_rows_processed", 0)]
+        ]
+        
+        for key, value in metadata:
+            ws[f'A{row}'] = key
+            ws[f'B{row}'] = value
+            ws[f'A{row}'].font = Font(bold=True)
+            ws[f'A{row}'].fill = self.subheader_fill
+            ws[f'A{row}'].border = self.border
+            ws[f'B{row}'].border = self.border
+            row += 1
+        
+        row += 1
+        
+        # Standardization scores
+        ws[f'A{row}'] = "STANDARDIZATION SCORES"
+        ws[f'A{row}'].font = Font(bold=True, size=10)
+        ws[f'A{row}'].fill = self.subheader_fill
+        row += 1
+        
+        standardization_score = data.get("standardization_score", {})
+        metrics = standardization_score.get("metrics", {})
+        score_items = [
+            ["Overall Score", standardization_score.get("overall_score", 0)],
+            ["Standardization Effectiveness", f"{metrics.get('standardization_effectiveness', 0):.1f}%"],
+            ["Data Retention Rate", f"{metrics.get('data_retention_rate', 0):.1f}%"],
+            ["Variations Before", metrics.get('variations_before', 0)],
+            ["Variations After", metrics.get('variations_after', 0)],
+            ["Variations Reduced", metrics.get('variations_reduced', 0)]
+        ]
+        
+        for key, value in score_items:
+            ws[f'A{row}'] = key
+            ws[f'B{row}'] = value
+            ws[f'A{row}'].border = self.border
+            ws[f'B{row}'].border = self.border
+            row += 1
+        
+        row += 1
+        
+        # Column improvements
+        ws[f'A{row}'] = "COLUMN IMPROVEMENTS"
+        ws[f'A{row}'].font = Font(bold=True, size=10)
+        ws[f'A{row}'].fill = self.subheader_fill
+        ws.merge_cells(f'A{row}:E{row}')
+        row += 1
+        
+        headers = ["Column", "Unique Values Reduced", "Case Variations Fixed", "Whitespace Fixed", "Improvement %"]
+        for col_idx, header in enumerate(headers, 1):
+            cell = ws.cell(row=row, column=col_idx, value=header)
+            cell.fill = self.header_fill
+            cell.font = self.header_font
+            cell.border = self.border
+            cell.alignment = self.center_alignment
+        row += 1
+        
+        standardization_analysis = data.get("standardization_analysis", {})
+        improvements = standardization_analysis.get("improvements", {})
+        column_improvements = improvements.get("column_improvements", {})
+        
+        for col_name, col_data in column_improvements.items():
+            ws.cell(row=row, column=1, value=col_name)
+            ws.cell(row=row, column=2, value=col_data.get("unique_values_reduced", 0))
+            ws.cell(row=row, column=3, value=col_data.get("case_variations_fixed", 0))
+            ws.cell(row=row, column=4, value=col_data.get("whitespace_issues_fixed", 0))
+            ws.cell(row=row, column=5, value=f"{col_data.get('improvement_percentage', 0):.2f}%")
+            
+            for col_idx in range(1, 6):
+                ws.cell(row=row, column=col_idx).border = self.border
+                ws.cell(row=row, column=col_idx).alignment = self.left_alignment
+            row += 1
+        
+        row += 1
+        
+        # Standardization operations applied
+        ws[f'A{row}'] = "OPERATIONS APPLIED"
+        ws[f'A{row}'].font = Font(bold=True, size=10)
+        ws[f'A{row}'].fill = self.subheader_fill
+        ws.merge_cells(f'A{row}:B{row}')
+        row += 1
+        
+        operations = standardization_analysis.get("standardization_operations", {})
+        for operation, applied in operations.items():
+            ws[f'A{row}'] = operation.replace('_', ' ').title()
+            ws[f'B{row}'] = "Yes" if applied else "No"
+            ws[f'A{row}'].border = self.border
+            ws[f'B{row}'].border = self.border
+            row += 1
     
     def _create_governance_sheet(self, wb, agent_output):
         """Create governance checker detailed sheet."""
