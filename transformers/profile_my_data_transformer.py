@@ -346,45 +346,45 @@ def transform_profile_my_data_response(
     complete_analysis_text = "\n".join(analysis_text_parts)
     
     # Generate summary using AI
-    analysis_summary = {
-        "status": "pending",
-        "summary": "",
-        "execution_time_ms": 0,
-        "model_used": None
-    }
+    # analysis_summary = {
+    #     "status": "pending",
+    #     "summary": "",
+    #     "execution_time_ms": 0,
+    #     "model_used": None
+    # }
     
-    try:
-        ai_generator = AnalysisSummaryAI()
-        summary_result = ai_generator.generate_summary(
-            analysis_text=complete_analysis_text,
-            dataset_name="Data Profile Analysis"
-        )
-        analysis_summary = summary_result
-    except Exception as e:
-        print(f"Warning: OpenAI summary generation failed: {str(e)}. Using fallback summary.")
-        analysis_summary = {
-            "status": "success",
-            "summary": f"Data profile analysis completed. {len(all_alerts)} alerts detected, {len(all_issues)} issues identified. " +
-                      f"Quality score: {profiler_output.get('data', {}).get('quality_summary', {}).get('overall_quality_score', 0):.1f}/100.",
-            "execution_time_ms": 0,
-            "model_used": "fallback-rule-based"
-        }
+    # try:
+    #     ai_generator = AnalysisSummaryAI()
+    #     summary_result = ai_generator.generate_summary(
+    #         analysis_text=complete_analysis_text,
+    #         dataset_name="Data Profile Analysis"
+    #     )
+    #     analysis_summary = summary_result
+    # except Exception as e:
+    #     print(f"Warning: OpenAI summary generation failed: {str(e)}. Using fallback summary.")
+    #     analysis_summary = {
+    #         "status": "success",
+    #         "summary": f"Data profile analysis completed. {len(all_alerts)} alerts detected, {len(all_issues)} issues identified. " +
+    #                   f"Quality score: {profiler_output.get('data', {}).get('quality_summary', {}).get('overall_quality_score', 0):.1f}/100.",
+    #         "execution_time_ms": 0,
+    #         "model_used": "fallback-rule-based"
+    #     }
     
     # ==================== GENERATE ROUTING RECOMMENDATIONS ====================
-    routing_decisions = []
-    try:
-        from ai.routing_decision_ai import RoutingDecisionAI
-        routing_ai = RoutingDecisionAI()
-        routing_decisions = routing_ai.get_routing_decisions(
-            current_tool="profile-my-data",
-            agent_results=agent_results,
-            primary_filename="data.csv",
-            baseline_filename=None,
-            current_parameters=None
-        )
-        print(f"Generated {len(routing_decisions)} routing recommendations")
-    except Exception as e:
-        print(f"Warning: Routing AI agent failed: {str(e)}")
+    # routing_decisions = []
+    # try:
+    #     from ai.routing_decision_ai import RoutingDecisionAI
+    #     routing_ai = RoutingDecisionAI()
+    #     routing_decisions = routing_ai.get_routing_decisions(
+    #         current_tool="profile-my-data",
+    #         agent_results=agent_results,
+    #         primary_filename="data.csv",
+    #         baseline_filename=None,
+    #         current_parameters=None
+    #     )
+    #     print(f"Generated {len(routing_decisions)} routing recommendations")
+    # except Exception as e:
+    #     print(f"Warning: Routing AI agent failed: {str(e)}")
     
     # ==================== GENERATE DOWNLOADS ====================
     # Use dedicated download module for comprehensive Excel and JSON exports
@@ -410,9 +410,9 @@ def transform_profile_my_data_response(
             "issues": all_issues,
             "recommendations": all_recommendations,
             "executiveSummary": executive_summary,
-            "analysisSummary": analysis_summary,
+            # "analysisSummary": analysis_summary,
             "visualizations": [],
-            "routing_decisions": routing_decisions,
+            # "routing_decisions": routing_decisions,
             # Individual agent outputs (for detailed inspection)
             **{agent_id: output for agent_id, output in agent_results.items() if output.get("status") == "success"},
             # Downloads with Excel and JSON exports
