@@ -1,0 +1,666 @@
+"""
+Cleanse Previewer Agent
+
+Provides "What If" analysis for data cleaning operations before execution.
+Calculates and presents anticipated effects of cleaning operations to mitigate risk
+and build trust. Simulates transformations and compares metrics before/after.
+
+Primary Goal: Mitigate Risk and Build Trust
+Workflow: Runs pre-emptively before actual cleaning agents execute
+Analysis: Calculates Current vs Preview metrics for impact assessment
+
+Input: CSV/JSON/XLSX file (primary) + cleaning rules
+Output: Impact assessment with before/after comparison and risk analysis
+"""
+
+import pandas as pd
+import numpy as np
+import io
+import time
+import re
+import base64
+from typing import Dict, Any, Optional, List, Tuple
+from scipy import stats
+
+
+def execute_cleanse_previewer(
+    file_contents: bytes,
+    filename: str,
+    parameters: Optional[Dict[str, Any]] = None
+) -> Dict[str, Any]:
+    """
+    Preview the impact of data cleaning operations before execution.
+
+    Args:
+        file_contents: File bytes (read as binary)
+        filename: Original filename (used to detect format)
+        parameters: Agent parameters from tool.json
+
+    Returns:
+        Standardized output dictionary with impact assessment
+    """
+
+    start_time = time.time()
+    parameters = parameters or {}
+
+    # Extract parameters with defaults
+    preview_rules = parameters.get("preview_rules", [])  # List of cleaning rules to simulate
+    impact_threshold_high = parameters.get("impact_threshold_high", 10)  # % change considered high impact
+    impact_threshold_medium = parameters.get("impact_threshold_medium", 5)  # % change considered medium impact
+    confidence_level = parameters.get("confidence_level", 0.95)  # Statistical confidence level
+    calculate_distributions = parameters.get("calculate_distributions", True)
+    compare_statistics = parameters.get("compare_statistics", True)
+    analyze_correlations = parameters.get("analyze_correlations", False)
+    
+    # Scoring weights
+    accuracy_weight = parameters.get("accuracy_weight", 0.4)
+    safety_weight = parameters.get("safety_weight", 0.3)
+    completeness_weight = parameters.get("completeness_weight", 0.3)
+    excellent_threshold = parameters.get("excellent_threshold", 90)
+    good_threshold = parameters.get("good_threshold", 75)
+
+    try:
+        # Read file based on format
+        if filename.endswith('.csv'):
+            df = pd.read_csv(io.BytesIO(file_contents), on_bad_lines='skip')
+        elif filename.endswith('.json'):
+            df = pd.read_json(io.BytesIO(file_contents))
+        elif filename.endswith(('.xlsx', '.xls')):
+            df = pd.read_excel(io.BytesIO(file_contents))
+        else:
+            return {
+                "status": "error",
+                "agent_id": "cleanse-previewer",
+                "error": f"Unsupported file format: {filename}",
+                "execution_time_ms": int((time.time() - start_time) * 1000)
+            }
+
+        # Validate data
+        if df.empty:
+            return {
+                "status": "error",
+                "agent_id": "cleanse-previewer",
+                "agent_name": "Cleanse Previewer",
+                "error": "File is empty",
+                "execution_time_ms": int((time.time() - start_time) * 1000)
+            }
+
+        # Analyze original data (current state)
+        original_profile = _profile_dataset(df, {
+            "calculate_distributions": calculate_distributions,
+            "compare_statistics": compare_statistics,
+            "analyze_correlations": analyze_correlations
+        })
+        
+        # Simulate cleaning operations
+        simulated_results = []
+        overall_impact_assessment = {
+            "total_rules": len(preview_rules),
+            "high_impact_rules": 0,
+            "medium_impact_rules": 0,
+            "low_impact_rules": 0,
+            "safe_to_execute": True,
+            "warnings": []
+        }
+        
+        for rule_idx, rule in enumerate(preview_rules):
+            try:
+                # Apply rule simulation
+                df_simulated, simulation_log = _simulate_cleaning_rule(df.copy(), rule)
+                
+                # Profile simulated data
+                simulated_profile = _profile_dataset(df_simulated, {
+                    "calculate_distributions": calculate_distributions,
+                    "compare_statistics": compare_statistics,
+                    "analyze_correlations": analyze_correlations
+                })
+                
+                # Calculate impact
+                impact_analysis = _calculate_impact(
+                    original_profile,
+                    simulated_profile,
+                    rule,
+                    {
+                        "high_threshold": impact_threshold_high,
+                        "medium_threshold": impact_threshold_medium
+                    }
+                )
+                
+                # Store result
+                simulated_results.append({
+                    "rule_id": rule.get("rule_id", f"rule_{rule_idx + 1}"),
+                    "rule_description": rule.get("description", "Cleaning rule"),
+                    "rule_type": rule.get("type", "unknown"),
+                    "target_columns": rule.get("target_columns", []),
+                    "simulation_log": simulation_log,
+                    "original_metrics": impact_analysis["original_metrics"],
+                    "preview_metrics": impact_analysis["preview_metrics"],
+                    "changes": impact_analysis["changes"],
+                    "impact_level": impact_analysis["impact_level"],
+                    "risk_assessment": impact_analysis["risk_assessment"],
+                    "recommendations": impact_analysis["recommendations"]
+                })
+                
+                # Update overall assessment
+                if impact_analysis["impact_level"] == "high":
+                    overall_impact_assessment["high_impact_rules"] += 1
+                    if impact_analysis["risk_assessment"]["is_risky"]:
+                        overall_impact_assessment["safe_to_execute"] = False
+                        overall_impact_assessment["warnings"].append(
+                            f"Rule '{rule.get('description', 'unknown')}' has high impact and risk"
+                        )
+                elif impact_analysis["impact_level"] == "medium":
+                    overall_impact_assessment["medium_impact_rules"] += 1
+                else:
+                    overall_impact_assessment["low_impact_rules"] += 1
+                    
+            except Exception as e:
+                simulated_results.append({
+                    "rule_id": rule.get("rule_id", f"rule_{rule_idx + 1}"),
+                    "rule_description": rule.get("description", "Cleaning rule"),
+                    "status": "error",
+                    "error": str(e)
+                })
+        
+        # Calculate preview confidence score
+        preview_score = _calculate_preview_score(
+            original_profile,
+            simulated_results,
+            overall_impact_assessment,
+            {
+                "accuracy_weight": accuracy_weight,
+                "safety_weight": safety_weight,
+                "completeness_weight": completeness_weight,
+                "excellent_threshold": excellent_threshold,
+                "good_threshold": good_threshold
+            }
+        )
+        
+        # Determine quality status
+        if preview_score["overall_score"] >= excellent_threshold:
+            quality_status = "excellent"
+        elif preview_score["overall_score"] >= good_threshold:
+            quality_status = "good"
+        else:
+            quality_status = "needs_review"
+        
+        # Generate recommendations
+        recommendations = _generate_preview_recommendations(
+            simulated_results,
+            overall_impact_assessment,
+            preview_score
+        )
+        
+        # Build preview analysis
+        preview_analysis = {
+            "original_profile": original_profile,
+            "simulated_results": simulated_results,
+            "overall_impact": overall_impact_assessment,
+            "statistical_confidence": confidence_level * 100,
+            "execution_safety": "SAFE" if overall_impact_assessment["safe_to_execute"] else "CAUTION",
+            "recommendations": recommendations
+        }
+        
+        # Build results
+        preview_data = {
+            "preview_score": preview_score,
+            "quality_status": quality_status,
+            "preview_analysis": preview_analysis,
+            "summary": f"Preview analysis completed. Quality: {quality_status}. Analyzed {len(preview_rules)} cleaning rules across {len(df)} rows. Safety: {preview_analysis['execution_safety']}.",
+            "impact_issues": _extract_impact_issues(simulated_results)[:100]
+        }
+
+        return {
+            "status": "success",
+            "agent_id": "cleanse-previewer",
+            "agent_name": "Cleanse Previewer",
+            "execution_time_ms": int((time.time() - start_time) * 1000),
+            "summary_metrics": {
+                "total_rows_analyzed": len(df),
+                "total_rules_previewed": len(preview_rules),
+                "high_impact_rules": overall_impact_assessment["high_impact_rules"],
+                "medium_impact_rules": overall_impact_assessment["medium_impact_rules"],
+                "low_impact_rules": overall_impact_assessment["low_impact_rules"],
+                "safe_to_execute": overall_impact_assessment["safe_to_execute"],
+                "total_warnings": len(overall_impact_assessment["warnings"])
+            },
+            "data": preview_data
+        }
+
+    except Exception as e:
+        return {
+            "status": "error",
+            "agent_id": "cleanse-previewer",
+            "agent_name": "Cleanse Previewer",
+            "error": str(e),
+            "execution_time_ms": int((time.time() - start_time) * 1000)
+        }
+
+
+def _profile_dataset(df: pd.DataFrame, config: Dict[str, Any]) -> Dict[str, Any]:
+    """Generate comprehensive profile of dataset."""
+    profile = {
+        "row_count": len(df),
+        "column_count": len(df.columns),
+        "memory_usage_mb": df.memory_usage(deep=True).sum() / (1024 * 1024),
+        "columns": {}
+    }
+    
+    for col in df.columns:
+        col_profile = {
+            "dtype": str(df[col].dtype),
+            "null_count": int(df[col].isna().sum()),
+            "null_percentage": round((df[col].isna().sum() / len(df) * 100) if len(df) > 0 else 0, 2),
+            "unique_count": int(df[col].nunique()),
+            "unique_percentage": round((df[col].nunique() / len(df) * 100) if len(df) > 0 else 0, 2)
+        }
+        
+        # Numeric columns
+        if pd.api.types.is_numeric_dtype(df[col]):
+            col_profile["statistics"] = {
+                "mean": float(df[col].mean()) if df[col].notna().any() else None,
+                "median": float(df[col].median()) if df[col].notna().any() else None,
+                "std": float(df[col].std()) if df[col].notna().any() else None,
+                "min": float(df[col].min()) if df[col].notna().any() else None,
+                "max": float(df[col].max()) if df[col].notna().any() else None,
+                "q25": float(df[col].quantile(0.25)) if df[col].notna().any() else None,
+                "q75": float(df[col].quantile(0.75)) if df[col].notna().any() else None
+            }
+            
+            if config.get("calculate_distributions"):
+                # Calculate distribution metrics
+                non_null = df[col].dropna()
+                if len(non_null) > 0:
+                    col_profile["distribution"] = {
+                        "skewness": float(non_null.skew()),
+                        "kurtosis": float(non_null.kurtosis())
+                    }
+        
+        # String columns
+        elif df[col].dtype == 'object':
+            col_profile["statistics"] = {
+                "most_common": str(df[col].mode().iloc[0]) if not df[col].mode().empty else None,
+                "most_common_count": int(df[col].value_counts().iloc[0]) if len(df[col].value_counts()) > 0 else 0,
+                "avg_length": float(df[col].astype(str).str.len().mean()) if df[col].notna().any() else None
+            }
+        
+        profile["columns"][col] = col_profile
+    
+    return profile
+
+
+def _simulate_cleaning_rule(df: pd.DataFrame, rule: Dict[str, Any]) -> Tuple[pd.DataFrame, List[str]]:
+    """Simulate application of a cleaning rule without modifying original data."""
+    log = []
+    rule_type = rule.get("type", "unknown")
+    
+    if rule_type == "drop_nulls":
+        # Drop rows with nulls in specified columns
+        target_cols = rule.get("target_columns", [])
+        if target_cols:
+            original_count = len(df)
+            df = df.dropna(subset=target_cols)
+            log.append(f"Dropped {original_count - len(df)} rows with nulls in {target_cols}")
+    
+    elif rule_type == "impute_nulls":
+        # Impute nulls with specified strategy
+        target_cols = rule.get("target_columns", [])
+        strategy = rule.get("strategy", "mean")
+        
+        for col in target_cols:
+            if col not in df.columns:
+                continue
+            
+            null_count = df[col].isna().sum()
+            
+            if strategy == "mean" and pd.api.types.is_numeric_dtype(df[col]):
+                df[col] = df[col].fillna(df[col].mean())
+                log.append(f"Imputed {null_count} nulls in '{col}' with mean")
+            elif strategy == "median" and pd.api.types.is_numeric_dtype(df[col]):
+                df[col] = df[col].fillna(df[col].median())
+                log.append(f"Imputed {null_count} nulls in '{col}' with median")
+            elif strategy == "mode":
+                df[col] = df[col].fillna(df[col].mode().iloc[0] if not df[col].mode().empty else 0)
+                log.append(f"Imputed {null_count} nulls in '{col}' with mode")
+            elif strategy == "constant":
+                fill_value = rule.get("fill_value", 0)
+                df[col] = df[col].fillna(fill_value)
+                log.append(f"Imputed {null_count} nulls in '{col}' with constant: {fill_value}")
+    
+    elif rule_type == "remove_outliers":
+        # Remove outliers using specified method
+        target_cols = rule.get("target_columns", [])
+        method = rule.get("method", "iqr")
+        
+        for col in target_cols:
+            if col not in df.columns or not pd.api.types.is_numeric_dtype(df[col]):
+                continue
+            
+            original_count = len(df)
+            
+            if method == "iqr":
+                Q1 = df[col].quantile(0.25)
+                Q3 = df[col].quantile(0.75)
+                IQR = Q3 - Q1
+                multiplier = rule.get("iqr_multiplier", 1.5)
+                df = df[(df[col] >= Q1 - multiplier * IQR) & (df[col] <= Q3 + multiplier * IQR)]
+            elif method == "z_score":
+                threshold = rule.get("z_threshold", 3.0)
+                z_scores = np.abs(stats.zscore(df[col].dropna()))
+                df = df[np.abs(stats.zscore(df[col])) < threshold]
+            
+            log.append(f"Removed {original_count - len(df)} outliers from '{col}' using {method}")
+    
+    elif rule_type == "drop_duplicates":
+        # Drop duplicate rows
+        subset_cols = rule.get("target_columns", None)
+        original_count = len(df)
+        df = df.drop_duplicates(subset=subset_cols, keep='first')
+        log.append(f"Removed {original_count - len(df)} duplicate rows")
+    
+    elif rule_type == "drop_columns":
+        # Drop specified columns
+        target_cols = rule.get("target_columns", [])
+        existing_cols = [col for col in target_cols if col in df.columns]
+        df = df.drop(columns=existing_cols)
+        log.append(f"Dropped {len(existing_cols)} columns: {existing_cols}")
+    
+    elif rule_type == "convert_types":
+        # Convert column types
+        target_cols = rule.get("target_columns", [])
+        target_type = rule.get("target_type", "float")
+        
+        for col in target_cols:
+            if col not in df.columns:
+                continue
+            
+            try:
+                if target_type == "numeric":
+                    df[col] = pd.to_numeric(df[col], errors='coerce')
+                elif target_type == "datetime":
+                    df[col] = pd.to_datetime(df[col], errors='coerce')
+                elif target_type == "string":
+                    df[col] = df[col].astype(str)
+                
+                log.append(f"Converted '{col}' to {target_type}")
+            except Exception as e:
+                log.append(f"Failed to convert '{col}' to {target_type}: {str(e)}")
+    
+    else:
+        log.append(f"Unknown rule type: {rule_type}")
+    
+    return df, log
+
+
+def _calculate_impact(
+    original_profile: Dict[str, Any],
+    simulated_profile: Dict[str, Any],
+    rule: Dict[str, Any],
+    config: Dict[str, Any]
+) -> Dict[str, Any]:
+    """Calculate impact of cleaning rule by comparing profiles."""
+    
+    # Row count change
+    row_change = simulated_profile["row_count"] - original_profile["row_count"]
+    row_change_pct = (row_change / original_profile["row_count"] * 100) if original_profile["row_count"] > 0 else 0
+    
+    # Column count change
+    col_change = simulated_profile["column_count"] - original_profile["column_count"]
+    
+    # Detailed changes per column
+    column_changes = {}
+    for col in original_profile["columns"].keys():
+        if col not in simulated_profile["columns"]:
+            column_changes[col] = {"status": "removed"}
+            continue
+        
+        orig_col = original_profile["columns"][col]
+        sim_col = simulated_profile["columns"][col]
+        
+        changes = {
+            "null_count_change": sim_col["null_count"] - orig_col["null_count"],
+            "null_percentage_change": round(sim_col["null_percentage"] - orig_col["null_percentage"], 2),
+            "unique_count_change": sim_col["unique_count"] - orig_col["unique_count"]
+        }
+        
+        # Statistical changes for numeric columns
+        if "statistics" in orig_col and "statistics" in sim_col:
+            if orig_col["statistics"].get("mean") is not None and sim_col["statistics"].get("mean") is not None:
+                changes["mean_change"] = round(sim_col["statistics"]["mean"] - orig_col["statistics"]["mean"], 2)
+                changes["mean_change_pct"] = round(
+                    ((sim_col["statistics"]["mean"] - orig_col["statistics"]["mean"]) / orig_col["statistics"]["mean"] * 100)
+                    if orig_col["statistics"]["mean"] != 0 else 0,
+                    2
+                )
+            
+            if orig_col["statistics"].get("median") is not None and sim_col["statistics"].get("median") is not None:
+                changes["median_change"] = round(sim_col["statistics"]["median"] - orig_col["statistics"]["median"], 2)
+        
+        column_changes[col] = changes
+    
+    # Determine impact level
+    high_threshold = config.get("high_threshold", 10)
+    medium_threshold = config.get("medium_threshold", 5)
+    
+    if abs(row_change_pct) >= high_threshold or col_change != 0:
+        impact_level = "high"
+    elif abs(row_change_pct) >= medium_threshold:
+        impact_level = "medium"
+    else:
+        impact_level = "low"
+    
+    # Risk assessment
+    is_risky = False
+    risk_factors = []
+    
+    if abs(row_change_pct) > 20:
+        is_risky = True
+        risk_factors.append(f"Large data loss: {abs(row_change_pct):.1f}% of rows will be removed")
+    
+    if col_change < 0:
+        is_risky = True
+        risk_factors.append(f"{abs(col_change)} columns will be permanently removed")
+    
+    # Check for significant statistical shifts
+    for col, changes in column_changes.items():
+        if "mean_change_pct" in changes and abs(changes["mean_change_pct"]) > 50:
+            risk_factors.append(f"Large statistical shift in '{col}': mean changes by {changes['mean_change_pct']:.1f}%")
+    
+    risk_assessment = {
+        "is_risky": is_risky,
+        "risk_level": "high" if is_risky else "low",
+        "risk_factors": risk_factors
+    }
+    
+    # Generate recommendations
+    recommendations = []
+    
+    if abs(row_change_pct) > 10:
+        recommendations.append({
+            "priority": "high",
+            "action": "review_data_loss",
+            "reason": f"This operation will affect {abs(row_change_pct):.1f}% of your data"
+        })
+    
+    if is_risky:
+        recommendations.append({
+            "priority": "high",
+            "action": "create_backup",
+            "reason": "High-risk operation detected. Create a backup before proceeding"
+        })
+    
+    if impact_level == "low":
+        recommendations.append({
+            "priority": "low",
+            "action": "safe_to_proceed",
+            "reason": "This operation has minimal impact on your data"
+        })
+    
+    return {
+        "original_metrics": {
+            "total_rows": original_profile["row_count"],
+            "total_columns": original_profile["column_count"],
+            "memory_mb": round(original_profile["memory_usage_mb"], 2)
+        },
+        "preview_metrics": {
+            "total_rows": simulated_profile["row_count"],
+            "total_columns": simulated_profile["column_count"],
+            "memory_mb": round(simulated_profile["memory_usage_mb"], 2)
+        },
+        "changes": {
+            "row_change": row_change,
+            "row_change_percentage": round(row_change_pct, 2),
+            "column_change": col_change,
+            "memory_change_mb": round(simulated_profile["memory_usage_mb"] - original_profile["memory_usage_mb"], 2),
+            "column_level_changes": column_changes
+        },
+        "impact_level": impact_level,
+        "risk_assessment": risk_assessment,
+        "recommendations": recommendations
+    }
+
+
+def _calculate_preview_score(
+    original_profile: Dict[str, Any],
+    simulated_results: List[Dict[str, Any]],
+    overall_impact: Dict[str, Any],
+    config: Dict[str, Any]
+) -> Dict[str, Any]:
+    """Calculate preview confidence score."""
+    
+    # Accuracy: How well we can predict the outcome
+    successful_simulations = sum(1 for r in simulated_results if r.get("status") != "error")
+    accuracy_score = (successful_simulations / len(simulated_results) * 100) if len(simulated_results) > 0 else 100
+    
+    # Safety: How safe the operations are
+    safety_score = 100
+    if overall_impact["high_impact_rules"] > 0:
+        safety_score -= overall_impact["high_impact_rules"] * 15
+    if overall_impact["medium_impact_rules"] > 0:
+        safety_score -= overall_impact["medium_impact_rules"] * 5
+    if not overall_impact["safe_to_execute"]:
+        safety_score -= 20
+    safety_score = max(0, safety_score)
+    
+    # Completeness: How comprehensive the preview is
+    completeness_score = 100
+    if len(simulated_results) == 0:
+        completeness_score = 0
+    
+    # Calculate weighted overall score
+    accuracy_weight = config.get("accuracy_weight", 0.4)
+    safety_weight = config.get("safety_weight", 0.3)
+    completeness_weight = config.get("completeness_weight", 0.3)
+    
+    overall_score = (
+        accuracy_score * accuracy_weight +
+        safety_score * safety_weight +
+        completeness_score * completeness_weight
+    )
+    
+    return {
+        "overall_score": round(overall_score, 1),
+        "metrics": {
+            "accuracy_score": round(accuracy_score, 1),
+            "safety_score": round(safety_score, 1),
+            "completeness_score": round(completeness_score, 1),
+            "successful_simulations": successful_simulations,
+            "total_simulations": len(simulated_results),
+            "high_impact_operations": overall_impact["high_impact_rules"],
+            "safe_to_execute": overall_impact["safe_to_execute"]
+        }
+    }
+
+
+def _generate_preview_recommendations(
+    simulated_results: List[Dict[str, Any]],
+    overall_impact: Dict[str, Any],
+    preview_score: Dict[str, Any]
+) -> List[Dict[str, Any]]:
+    """Generate recommendations based on preview analysis."""
+    recommendations = []
+    
+    if not overall_impact["safe_to_execute"]:
+        recommendations.append({
+            "priority": "critical",
+            "action": "review_high_risk_rules",
+            "reason": f"Found {overall_impact['high_impact_rules']} high-risk operations that require careful review",
+            "affected_rules": [r["rule_id"] for r in simulated_results if r.get("impact_level") == "high"]
+        })
+    
+    if overall_impact["high_impact_rules"] > 0:
+        recommendations.append({
+            "priority": "high",
+            "action": "backup_data",
+            "reason": "High-impact operations detected. Create a backup before proceeding"
+        })
+    
+    if preview_score["overall_score"] >= 90:
+        recommendations.append({
+            "priority": "low",
+            "action": "proceed_with_confidence",
+            "reason": "Preview analysis shows low risk. Safe to proceed with cleaning operations"
+        })
+    elif preview_score["overall_score"] >= 75:
+        recommendations.append({
+            "priority": "medium",
+            "action": "review_before_execution",
+            "reason": "Some operations may have moderate impact. Review changes before proceeding"
+        })
+    else:
+        recommendations.append({
+            "priority": "high",
+            "action": "reconsider_strategy",
+            "reason": "Preview shows concerning changes. Consider revising cleaning strategy"
+        })
+    
+    # Rule-specific recommendations
+    for result in simulated_results:
+        if result.get("status") == "error":
+            recommendations.append({
+                "priority": "high",
+                "action": "fix_rule_error",
+                "reason": f"Rule '{result.get('rule_description')}' failed: {result.get('error')}",
+                "affected_rules": [result.get("rule_id")]
+            })
+    
+    return recommendations
+
+
+def _extract_impact_issues(simulated_results: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """Extract issues from simulated results for reporting."""
+    issues = []
+    
+    for result in simulated_results:
+        if result.get("status") == "error":
+            issues.append({
+                "issue_type": "simulation_error",
+                "rule_id": result.get("rule_id"),
+                "severity": "high",
+                "description": f"Failed to simulate rule: {result.get('error')}"
+            })
+            continue
+        
+        if result.get("impact_level") == "high":
+            changes = result.get("changes", {})
+            issues.append({
+                "issue_type": "high_impact_operation",
+                "rule_id": result.get("rule_id"),
+                "severity": "high",
+                "description": f"High impact: {changes.get('row_change_percentage', 0):.1f}% row change",
+                "details": {
+                    "rows_affected": changes.get("row_change", 0),
+                    "columns_affected": changes.get("column_change", 0)
+                }
+            })
+        
+        if result.get("risk_assessment", {}).get("is_risky"):
+            for risk_factor in result.get("risk_assessment", {}).get("risk_factors", []):
+                issues.append({
+                    "issue_type": "risk_detected",
+                    "rule_id": result.get("rule_id"),
+                    "severity": "high",
+                    "description": risk_factor
+                })
+    
+    return issues

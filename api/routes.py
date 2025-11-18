@@ -551,6 +551,23 @@ def execute_agent_flexible(
             parameters
         )
     
+    elif agent_id == "cleanse-previewer":
+        if "primary" not in files_map:
+            return {
+                "status": "error",
+                "error": "Cleanse previewer requires 'primary' file",
+                "execution_time_ms": 0
+            }
+        
+        primary_bytes, primary_filename = files_map["primary"]
+        
+        from agents import cleanse_previewer
+        return cleanse_previewer.execute_cleanse_previewer(
+            primary_bytes,
+            primary_filename,
+            parameters
+        )
+    
     else:
         return {
             "status": "error",

@@ -8,6 +8,7 @@
     "isAvailable": true,
     "version": "1.0.0",
     "available_agents": [
+      "cleanse-previewer",
       "quarantine-agent",
       "null-handler",
       "outlier-remover",
@@ -27,6 +28,126 @@
     }
   },
   "agents": {
+    "cleanse-previewer": {
+      "id": "cleanse-previewer",
+      "name": "Cleanse Previewer",
+      "description": "Provides 'What If' analysis for data cleaning operations before execution. Calculates and presents anticipated effects of cleaning operations to mitigate risk and build trust. Simulates transformations and compares metrics before/after to ensure safe execution.",
+      "icon": "🔮",
+      "category": "Data Analysis & Preview",
+      "accuracy": "97%",
+      "features": [
+        "What-If Simulation",
+        "Impact Assessment",
+        "Risk Analysis",
+        "Before/After Comparison",
+        "Statistical Confidence Scoring",
+        "Safety Validation"
+      ],
+      "input": { "type": "CSV, JSON, XLSX + cleaning rules" },
+      "version": "1.0.0",
+      "required_files": ["primary"],
+      "parameters": {
+        "preview_rules": {
+          "type": "array",
+          "description": "List of cleaning rules to preview. Each rule specifies: {type, target_columns, description, ...}. Supported types: drop_nulls, impute_nulls, remove_outliers, drop_duplicates, drop_columns, convert_types",
+          "default": [],
+          "items": "object"
+        },
+        "impact_threshold_high": {
+          "type": "float",
+          "description": "Percentage change threshold to classify as high impact",
+          "default": 10,
+          "min": 0,
+          "max": 100
+        },
+        "impact_threshold_medium": {
+          "type": "float",
+          "description": "Percentage change threshold to classify as medium impact",
+          "default": 5,
+          "min": 0,
+          "max": 100
+        },
+        "confidence_level": {
+          "type": "float",
+          "description": "Statistical confidence level for analysis",
+          "default": 0.95,
+          "min": 0.8,
+          "max": 0.99
+        },
+        "calculate_distributions": {
+          "type": "boolean",
+          "description": "Calculate distribution metrics (skewness, kurtosis)",
+          "default": true
+        },
+        "compare_statistics": {
+          "type": "boolean",
+          "description": "Compare statistical measures before/after",
+          "default": true
+        },
+        "analyze_correlations": {
+          "type": "boolean",
+          "description": "Analyze correlation changes",
+          "default": false
+        },
+        "accuracy_weight": {
+          "type": "float",
+          "description": "Weight for preview accuracy in scoring",
+          "default": 0.4,
+          "min": 0,
+          "max": 1
+        },
+        "safety_weight": {
+          "type": "float",
+          "description": "Weight for operation safety in scoring",
+          "default": 0.3,
+          "min": 0,
+          "max": 1
+        },
+        "completeness_weight": {
+          "type": "float",
+          "description": "Weight for analysis completeness in scoring",
+          "default": 0.3,
+          "min": 0,
+          "max": 1
+        },
+        "excellent_threshold": {
+          "type": "integer",
+          "description": "Score threshold for excellent preview quality",
+          "default": 90,
+          "min": 0,
+          "max": 100
+        },
+        "good_threshold": {
+          "type": "integer",
+          "description": "Score threshold for good preview quality",
+          "default": 75,
+          "min": 0,
+          "max": 100
+        }
+      },
+      "output_structure": {
+        "agent_id": "string",
+        "agent_name": "string",
+        "status": "string",
+        "execution_time_ms": "integer",
+        "summary_metrics": {
+          "total_rows_analyzed": "integer",
+          "total_rules_previewed": "integer",
+          "high_impact_rules": "integer",
+          "medium_impact_rules": "integer",
+          "low_impact_rules": "integer",
+          "safe_to_execute": "boolean",
+          "total_warnings": "integer"
+        },
+        "data": {
+          "preview_score": "object",
+          "quality_status": "string",
+          "preview_analysis": "object",
+          "summary": "string",
+          "impact_issues": "array"
+        }
+      }
+    },
     "quarantine-agent": {
       "id": "quarantine-agent",
       "name": "Quarantine Agent",

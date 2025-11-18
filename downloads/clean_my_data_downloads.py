@@ -95,6 +95,7 @@ class CleanMyDataDownloads:
         # ==================== ADD CLEANED DATA FILES ====================
         # Add cleaned CSV files from individual agents
         agent_names = {
+            "cleanse-previewer": "Cleanse Previewer",
             "null-handler": "Null Handler",
             "outlier-remover": "Outlier Remover",
             "type-fixer": "Type Fixer",
@@ -175,48 +176,53 @@ class CleanMyDataDownloads:
                 wb, analysis_id, execution_time_ms, alerts, issues, recommendations
             )
             
-            # 2. NULL HANDLER SHEET
+            # 2. CLEANSE PREVIEWER SHEET
+            cleanse_previewer_output = agent_results.get("cleanse-previewer", {})
+            if cleanse_previewer_output.get("status") == "success":
+                self._create_cleanse_previewer_sheet(wb, cleanse_previewer_output)
+            
+            # 3. NULL HANDLER SHEET
             if null_output.get("status") == "success":
                 self._create_null_handler_sheet(wb, null_output)
             
-            # 3. OUTLIER REMOVER SHEET
+            # 4. OUTLIER REMOVER SHEET
             if outlier_output.get("status") == "success":
                 self._create_outlier_sheet(wb, outlier_output)
             
-            # 4. TYPE FIXER SHEET
+            # 5. TYPE FIXER SHEET
             if type_output.get("status") == "success":
                 self._create_type_fixer_sheet(wb, type_output)
             
-            # 5. DUPLICATE RESOLVER SHEET
+            # 6. DUPLICATE RESOLVER SHEET
             if duplicate_output.get("status") == "success":
                 self._create_duplicate_resolver_sheet(wb, duplicate_output)
             
-            # 6. FIELD STANDARDIZATION SHEET
+            # 7. FIELD STANDARDIZATION SHEET
             field_standardization_output = agent_results.get("field-standardization", {})
             if field_standardization_output.get("status") == "success":
                 self._create_field_standardization_sheet(wb, field_standardization_output)
             
-            # 7. QUARANTINE AGENT SHEET
+            # 8. QUARANTINE AGENT SHEET
             if quarantine_output.get("status") == "success":
                 self._create_quarantine_sheet(wb, quarantine_output)
             
-            # 8. GOVERNANCE CHECKER SHEET
+            # 9. GOVERNANCE CHECKER SHEET
             if governance_output.get("status") == "success":
                 self._create_governance_sheet(wb, governance_output)
             
-            # 9. TEST COVERAGE SHEET
+            # 10. TEST COVERAGE SHEET
             if test_output.get("status") == "success":
                 self._create_test_coverage_sheet(wb, test_output)
             
-            # 10. ALERTS SHEET
+            # 11. ALERTS SHEET
             if alerts:
                 self._create_alerts_sheet(wb, alerts)
             
-            # 11. ISSUES SHEET
+            # 12. ISSUES SHEET
             if issues:
                 self._create_issues_sheet(wb, issues)
             
-            # 12. RECOMMENDATIONS SHEET
+            # 13. RECOMMENDATIONS SHEET
             if recommendations:
                 self._create_recommendations_sheet(wb, recommendations)
             
@@ -300,6 +306,143 @@ class CleanMyDataDownloads:
             ws[f'A{row}'].border = self.border
             ws[f'B{row}'].border = self.border
             row += 1
+    
+    def _create_cleanse_previewer_sheet(self, wb, agent_output):
+        """Create cleanse previewer detailed sheet."""
+        ws = wb.create_sheet("Cleanse Preview", 1)
+        self._set_column_widths(ws, [30, 20, 20, 20, 50])
+        
+        row = 1
+        ws[f'A{row}'] = "CLEANSE PREVIEWER ANALYSIS"
+        ws[f'A{row}'].font = Font(bold=True, size=12, color="FFFFFF")
+        ws[f'A{row}'].fill = self.header_fill
+        row += 2
+        
+        data = agent_output.get("data", {})
+        summary_metrics = agent_output.get("summary_metrics", {})
+        
+        metadata = [
+            ["Status", agent_output.get("status")],
+            ["Execution Time (ms)", agent_output.get("execution_time_ms", 0)],
+            ["Rules Previewed", summary_metrics.get("total_rules_previewed", 0)],
+            ["High Impact Rules", summary_metrics.get("high_impact_rules", 0)],
+            ["Medium Impact Rules", summary_metrics.get("medium_impact_rules", 0)],
+            ["Low Impact Rules", summary_metrics.get("low_impact_rules", 0)],
+            ["Safe to Execute", "YES" if summary_metrics.get("safe_to_execute", True) else "NO"],
+            ["Total Warnings", summary_metrics.get("total_warnings", 0)]
+        ]
+        
+        for key, value in metadata:
+            ws[f'A{row}'] = key
+            ws[f'B{row}'] = value
+            ws[f'A{row}'].font = Font(bold=True)
+            ws[f'A{row}'].fill = self.subheader_fill
+            ws[f'A{row}'].border = self.border
+            ws[f'B{row}'].border = self.border
+            row += 1
+        
+        row += 1
+        
+        # Preview scores
+        ws[f'A{row}'] = "PREVIEW SCORES"
+        ws[f'A{row}'].font = Font(bold=True, size=10)
+        ws[f'A{row}'].fill = self.subheader_fill
+        row += 1
+        
+        preview_score = data.get("preview_score", {})
+        metrics = preview_score.get("metrics", {})
+        score_items = [
+            ["Overall Score", preview_score.get("overall_score", 0)],
+            ["Accuracy Score", metrics.get("accuracy_score", 0)],
+            ["Safety Score", metrics.get("safety_score", 0)],
+            ["Completeness Score", metrics.get("completeness_score", 0)],
+            ["Successful Simulations", f"{metrics.get('successful_simulations', 0)}/{metrics.get('total_simulations', 0)}"]
+        ]
+        
+        for key, value in score_items:
+            ws[f'A{row}'] = key
+            ws[f'B{row}'] = value
+            ws[f'A{row}'].border = self.border
+            ws[f'B{row}'].border = self.border
+            row += 1
+        
+        row += 1
+        
+        # Simulated results
+        ws[f'A{row}'] = "PREVIEW RESULTS BY RULE"
+        ws[f'A{row}'].font = Font(bold=True, size=10)
+        ws[f'A{row}'].fill = self.subheader_fill
+        ws.merge_cells(f'A{row}:E{row}')
+        row += 1
+        
+        headers = ["Rule ID", "Description", "Impact Level", "Row Change %", "Risk Level"]
+        for col_idx, header in enumerate(headers, 1):
+            cell = ws.cell(row=row, column=col_idx, value=header)
+            cell.fill = self.header_fill
+            cell.font = self.header_font
+            cell.border = self.border
+            cell.alignment = self.center_alignment
+        row += 1
+        
+        preview_analysis = data.get("preview_analysis", {})
+        simulated_results = preview_analysis.get("simulated_results", [])
+        
+        for result in simulated_results:
+            ws.cell(row=row, column=1, value=result.get("rule_id", ""))
+            ws.cell(row=row, column=2, value=result.get("rule_description", ""))
+            ws.cell(row=row, column=3, value=result.get("impact_level", "unknown").upper())
+            
+            changes = result.get("changes", {})
+            ws.cell(row=row, column=4, value=f"{changes.get('row_change_percentage', 0):.2f}%")
+            
+            risk_assessment = result.get("risk_assessment", {})
+            ws.cell(row=row, column=5, value=risk_assessment.get("risk_level", "unknown").upper())
+            
+            for col_idx in range(1, 6):
+                ws.cell(row=row, column=col_idx).border = self.border
+                ws.cell(row=row, column=col_idx).alignment = self.left_alignment
+            row += 1
+        
+        row += 1
+        
+        # Overall impact assessment
+        ws[f'A{row}'] = "OVERALL IMPACT ASSESSMENT"
+        ws[f'A{row}'].font = Font(bold=True, size=10)
+        ws[f'A{row}'].fill = self.subheader_fill
+        ws.merge_cells(f'A{row}:B{row}')
+        row += 1
+        
+        overall_impact = preview_analysis.get("overall_impact", {})
+        impact_items = [
+            ["Execution Safety", preview_analysis.get("execution_safety", "UNKNOWN")],
+            ["Statistical Confidence", f"{preview_analysis.get('statistical_confidence', 0):.1f}%"],
+            ["Safe to Execute", "YES" if overall_impact.get("safe_to_execute", True) else "NO"]
+        ]
+        
+        for key, value in impact_items:
+            ws[f'A{row}'] = key
+            ws[f'B{row}'] = value
+            ws[f'A{row}'].border = self.border
+            ws[f'B{row}'].border = self.border
+            row += 1
+        
+        row += 1
+        
+        # Warnings
+        warnings = overall_impact.get("warnings", [])
+        if warnings:
+            ws[f'A{row}'] = "WARNINGS"
+            ws[f'A{row}'].font = Font(bold=True, size=10)
+            ws[f'A{row}'].fill = self.subheader_fill
+            ws.merge_cells(f'A{row}:E{row}')
+            row += 1
+            
+            for warning in warnings:
+                ws[f'A{row}'] = warning
+                ws[f'A{row}'].border = self.border
+                ws[f'A{row}'].alignment = self.left_alignment
+                ws.merge_cells(f'A{row}:E{row}')
+                row += 1
     
     def _create_null_handler_sheet(self, wb, agent_output):
         """Create null handler detailed sheet."""

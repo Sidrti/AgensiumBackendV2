@@ -42,6 +42,7 @@ def transform_clean_my_data_response(
     """
     
     # Extract individual agent outputs
+    cleanse_previewer_output = agent_results.get("cleanse-previewer", {})
     null_handler_output = agent_results.get("null-handler", {})
     outlier_output = agent_results.get("outlier-remover", {})
     type_fixer_output = agent_results.get("type-fixer", {})
@@ -56,6 +57,39 @@ def transform_clean_my_data_response(
     all_issues = []
     all_recommendations = []
     executive_summary = []
+    
+    # ==================== CLEANSE PREVIEWER ALERTS & ISSUES ====================
+    if cleanse_previewer_output.get("status") == "success":
+        preview_data = cleanse_previewer_output.get("data", {})
+        preview_score = preview_data.get("preview_score", {})
+        preview_analysis = preview_data.get("preview_analysis", {})
+        overall_impact = preview_analysis.get("overall_impact", {})
+        
+        overall_score = preview_score.get("overall_score", 0)
+        safe_to_execute = overall_impact.get("safe_to_execute", True)
+        high_impact_rules = overall_impact.get("high_impact_rules", 0)
+        
+        if not safe_to_execute or high_impact_rules > 0:
+            severity = "critical" if not safe_to_execute else "high"
+            all_alerts.append({
+                "alert_id": "alert_cleanse_preview",
+                "severity": severity,
+                "category": "data_cleaning",
+                "message": f"Preview shows high-impact operations: {high_impact_rules} high-risk rules detected. Safety: {preview_analysis.get('execution_safety', 'UNKNOWN')}",
+                "affected_fields_count": overall_impact.get("total_rules", 0),
+                "recommendation": f"Review {high_impact_rules} high-impact rules before execution. {len(overall_impact.get('warnings', []))} warnings generated."
+            })
+        
+        # Add impact issues
+        for issue in preview_data.get("impact_issues", []):
+            all_issues.append({
+                "issue_id": f"issue_preview_{issue.get('rule_id', 'unknown')}",
+                "agent_id": "cleanse-previewer",
+                "field_name": issue.get("rule_id", ""),
+                "issue_type": issue.get("issue_type", "preview_warning"),
+                "severity": issue.get("severity", "medium"),
+                "message": issue.get("description", "Preview impact detected")
+            })
     
     # ==================== NULL HANDLER ALERTS & ISSUES ====================
     if null_handler_output.get("status") == "success":
@@ -337,6 +371,21 @@ def transform_clean_my_data_response(
     
     # ==================== GENERATE RECOMMENDATIONS ====================
     
+    # Cleanse previewer recommendations
+    if cleanse_previewer_output.get("status") == "success":
+        preview_data = cleanse_previewer_output.get("data", {})
+        preview_analysis = preview_data.get("preview_analysis", {})
+        
+        for rec in preview_analysis.get("recommendations", [])[:5]:
+            all_recommendations.append({
+                "recommendation_id": f"rec_preview_{rec.get('action', 'unknown')}",
+                "agent_id": "cleanse-previewer",
+                "field_name": ",".join(rec.get("affected_rules", [])) if "affected_rules" in rec else "multiple",
+                "priority": rec.get("priority", "medium"),
+                "recommendation": f"{rec.get('action', 'Unknown action')}: {rec.get('reason', '')}",
+                "timeline": "immediate" if rec.get("priority") == "critical" else "1 week" if rec.get("priority") == "high" else "2 weeks"
+            })
+    
     # Quarantine recommendations
     if quarantine_output.get("status") == "success":
         quarantine_data = quarantine_output.get("data", {})
@@ -484,6 +533,11 @@ def transform_clean_my_data_response(
         overall_quality += standardization_score
         quality_count += 1
     
+    if cleanse_previewer_output.get("status") == "success":
+        preview_score = cleanse_previewer_output.get("data", {}).get("preview_score", {}).get("overall_score", 0)
+        overall_quality += preview_score
+        quality_count += 1
+    
     if quality_count > 0:
         overall_quality = overall_quality / quality_count
         quality_grade = "A" if overall_quality >= 90 else "B" if overall_quality >= 80 else "C" if overall_quality >= 70 else "D" if overall_quality >= 60 else "F"
@@ -566,6 +620,12 @@ def transform_clean_my_data_response(
     
     # Add key metrics from agents
     analysis_text_parts.append("\nAGENT ANALYSIS RESULTS:")
+    
+    if cleanse_previewer_output.get("status") == "success":
+        preview_score = cleanse_previewer_output.get("data", {}).get("preview_score", {}).get("overall_score", 0)
+        rules_previewed = cleanse_previewer_output.get("summary_metrics", {}).get("total_rules_previewed", 0)
+        safe_to_execute = cleanse_previewer_output.get("summary_metrics", {}).get("safe_to_execute", True)
+        analysis_text_parts.append(f"- Cleanse Previewer: Preview Score {preview_score:.1f}/100 ({rules_previewed} rules analyzed, Safety: {'SAFE' if safe_to_execute else 'CAUTION'})")
     
     if quarantine_output.get("status") == "success":
         quarantine_score = quarantine_output.get("data", {}).get("quality_score", {}).get("overall_score", 0)
