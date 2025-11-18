@@ -70,7 +70,7 @@ class RoutingDecisionAI:
             }
         }
         # Configure OpenAI API key from provided value or environment variable
-        provided_key = api_key or os.environ.get("OPENAI_API_KEY")
+        provided_key = api_key or os.getenv("OPENAI_API_KEY")
         if provided_key:
             try:
                 # Prefer the new OpenAI client class if available
