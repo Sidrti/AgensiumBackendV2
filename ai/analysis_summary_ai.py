@@ -19,11 +19,11 @@ from typing import Dict, List, Any, Optional
 from datetime import datetime
 
 try:
-    import openai
     from openai import OpenAI
+    OPENAI_AVAILABLE = True
 except ImportError:
-    openai = None
     OpenAI = None
+    OPENAI_AVAILABLE = False
 
 
 class AnalysisSummaryAI:
@@ -47,24 +47,27 @@ class AnalysisSummaryAI:
         # Prefer a provided api_key argument, but fall back to environment variable.
         self.api_key = api_key or os.environ.get("OPENAI_API_KEY")
         self.model = model
+        self.client = None
+        self.use_ai = False
 
         if not self.api_key:
             # Do not raise here; allow using fallback summarizer behavior when API key is missing.
             print(
                 "Info: OPENAI_API_KEY not set. Falling back to rule-based summary for analysis summaries."
             )
-            self.client = None
-            self.use_ai = False
+        elif not OPENAI_AVAILABLE:
+            print(
+                "Warning: OpenAI package not installed. To enable AI summaries install 'openai' and set OPENAI_API_KEY."
+            )
         else:
-            if OpenAI is None:
-                print(
-                    "Warning: OpenAI package not installed. To enable AI summaries install 'openai' and set OPENAI_API_KEY."
-                )
-                self.client = None
-                self.use_ai = False
-            else:
+            try:
                 self.client = OpenAI(api_key=self.api_key)
                 self.use_ai = True
+                print("Info: OpenAI client initialized successfully for analysis summaries.")
+            except Exception as e:
+                print(f"Warning: Failed to initialize OpenAI client: {str(e)}. Using fallback summaries.")
+                self.client = None
+                self.use_ai = False
 
     @staticmethod
     def _create_summary_prompt(analysis_data: str, dataset_name: str = "Dataset") -> str:
@@ -141,37 +144,49 @@ Be concise, data-driven, and actionable. Focus on what matters most."""
             prompt = self._create_summary_prompt(analysis_text, dataset_name)
 
             # Call OpenAI API if configured, otherwise use fallback
-            if not getattr(self, "use_ai", False) or not self.client:
+            if not self.use_ai or not self.client:
                 # No OpenAI client configured - return the fallback summary
                 return {
                     "status": "success",
                     "summary": self.get_fallback_summary(analysis_text, dataset_name),
                     "execution_time_ms": int((time.time() - start_time) * 1000),
-                    "model_used": None,
+                    "model_used": "fallback",
                     "timestamp": datetime.utcnow().isoformat() + "Z",
                 }
 
-            # Call the OpenAI-based client
-            response = self.client.chat.completions.create(
-                model=self.model,
-                messages=[
-                    {
-                        "role": "system",
-                        "content": "You are a professional data analyst expert. Generate clear, concise, actionable analysis summaries.",
-                    },
-                    {"role": "user", "content": prompt},
-                ],
-            )
+            try:
+                # Call the OpenAI-based client
+                response = self.client.chat.completions.create(
+                    model=self.model,
+                    messages=[
+                        {
+                            "role": "system",
+                            "content": "You are a professional data analyst expert. Generate clear, concise, actionable analysis summaries.",
+                        },
+                        {"role": "user", "content": prompt},
+                    ],
+                    temperature=0.3,
+                    max_tokens=800,
+                )
 
-            summary_text = response.choices[0].message.content
+                summary_text = response.choices[0].message.content
 
-            return {
-                "status": "success",
-                "summary": summary_text,
-                "execution_time_ms": int((time.time() - start_time) * 1000),
-                "model_used": self.model,
-                "timestamp": datetime.utcnow().isoformat() + "Z",
-            }
+                return {
+                    "status": "success",
+                    "summary": summary_text,
+                    "execution_time_ms": int((time.time() - start_time) * 1000),
+                    "model_used": self.model,
+                    "timestamp": datetime.utcnow().isoformat() + "Z",
+                }
+            except Exception as api_error:
+                print(f"Warning: OpenAI API call failed: {str(api_error)}. Using fallback summary.")
+                return {
+                    "status": "success",
+                    "summary": self.get_fallback_summary(analysis_text, dataset_name),
+                    "execution_time_ms": int((time.time() - start_time) * 1000),
+                    "model_used": "fallback",
+                    "timestamp": datetime.utcnow().isoformat() + "Z",
+                }
 
         except Exception as e:
             return {
