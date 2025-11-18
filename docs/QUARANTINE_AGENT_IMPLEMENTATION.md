@@ -1,6 +1,7 @@
 # QuarantineAgent Implementation Summary
 
 ## Overview
+
 The **QuarantineAgent** is a new, comprehensive component for the Clean My Data tool that identifies, isolates, and manages bad, invalid, or suspicious data to prevent corruption of the main processing pipeline. This document details the complete implementation across all necessary files.
 
 ---
@@ -12,6 +13,7 @@ The **QuarantineAgent** is a new, comprehensive component for the Clean My Data 
 **Description:** Main agent implementation with complete data quality detection and isolation capabilities.
 
 **Key Functions:**
+
 - `execute_quarantine_agent()` - Main execution function
 - `_analyze_and_quarantine()` - Analyzes data and separates quarantine candidates
 - `_infer_column_type()` - Infers the overall type of a column
@@ -28,26 +30,31 @@ The **QuarantineAgent** is a new, comprehensive component for the Clean My Data 
 **Detection Capabilities:**
 
 1. **Missing Required Fields**
+
    - Detects null values in required columns
    - Identifies which rows are affected
    - Tags as "critical" severity
 
 2. **Type Mismatches**
+
    - Compares actual data types against expected schema
    - Detects numeric, integer, datetime, boolean mismatches
    - Tags as "high" severity
 
 3. **Out-of-Range Values**
+
    - Validates numeric values against min/max constraints
    - Supports configurable range constraints per column
    - Tags as "high" severity
 
 4. **Invalid Formats**
+
    - Uses regex patterns for format validation
    - Supports email, phone, date, and custom patterns
    - Tags as "medium" severity
 
 5. **Broken/Corrupted Records**
+
    - Detects records with all null values
    - Identifies SQL injection patterns
    - Identifies XSS attack patterns
@@ -60,6 +67,7 @@ The **QuarantineAgent** is a new, comprehensive component for the Clean My Data 
    - Tags as "critical" severity
 
 **Output Structure:**
+
 ```python
 {
     "status": "success",
@@ -122,24 +130,28 @@ The **QuarantineAgent** is a new, comprehensive component for the Clean My Data 
 ### File: `downloads/clean_my_data_downloads.py`
 
 **Updates Made:**
+
 1. Added quarantine agent support to cleaned files mapping
 2. Created `_create_quarantine_sheet()` method for Excel reports
 3. Added quarantine file exports (separate quarantine zone CSV)
 4. Updated agent names mapping to include "quarantine-agent"
 
 **New Method: `_create_quarantine_sheet()`**
+
 - Creates dedicated Excel sheet for quarantine analysis
 - Shows quarantine metrics and quality scores
 - Displays issues by type and severity
 - Includes quarantine analysis breakdown
 
 **Quarantine File Export Features:**
+
 - Exports all quarantined records to separate CSV
 - Includes quarantine timestamp and reason
 - Labeled as "Quarantine Zone" in download metadata
 - Separate from cleaned data for easy reference
 
 **Download Metadata Example:**
+
 ```python
 {
     "download_id": f"{analysis_id}_quarantined_records",
@@ -163,6 +175,7 @@ The **QuarantineAgent** is a new, comprehensive component for the Clean My Data 
 ### File: `transformers/clean_my_data_transformer.py`
 
 **Updates Made:**
+
 1. Added `quarantine_output` to agent results extraction
 2. Integrated quarantine alerts generation
 3. Added quarantine issues aggregation
@@ -171,21 +184,25 @@ The **QuarantineAgent** is a new, comprehensive component for the Clean My Data 
 6. Modified cleaned files collection to include quarantine files
 
 **Alerts Generated:**
+
 - **alert_quarantine_quality** - When quality score < 80
-- **alert_quarantine_{issue_type}** - Per issue type (e.g., missing_required_field, corrupted_record)
+- **alert*quarantine*{issue_type}** - Per issue type (e.g., missing_required_field, corrupted_record)
 
 **Issues Generated:**
+
 - Row-level issues from quarantine_analysis
 - Includes row index, column, issue type, severity, and description
 - Up to 50 most critical issues included
 
 **Recommendations Generated:**
+
 - Quarantine review recommendation (high priority if >100 records)
 - Issue-type specific recommendations
 - Includes investigation and fix timelines
 - Prioritized by issue type severity
 
 **Summary Integration:**
+
 - Quarantine Agent metrics included in executive summary
 - Quality scores and quarantine percentages in analysis text
 - Issue type summary in report
@@ -197,6 +214,7 @@ The **QuarantineAgent** is a new, comprehensive component for the Clean My Data 
 ### File: `tools/clean_my_data_tool.json`
 
 **Updates Made:**
+
 1. Added "quarantine-agent" to available_agents list (first position for priority)
 2. Added complete quarantine-agent definition with:
    - Agent metadata (id, name, description, icon, category)
@@ -205,6 +223,7 @@ The **QuarantineAgent** is a new, comprehensive component for the Clean My Data 
    - Complete output structure specification
 
 **Agent Definition Structure:**
+
 ```json
 {
   "quarantine-agent": {
@@ -243,6 +262,7 @@ The **QuarantineAgent** is a new, comprehensive component for the Clean My Data 
 ```
 
 **Key Parameters:**
+
 - `detect_*` flags for enabling/disabling specific detections
 - `required_fields` - List of fields that must be present
 - `range_constraints` - Min/max values for numeric columns
@@ -257,19 +277,21 @@ The **QuarantineAgent** is a new, comprehensive component for the Clean My Data 
 ### File: `api/routes.py`
 
 **Updates Made:**
+
 1. Added quarantine_agent import from agents package
 2. Added quarantine-agent case handler in agent execution function
 3. Quarantine agent processes "primary" file input
 4. Returns standardized quarantine output format
 
 **Handler Code:**
+
 ```python
 elif agent_id == "quarantine-agent":
     if "primary" not in files_map:
         return {"status": "error", "error": "...requires 'primary' file"}
-    
+
     primary_bytes, primary_filename = files_map["primary"]
-    
+
     return quarantine_agent.execute_quarantine_agent(
         primary_bytes,
         primary_filename,
@@ -284,31 +306,36 @@ elif agent_id == "quarantine-agent":
 ### File: `agents/__init__.py`
 
 **Updates Made:**
+
 1. Added quarantine_agent to imports
-2. Added "quarantine_agent" to __all__ export list
+2. Added "quarantine_agent" to **all** export list
 
 ---
 
 ## Key Features
 
 ### 1. Comprehensive Data Validation
+
 - Detects 6 major categories of data quality issues
 - Validates against configurable constraints
 - Identifies corruption and security threats
 
 ### 2. Intelligent Quarantine Isolation
+
 - Automatically separates problematic records
 - Creates "quarantine zone" for review
 - Maintains clean pipeline integrity
 - Preserves problematic data for investigation
 
 ### 3. Detailed Logging & Reporting
+
 - Per-record issue documentation
 - Issue type classification
 - Severity levels (critical, high, medium, warning)
 - Root cause tracking
 
 ### 4. Quality Scoring
+
 - Weighted scoring algorithm
 - Quarantine reduction rate
 - Data integrity rate
@@ -316,6 +343,7 @@ elif agent_id == "quarantine-agent":
 - Quality status grades (excellent/good/needs_improvement)
 
 ### 5. Flexible Configuration
+
 - Enable/disable specific detections
 - Define required fields per use case
 - Specify range constraints
@@ -323,6 +351,7 @@ elif agent_id == "quarantine-agent":
 - Define expected schema
 
 ### 6. Multiple Export Formats
+
 - Cleaned data CSV (without quarantined records)
 - Quarantined records CSV (for investigation)
 - Excel report with dedicated sheet
@@ -333,6 +362,7 @@ elif agent_id == "quarantine-agent":
 ## Workflow
 
 ### Execution Flow
+
 1. **Input Validation** - Checks file format and content
 2. **Analysis** - Applies all enabled detection methods
 3. **Quarantine** - Separates problematic records
@@ -341,6 +371,7 @@ elif agent_id == "quarantine-agent":
 6. **Reporting** - Creates comprehensive reports
 
 ### Integration Flow
+
 1. **Transformer** - Aggregates quarantine results with other agents
 2. **Alerts** - Generates quality and issue alerts
 3. **Issues** - Creates detailed issue records
@@ -352,6 +383,7 @@ elif agent_id == "quarantine-agent":
 ## Usage Example
 
 ### Basic Configuration
+
 ```python
 parameters = {
     "detect_missing_fields": True,
@@ -380,6 +412,7 @@ parameters = {
 ```
 
 ### Execution
+
 ```python
 result = quarantine_agent.execute_quarantine_agent(
     file_bytes,
@@ -389,6 +422,7 @@ result = quarantine_agent.execute_quarantine_agent(
 ```
 
 ### Results
+
 - Clean data (minus quarantined records)
 - Quarantine zone (problematic records)
 - Quality scores and metrics
@@ -400,18 +434,21 @@ result = quarantine_agent.execute_quarantine_agent(
 ## Quality Scoring
 
 ### Score Calculation
+
 ```
-Overall Score = (Quarantine Reduction Rate × weight_q) + 
-                (Data Integrity Rate × weight_i) + 
+Overall Score = (Quarantine Reduction Rate × weight_q) +
+                (Data Integrity Rate × weight_i) +
                 (Processing Efficiency Rate × weight_e)
 ```
 
 ### Default Weights
+
 - Quarantine Reduction: 50%
 - Data Integrity: 30%
 - Processing Efficiency: 20%
 
 ### Quality Thresholds
+
 - **Excellent**: ≥ 90
 - **Good**: ≥ 75
 - **Needs Improvement**: < 75
@@ -421,6 +458,7 @@ Overall Score = (Quarantine Reduction Rate × weight_q) +
 ## Testing Considerations
 
 ### Test Cases
+
 1. **Missing Required Fields** - Validate detection and quarantine
 2. **Type Mismatches** - Test numeric, datetime, boolean conversions
 3. **Out-of-Range Values** - Verify constraint enforcement
@@ -437,7 +475,7 @@ Overall Score = (Quarantine Reduction Rate × weight_q) +
 
 - **Time Complexity**: O(n × m) where n = rows, m = columns
 - **Memory Usage**: Linear with file size (entire dataframe in memory)
-- **Optimizations**: 
+- **Optimizations**:
   - Uses pandas for vectorized operations
   - Regex compilation cached where possible
   - Batch issue collection with limits
