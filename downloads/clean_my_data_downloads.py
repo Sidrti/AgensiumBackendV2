@@ -49,14 +49,26 @@ class CleanMyDataDownloads:
         execution_time_ms: int,
         alerts: List[Dict],
         issues: List[Dict],
-        recommendations: List[Dict]
+        recommendations: List[Dict],
+        cleaned_files: Dict[str, Dict[str, Any]] = None
     ) -> List[Dict[str, Any]]:
         """
-        Generate both Excel and JSON downloads.
+        Generate both Excel and JSON downloads, plus cleaned data files from agents.
         
-        Returns list of download metadata dicts with base64 encoded content.
+        Args:
+            agent_results: Dictionary of agent_id -> agent output
+            analysis_id: Unique analysis identifier
+            execution_time_ms: Total execution time
+            alerts: List of alerts
+            issues: List of issues
+            recommendations: List of recommendations
+            cleaned_files: Dictionary of agent_id -> cleaned_file metadata (with base64 content)
+        
+        Returns:
+            List of download metadata dicts with base64 encoded content.
         """
         downloads = []
+        cleaned_files = cleaned_files or {}
         
         # Generate Excel report
         excel_data = self._generate_excel_report(
@@ -79,6 +91,58 @@ class CleanMyDataDownloads:
             recommendations=recommendations
         )
         downloads.append(json_data)
+        
+        # ==================== ADD CLEANED DATA FILES ====================
+        # Add cleaned CSV files from individual agents
+        agent_names = {
+            "null-handler": "Null Handler",
+            "outlier-remover": "Outlier Remover",
+            "type-fixer": "Type Fixer",
+            "duplicate-resolver": "Duplicate Resolver",
+            "quarantine-agent": "Quarantine Agent"
+        }
+        
+        for agent_id, agent_name in agent_names.items():
+            if agent_id in cleaned_files:
+                cleaned_file_data = cleaned_files[agent_id]
+                
+                # Create download entry for cleaned file following the standard pattern
+                download_entry = {
+                    "download_id": f"{analysis_id}_cleaned_{agent_id}",
+                    "name": f"Clean My Data - {agent_name} Cleaned Data",
+                    "format": "csv",
+                    "file_name": cleaned_file_data.get("filename", f"cleaned_{agent_id}.csv"),
+                    "description": f"Cleaned data file produced by {agent_name} agent with all cleaning operations applied",
+                    "mimeType": "text/csv",
+                    "content_base64": cleaned_file_data.get("content", ""),  # Already base64 encoded from agent
+                    "size_bytes": cleaned_file_data.get("size_bytes", 0),
+                    "creation_date": datetime.utcnow().isoformat() + "Z",
+                    "agent_id": agent_id
+                }
+                
+                downloads.append(download_entry)
+        
+        # ==================== ADD QUARANTINED DATA FILES ====================
+        # Add quarantined records file from quarantine agent
+        if "quarantine-agent" in cleaned_files:
+            quarantine_file = cleaned_files.get("quarantine-agent", {}).get("quarantine_file", {})
+            
+            if quarantine_file:
+                quarantine_entry = {
+                    "download_id": f"{analysis_id}_quarantined_records",
+                    "name": "Clean My Data - Quarantined Records",
+                    "format": "csv",
+                    "file_name": quarantine_file.get("filename", "quarantined_records.csv"),
+                    "description": "Records identified and isolated by Quarantine Agent as invalid or suspicious. Contains problematic data with quarantine timestamps and reasons.",
+                    "mimeType": "text/csv",
+                    "content_base64": quarantine_file.get("content", ""),
+                    "size_bytes": quarantine_file.get("size_bytes", 0),
+                    "creation_date": datetime.utcnow().isoformat() + "Z",
+                    "agent_id": "quarantine-agent",
+                    "data_type": "quarantine_zone"
+                }
+                
+                downloads.append(quarantine_entry)
         
         return downloads
     
@@ -103,6 +167,7 @@ class CleanMyDataDownloads:
             duplicate_output = agent_results.get("duplicate-resolver", {})
             governance_output = agent_results.get("governance-checker", {})
             test_output = agent_results.get("test-coverage-agent", {})
+            quarantine_output = agent_results.get("quarantine-agent", {})
             
             # 1. ANALYSIS SUMMARY SHEET
             self._create_analysis_summary_sheet(
@@ -125,15 +190,19 @@ class CleanMyDataDownloads:
             if duplicate_output.get("status") == "success":
                 self._create_duplicate_resolver_sheet(wb, duplicate_output)
             
-            # 6. GOVERNANCE CHECKER SHEET
+            # 6. QUARANTINE AGENT SHEET
+            if quarantine_output.get("status") == "success":
+                self._create_quarantine_sheet(wb, quarantine_output)
+            
+            # 7. GOVERNANCE CHECKER SHEET
             if governance_output.get("status") == "success":
                 self._create_governance_sheet(wb, governance_output)
             
-            # 7. TEST COVERAGE SHEET
+            # 8. TEST COVERAGE SHEET
             if test_output.get("status") == "success":
                 self._create_test_coverage_sheet(wb, test_output)
             
-            # 8. ALERTS SHEET
+            # 9. ALERTS SHEET
             if alerts:
                 self._create_alerts_sheet(wb, alerts)
             
@@ -515,9 +584,130 @@ class CleanMyDataDownloads:
                 ws.cell(row=row, column=col_idx).alignment = self.left_alignment
             row += 1
     
+    def _create_quarantine_sheet(self, wb, agent_output):
+        """Create quarantine agent detailed sheet."""
+        ws = wb.create_sheet("Quarantine", 5)
+        self._set_column_widths(ws, [25, 15, 15, 15, 15, 50])
+        
+        row = 1
+        ws[f'A{row}'] = "QUARANTINE AGENT ANALYSIS"
+        ws[f'A{row}'].font = Font(bold=True, size=12, color="FFFFFF")
+        ws[f'A{row}'].fill = self.header_fill
+        row += 2
+        
+        data = agent_output.get("data", {})
+        summary_metrics = agent_output.get("summary_metrics", {})
+        
+        # Metadata
+        metadata = [
+            ["Status", agent_output.get("status")],
+            ["Execution Time (ms)", agent_output.get("execution_time_ms", 0)],
+            ["Total Rows Processed", summary_metrics.get("total_rows_processed", 0)],
+            ["Quarantined Records", summary_metrics.get("quarantined_records", 0)],
+            ["Clean Records", summary_metrics.get("clean_records", 0)],
+            ["Quarantine %", f"{summary_metrics.get('quarantine_percentage', 0):.2f}%"]
+        ]
+        
+        for key, value in metadata:
+            ws[f'A{row}'] = key
+            ws[f'B{row}'] = value
+            ws[f'A{row}'].font = Font(bold=True)
+            ws[f'A{row}'].fill = self.subheader_fill
+            ws[f'A{row}'].border = self.border
+            ws[f'B{row}'].border = self.border
+            row += 1
+        
+        row += 1
+        
+        # Quality scores
+        ws[f'A{row}'] = "QUARANTINE QUALITY SCORES"
+        ws[f'A{row}'].font = Font(bold=True, size=10)
+        ws[f'A{row}'].fill = self.subheader_fill
+        row += 1
+        
+        quality_score = data.get("quality_score", {})
+        metrics = quality_score.get("metrics", {})
+        score_items = [
+            ["Overall Score", quality_score.get("overall_score", 0)],
+            ["Quality Status", data.get("quality_status", "unknown")],
+            ["Quarantine Reduction Rate", f"{metrics.get('quarantine_reduction_rate', 0):.1f}%"],
+            ["Data Integrity Rate", f"{metrics.get('data_integrity_rate', 0):.1f}%"],
+            ["Processing Efficiency", f"{metrics.get('processing_efficiency_rate', 0):.1f}%"]
+        ]
+        
+        for key, value in score_items:
+            ws[f'A{row}'] = key
+            ws[f'B{row}'] = value
+            ws[f'A{row}'].border = self.border
+            ws[f'B{row}'].border = self.border
+            row += 1
+        
+        row += 1
+        
+        # Quarantine issues by type
+        ws[f'A{row}'] = "ISSUES BY TYPE"
+        ws[f'A{row}'].font = Font(bold=True, size=10)
+        ws[f'A{row}'].fill = self.subheader_fill
+        ws.merge_cells(f'A{row}:C{row}')
+        row += 1
+        
+        headers = ["Issue Type", "Count", "Percentage"]
+        for col_idx, header in enumerate(headers, 1):
+            cell = ws.cell(row=row, column=col_idx, value=header)
+            cell.fill = self.header_fill
+            cell.font = self.header_font
+            cell.border = self.border
+            cell.alignment = self.center_alignment
+        row += 1
+        
+        quarantine_analysis = data.get("quarantine_analysis", {})
+        issue_types = quarantine_analysis.get("issue_types", {})
+        total_issues = sum(issue_types.values())
+        
+        for issue_type, count in issue_types.items():
+            ws.cell(row=row, column=1, value=issue_type.replace('_', ' ').title())
+            ws.cell(row=row, column=2, value=count)
+            ws.cell(row=row, column=3, value=f"{(count / total_issues * 100) if total_issues > 0 else 0:.1f}%")
+            
+            for col_idx in range(1, 4):
+                ws.cell(row=row, column=col_idx).border = self.border
+                ws.cell(row=row, column=col_idx).alignment = self.left_alignment
+            row += 1
+        
+        row += 1
+        
+        # Severity breakdown
+        ws[f'A{row}'] = "SEVERITY BREAKDOWN"
+        ws[f'A{row}'].font = Font(bold=True, size=10)
+        ws[f'A{row}'].fill = self.subheader_fill
+        ws.merge_cells(f'A{row}:C{row}')
+        row += 1
+        
+        headers = ["Severity Level", "Count", "Percentage"]
+        for col_idx, header in enumerate(headers, 1):
+            cell = ws.cell(row=row, column=col_idx, value=header)
+            cell.fill = self.header_fill
+            cell.font = self.header_font
+            cell.border = self.border
+            cell.alignment = self.center_alignment
+        row += 1
+        
+        severity_breakdown = quarantine_analysis.get("severity_breakdown", {})
+        severity_total = sum(severity_breakdown.values())
+        
+        for severity, count in severity_breakdown.items():
+            ws.cell(row=row, column=1, value=severity.upper())
+            ws.cell(row=row, column=2, value=count)
+            ws.cell(row=row, column=3, value=f"{(count / severity_total * 100) if severity_total > 0 else 0:.1f}%")
+            
+            for col_idx in range(1, 4):
+                ws.cell(row=row, column=col_idx).border = self.border
+                ws.cell(row=row, column=col_idx).alignment = self.left_alignment
+            row += 1
+    
     def _create_duplicate_resolver_sheet(self, wb, agent_output):
         """Create duplicate resolver detailed sheet."""
-        ws = wb.create_sheet("Duplicates", 4)
+        ws = wb.create_sheet("Duplicates", 6)
         self._set_column_widths(ws, [30, 15, 50])
         
         row = 1

@@ -46,6 +46,7 @@ def transform_clean_my_data_response(
     outlier_output = agent_results.get("outlier-remover", {})
     type_fixer_output = agent_results.get("type-fixer", {})
     duplicate_resolver_output = agent_results.get("duplicate-resolver", {})
+    quarantine_output = agent_results.get("quarantine-agent", {})
     governance_output = agent_results.get("governance-checker", {})
     test_coverage_output = agent_results.get("test-coverage-agent", {})
     
@@ -161,6 +162,51 @@ def transform_clean_my_data_response(
                 "message": f"Type mismatch: currently '{current}', should be '{suggested}'. {'; '.join(col_analysis.get('issues', []))}"
             })
     
+    # ==================== QUARANTINE AGENT ALERTS & ISSUES ====================
+    if quarantine_output.get("status") == "success":
+        quarantine_data = quarantine_output.get("data", {})
+        quality_score = quarantine_data.get("quality_score", {})
+        quarantine_analysis = quarantine_data.get("quarantine_analysis", {})
+        
+        overall_score = quality_score.get("overall_score", 0)
+        quarantined_records = quarantine_analysis.get("total_quarantined", 0)
+        
+        # Alert if quality score is low or significant data quarantined
+        if overall_score < 80:
+            severity = "high" if overall_score < 60 else "medium"
+            all_alerts.append({
+                "alert_id": "alert_quarantine_quality",
+                "severity": severity,
+                "category": "data_quality",
+                "message": f"Data quality concern: {quarantined_records} problematic records identified and quarantined",
+                "affected_fields_count": len(quarantine_analysis.get("issue_types", {})),
+                "recommendation": f"Review {quarantined_records} quarantined records. Check for systematic data quality issues."
+            })
+        
+        # Add issue-type specific alerts
+        issue_types = quarantine_analysis.get("issue_types", {})
+        for issue_type, count in issue_types.items():
+            if count > 0:
+                all_alerts.append({
+                    "alert_id": f"alert_quarantine_{issue_type}",
+                    "severity": "critical" if issue_type in ["missing_required_field", "corrupted_record", "schema_mismatch"] else "high" if count > 5 else "medium",
+                    "category": "data_quality",
+                    "message": f"{issue_type.replace('_', ' ').title()}: {count} records identified",
+                    "affected_fields_count": count,
+                    "recommendation": f"Investigate and correct the source of {issue_type.replace('_', ' ')} issues."
+                })
+        
+        # Add row-level quarantine issues
+        for issue in quarantine_analysis.get("quarantine_issues", [])[:50]:
+            all_issues.append({
+                "issue_id": f"issue_quarantine_{issue.get('row_index', 'unknown')}_{issue.get('column', 'unknown')}",
+                "agent_id": "quarantine-agent",
+                "field_name": issue.get("column", ""),
+                "issue_type": issue.get("issue_type", "unknown"),
+                "severity": issue.get("severity", "medium"),
+                "message": issue.get("description", "Record quarantined due to data quality issue")
+            })
+    
     # ==================== DUPLICATE RESOLVER ALERTS & ISSUES ====================
     if duplicate_resolver_output.get("status") == "success":
         dedup_data = duplicate_resolver_output.get("data", {})
@@ -252,6 +298,37 @@ def transform_clean_my_data_response(
             })
     
     # ==================== GENERATE RECOMMENDATIONS ====================
+    
+    # Quarantine recommendations
+    if quarantine_output.get("status") == "success":
+        quarantine_data = quarantine_output.get("data", {})
+        quarantine_analysis = quarantine_data.get("quarantine_analysis", {})
+        quality_score = quarantine_data.get("quality_score", {})
+        quarantined_records = quarantine_analysis.get("total_quarantined", 0)
+        
+        if quarantined_records > 0:
+            priority = "high" if quarantined_records > 100 else "medium"
+            all_recommendations.append({
+                "recommendation_id": "rec_quarantine_review",
+                "agent_id": "quarantine-agent",
+                "field_name": "multiple",
+                "priority": priority,
+                "recommendation": f"Review {quarantined_records} quarantined records. Investigate root causes of data quality issues.",
+                "timeline": "1 week" if priority == "high" else "2 weeks"
+            })
+        
+        # Issue-specific recommendations
+        issue_types = quarantine_analysis.get("issue_types", {})
+        for issue_type, count in issue_types.items():
+            if count > 0:
+                all_recommendations.append({
+                    "recommendation_id": f"rec_quarantine_{issue_type}",
+                    "agent_id": "quarantine-agent",
+                    "field_name": issue_type,
+                    "priority": "high" if issue_type in ["missing_required_field", "schema_mismatch"] else "medium",
+                    "recommendation": f"Fix {issue_type.replace('_', ' ')} issues: {count} records affected. Implement validation at data source.",
+                    "timeline": "1 week" if issue_type in ["missing_required_field", "schema_mismatch"] else "2 weeks"
+                })
     
     # Null handling recommendations
     if null_handler_output.get("status") == "success":
@@ -432,6 +509,11 @@ def transform_clean_my_data_response(
     # Add key metrics from agents
     analysis_text_parts.append("\nAGENT ANALYSIS RESULTS:")
     
+    if quarantine_output.get("status") == "success":
+        quarantine_score = quarantine_output.get("data", {}).get("quality_score", {}).get("overall_score", 0)
+        quarantined_records = quarantine_output.get("summary_metrics", {}).get("quarantined_records", 0)
+        analysis_text_parts.append(f"- Quarantine Agent: Quality Score {quarantine_score:.1f}/100 ({quarantined_records} problematic records isolated)")
+    
     if null_handler_output.get("status") == "success":
         null_score = null_handler_output.get("data", {}).get("cleaning_score", {}).get("overall_score", 0)
         total_nulls = sum(
@@ -524,6 +606,23 @@ def transform_clean_my_data_response(
     
     # ==================== GENERATE DOWNLOADS ====================
     # Use dedicated download module for comprehensive Excel and JSON exports
+    
+    # Collect cleaned files from agents
+    cleaned_files = {}
+    for agent_id in ["null-handler", "outlier-remover", "type-fixer", "duplicate-resolver", "quarantine-agent"]:
+        agent_output = agent_results.get(agent_id, {})
+        if agent_output.get("status") == "success":
+            if agent_id == "quarantine-agent":
+                # For quarantine agent, collect both cleaned and quarantine files
+                if "cleaned_file" in agent_output:
+                    cleaned_files[agent_id] = agent_output["cleaned_file"]
+                if "quarantine_file" in agent_output:
+                    if agent_id not in cleaned_files:
+                        cleaned_files[agent_id] = {}
+                    cleaned_files[agent_id]["quarantine_file"] = agent_output["quarantine_file"]
+            elif "cleaned_file" in agent_output:
+                cleaned_files[agent_id] = agent_output["cleaned_file"]
+    
     downloader = CleanMyDataDownloads()
     downloads = downloader.generate_downloads(
         agent_results=agent_results,
@@ -531,7 +630,8 @@ def transform_clean_my_data_response(
         execution_time_ms=execution_time_ms,
         alerts=all_alerts,
         issues=all_issues,
-        recommendations=all_recommendations
+        recommendations=all_recommendations,
+        cleaned_files=cleaned_files
     )
     
     # ==================== BUILD FINAL RESPONSE ====================

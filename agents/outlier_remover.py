@@ -11,6 +11,7 @@ import pandas as pd
 import numpy as np
 import io
 import time
+import base64
 from typing import Dict, Any, Optional, List
 from scipy import stats
 
@@ -129,7 +130,13 @@ def execute_outlier_remover(
                 "remaining_outliers": 0,  # Depends on strategy
                 "total_issues": len(outlier_issues)
             },
-            "data": outlier_handling_data
+            "data": outlier_handling_data,
+            "cleaned_file": {
+                "filename": f"cleaned_{filename}",
+                "content": base64.b64encode(_generate_cleaned_file(df_cleaned, filename)).decode('utf-8'),
+                "size_bytes": len(_generate_cleaned_file(df_cleaned, filename)),
+                "format": filename.split('.')[-1].lower()
+            }
         }
 
     except Exception as e:
@@ -384,3 +391,20 @@ def _calculate_cleaning_score(
             "cleaned_columns": len(cleaned_df.columns)
         }
     }
+
+
+def _generate_cleaned_file(df: pd.DataFrame, original_filename: str) -> bytes:
+    """
+    Generate cleaned data file in CSV format.
+    
+    Args:
+        df: Cleaned dataframe
+        original_filename: Original filename to determine format
+        
+    Returns:
+        File contents as bytes
+    """
+    # Always export as CSV for consistency and compatibility
+    output = io.BytesIO()
+    df.to_csv(output, index=False)
+    return output.getvalue()

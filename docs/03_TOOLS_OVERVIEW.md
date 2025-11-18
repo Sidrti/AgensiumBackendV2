@@ -342,6 +342,29 @@ Data cleaning and validation tool that improves data quality through systematic 
 clean-my-data
 ```
 
+### ✨ Cleaned Data Files Feature
+
+**NEW**: Each cleaning agent now produces a cleaned CSV file that you can download!
+
+When you run the Clean My Data tool, you get:
+
+- **Excel Report** with detailed analysis
+- **JSON Report** with complete data
+- **4 Cleaned Data Files** (one from each agent):
+  - `cleaned_data.csv` from Null Handler
+  - `cleaned_data.csv` from Outlier Remover
+  - `cleaned_data.csv` from Type Fixer
+  - `cleaned_data.csv` from Duplicate Resolver
+
+Each cleaned file is available in the `downloads` array with:
+
+- Unique `download_id` for tracking
+- `agent_id` field identifying which agent produced it
+- Base64 encoded content (`content_base64`)
+- File metadata (size, MIME type, creation date)
+
+**See [08_CLEANED_FILES_FEATURE.md](./08_CLEANED_FILES_FEATURE.md) for complete integration guide.**
+
 ### Available Agents
 
 #### 1. Null Handler
