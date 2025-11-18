@@ -79,14 +79,42 @@ def transform_profile_my_data_response(
         # Add field-level quality issues
         for field in profiler_data.get("fields", []):
             field_quality = field.get("quality_score", 0)
+            field_name = field.get("field_name")
+            properties = field.get("properties", {})
+            
             if field_quality < 80:
                 all_issues.append({
                     "issue_id": f"issue_quality_{field.get('field_id')}",
                     "agent_id": "unified-profiler",
-                    "field_name": field.get("field_name"),
+                    "field_name": field_name,
                     "issue_type": "low_quality_score",
                     "severity": "high" if field_quality < 60 else "medium",
                     "message": f"Field quality score: {field_quality:.1f}/100"
+                })
+            
+            # Add outlier issues
+            outlier_count = properties.get("outlier_count", 0)
+            outlier_percentage = properties.get("outlier_percentage", 0)
+            if outlier_percentage > 5:
+                all_issues.append({
+                    "issue_id": f"issue_outliers_{field.get('field_id')}",
+                    "agent_id": "unified-profiler",
+                    "field_name": field_name,
+                    "issue_type": "high_outlier_count",
+                    "severity": "medium",
+                    "message": f"{outlier_count} outliers detected ({outlier_percentage:.1f}% of values)"
+                })
+            
+            # Add missing value issues
+            missing_percentage = properties.get("missing_percentage", 0)
+            if missing_percentage > 50:
+                all_issues.append({
+                    "issue_id": f"issue_missing_{field.get('field_id')}",
+                    "agent_id": "unified-profiler",
+                    "field_name": field_name,
+                    "issue_type": "high_missing_rate",
+                    "severity": "high" if missing_percentage > 75 else "medium",
+                    "message": f"{missing_percentage:.1f}% missing values"
                 })
     
     # ==================== DRIFT ALERTS & ISSUES ====================
@@ -149,6 +177,30 @@ def transform_profile_my_data_response(
                 "message": f"{pii_fields} PII field(s) detected",
                 "affected_fields_count": pii_fields,
                 "recommendation": f"Implement encryption at rest/transit, restrict access, audit logging, data retention policies."
+            })
+        
+        # Add sensitive fields alert (separate from PII)
+        sensitive_fields = summary_metrics.get("sensitive_fields_detected", 0)
+        if sensitive_fields > 0 and sensitive_fields != pii_fields:
+            all_alerts.append({
+                "alert_id": "alert_sensitive_001",
+                "severity": "high",
+                "category": "sensitive_data",
+                "message": f"{sensitive_fields} sensitive field(s) detected",
+                "affected_fields_count": sensitive_fields,
+                "recommendation": f"Review and secure {sensitive_fields} sensitive field(s). Consider access controls and monitoring."
+            })
+        
+        # Add governance gaps alert
+        governance_gaps = summary_metrics.get("governance_gaps", 0)
+        if governance_gaps > 0:
+            all_alerts.append({
+                "alert_id": "alert_governance_gaps_001",
+                "severity": "high",
+                "category": "governance_gaps",
+                "message": f"{governance_gaps} governance gap(s) detected",
+                "affected_fields_count": governance_gaps,
+                "recommendation": f"Address {governance_gaps} governance gap(s) to ensure compliance and data quality."
             })
         
         # Add field risk issues
@@ -241,6 +293,17 @@ def transform_profile_my_data_response(
                 "affected_fields_count": issues_found,
                 "recommendation": f"Improve test coverage. {issues_found} test(s) failing or missing."
             })
+        
+        # Add test coverage issues
+        for issue in test_coverage_data.get("test_coverage_issues", []):
+            all_issues.append({
+                "issue_id": f"issue_test_coverage_{issue.get('type')}_{issue.get('field', 'general')}",
+                "agent_id": "test-coverage-agent",
+                "field_name": issue.get("field", "N/A"),
+                "issue_type": issue.get("type", "test_coverage_issue"),
+                "severity": issue.get("severity", "warning"),
+                "message": issue.get("message", "Test coverage issue detected")
+            })
     
     # ==================== GENERATE RECOMMENDATIONS ====================
     
@@ -282,13 +345,75 @@ def transform_profile_my_data_response(
                 "timeline": "immediate"
             })
     
+    # Test coverage recommendations
+    if test_output.get("status") == "success":
+        test_issues = test_output.get("data", {}).get("test_coverage_issues", [])[:5]
+        for issue in test_issues:
+            if issue.get("severity") == "critical":
+                all_recommendations.append({
+                    "recommendation_id": f"rec_test_{issue.get('type')}_{issue.get('field', 'general')}",
+                    "agent_id": "test-coverage-agent",
+                    "field_name": issue.get("field", "N/A"),
+                    "priority": "high",
+                    "recommendation": f"Fix test coverage issue: {issue.get('message')}",
+                    "timeline": "1 week"
+                })
+    
+    # Governance recommendations
+    if governance_output.get("status") == "success":
+        governance_issues = governance_output.get("data", {}).get("governance_issues", [])[:3]
+        for issue in governance_issues:
+            if issue.get("severity") in ["critical", "high"]:
+                all_recommendations.append({
+                    "recommendation_id": f"rec_governance_{issue.get('type')}_{issue.get('field', 'general')}",
+                    "agent_id": "governance-checker",
+                    "field_name": issue.get("field", "N/A"),
+                    "priority": "critical" if issue.get("severity") == "critical" else "high",
+                    "recommendation": f"Address governance issue: {issue.get('message')}",
+                    "timeline": "immediate" if issue.get("severity") == "critical" else "1-2 weeks"
+                })
+    
+    # Readiness recommendations
+    if readiness_output.get("status") == "success":
+        readiness_status = readiness_output.get("data", {}).get("readiness_assessment", {}).get("overall_status", "not_ready")
+        if readiness_status != "ready":
+            deductions = readiness_output.get("data", {}).get("deductions", [])[:3]
+            for deduction in deductions:
+                all_recommendations.append({
+                    "recommendation_id": f"rec_readiness_{deduction.get('deduction_reason')}",
+                    "agent_id": "readiness-rater",
+                    "field_name": ", ".join(deduction.get("fields_affected", [])[:3]),
+                    "priority": "high" if deduction.get("severity") == "high" else "medium",
+                    "recommendation": f"Fix readiness issue: {deduction.get('deduction_reason', '').replace('_', ' ').title()}",
+                    "timeline": "1-2 weeks"
+                })
+    
     # ==================== GENERATE EXECUTIVE SUMMARY ====================
     
     # Count active agents (agents with successful execution)
     active_agents = sum(1 for agent_output in agent_results.values() if agent_output.get("status") == "success")
     total_possible_agents = len(agent_results)
     
-    # Always present: Agents used summary
+    # Extract total records and fields from profiler output
+    total_records = 0
+    total_fields = 0
+    if profiler_output.get("status") == "success":
+        summary_metrics = profiler_output.get("summary_metrics", {})
+        total_records = summary_metrics.get("total_rows", 0)
+        total_fields = summary_metrics.get("total_columns", 0)
+    
+    # ==================== ALWAYS PRESENT EXECUTIVE SUMMARY ====================
+    
+    # 1. Dataset Overview
+    executive_summary.append({
+        "summary_id": "exec_dataset_overview",
+        "title": "Dataset Overview",
+        "value": f"{total_records:,}",
+        "status": "info",
+        "description": f"Total Records: {total_records:,} | Total Fields: {total_fields}"
+    })
+    
+    # 2. Agents Executed
     executive_summary.append({
         "summary_id": "exec_agents_used",
         "title": "Agents Executed",
@@ -297,7 +422,7 @@ def transform_profile_my_data_response(
         "description": f"{active_agents} of {total_possible_agents} agents executed successfully"
     })
     
-    # Always present: Execution time summary
+    # 3. Execution Time
     execution_time_seconds = execution_time_ms / 1000
     executive_summary.append({
         "summary_id": "exec_execution_time",
@@ -307,13 +432,31 @@ def transform_profile_my_data_response(
         "description": f"Analysis completed in {execution_time_seconds:.2f} seconds"
     })
     
-    # Always present: Analysis metrics summary
+    # 4. Total Alerts
     executive_summary.append({
-        "summary_id": "exec_analysis_metrics",
-        "title": "Analysis Metrics",
+        "summary_id": "exec_total_alerts",
+        "title": "Total Alerts",
         "value": f"{len(all_alerts)}",
-        "status": "success" if len(all_alerts) == 0 else "warning",
-        "description": f"{len(all_alerts)} alerts | {len(all_issues)} issues | {len(all_recommendations)} recommendations"
+        "status": "success" if len(all_alerts) == 0 else "warning" if len(all_alerts) < 5 else "critical",
+        "description": f"{len(all_alerts)} alert(s) requiring attention"
+    })
+    
+    # 5. Total Issues
+    executive_summary.append({
+        "summary_id": "exec_total_issues",
+        "title": "Total Issues",
+        "value": f"{len(all_issues)}",
+        "status": "success" if len(all_issues) == 0 else "warning" if len(all_issues) < 10 else "critical",
+        "description": f"{len(all_issues)} issue(s) detected across all fields"
+    })
+    
+    # 6. Total Recommendations
+    executive_summary.append({
+        "summary_id": "exec_total_recommendations",
+        "title": "Total Recommendations",
+        "value": f"{len(all_recommendations)}",
+        "status": "info",
+        "description": f"{len(all_recommendations)} actionable recommendation(s) generated"
     })
     
     if profiler_output.get("status") == "success":
@@ -363,6 +506,19 @@ def transform_profile_my_data_response(
             "value": str(round(risk_score, 1)),
             "status": "high" if risk_score >= 70 else "medium" if risk_score >= 40 else "low",
             "description": f"{risk_score:.1f}/100 - {risk_summary.get('overall_risk_level', 'unknown').upper()}"
+        })
+    
+    if test_output.get("status") == "success":
+        test_scores = test_output.get("data", {}).get("test_coverage_scores", {})
+        overall_test_score = test_scores.get("overall", 0)
+        coverage_status = test_output.get("data", {}).get("coverage_status", "needs_improvement")
+        
+        executive_summary.append({
+            "summary_id": "exec_test_coverage",
+            "title": "Test Coverage",
+            "value": str(round(overall_test_score, 1)),
+            "status": "excellent" if coverage_status == "excellent" else "good" if coverage_status == "good" else "needs_improvement",
+            "description": f"{overall_test_score:.1f}/100 - {coverage_status.upper().replace('_', ' ')}"
         })
     
     # ==================== GENERATE AI ANALYSIS SUMMARY ====================
