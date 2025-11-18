@@ -45,7 +45,7 @@ class AnalysisSummaryAI:
             model: Model name to use (default: gpt-4o-mini - latest & most efficient)
         """
         # Prefer a provided api_key argument, but fall back to environment variable.
-        self.api_key = api_key or os.environ.get("OPENAI_API_KEY")
+        self.api_key = api_key or os.getenv("OPENAI_API_KEY")
         self.model = model
         self.client = None
         self.use_ai = False
