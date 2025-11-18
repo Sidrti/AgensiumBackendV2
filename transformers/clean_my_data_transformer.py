@@ -3,9 +3,14 @@ Clean My Data Transformer
 
 Combines outputs from cleaning and validation agents into a final unified response.
 Agents include:
+- cleanse-previewer: 'What If' analysis and impact assessment before cleaning
+- quarantine-agent: Identifies and isolates invalid/suspicious data
 - null-handler: Null value detection and imputation
 - outlier-remover: Outlier detection and handling
 - type-fixer: Type conversion and fixing
+- duplicate-resolver: Duplicate record detection and resolution
+- field-standardization: Field value standardization and normalization
+- cleanse-writeback: Final quality assurance and manifest generation
 - governance-checker: Governance compliance validation
 - test-coverage-agent: Test coverage validation
 
@@ -563,6 +568,36 @@ def transform_clean_my_data_response(
                 "timeline": "immediate" if rec.get("priority") == "critical" else "1 week" if rec.get("priority") == "high" else "2 weeks"
             })
     
+    # Governance checker recommendations
+    if governance_output.get("status") == "success":
+        governance_data = governance_output.get("data", {})
+        
+        # Generate recommendations from governance issues
+        for issue in governance_data.get("governance_issues", [])[:5]:
+            all_recommendations.append({
+                "recommendation_id": f"rec_governance_{issue.get('field', 'unknown')}",
+                "agent_id": "governance-checker",
+                "field_name": issue.get("field", ""),
+                "priority": issue.get("severity", "medium"),
+                "recommendation": f"Address governance issue: {issue.get('message', 'Review governance compliance')}",
+                "timeline": "1 week" if issue.get("severity") == "high" else "2 weeks" if issue.get("severity") == "medium" else "3 weeks"
+            })
+    
+    # Test coverage agent recommendations
+    if test_coverage_output.get("status") == "success":
+        test_data = test_coverage_output.get("data", {})
+        
+        # Generate recommendations from test coverage issues
+        for issue in test_data.get("test_coverage_issues", [])[:5]:
+            all_recommendations.append({
+                "recommendation_id": f"rec_test_{issue.get('field', 'unknown')}",
+                "agent_id": "test-coverage-agent",
+                "field_name": issue.get("field", ""),
+                "priority": issue.get("severity", "medium"),
+                "recommendation": f"Improve test coverage: {issue.get('message', 'Add validation tests')}",
+                "timeline": "1 week" if issue.get("severity") == "high" else "2 weeks" if issue.get("severity") == "medium" else "3 weeks"
+            })
+    
     # ==================== GENERATE EXECUTIVE SUMMARY ====================
     
     # Overall cleaning quality summary
@@ -602,6 +637,11 @@ def transform_clean_my_data_response(
     if cleanse_writeback_output.get("status") == "success":
         writeback_score = cleanse_writeback_output.get("data", {}).get("writeback_score", {}).get("overall_score", 0)
         overall_quality += writeback_score
+        quality_count += 1
+    
+    if quarantine_output.get("status") == "success":
+        quarantine_score = quarantine_output.get("data", {}).get("quality_score", {}).get("overall_score", 0)
+        overall_quality += quarantine_score
         quality_count += 1
     
     if quality_count > 0:
@@ -656,6 +696,55 @@ def transform_clean_my_data_response(
             "status": "ready" if data_ready else "not_ready",
             "description": f"Integrity: {quality_status.replace('_', ' ').title()}, Pipeline Ready: {'Yes' if data_ready else 'No'}"
         })
+    
+    # Quarantine agent summary
+    if quarantine_output.get("status") == "success":
+        quarantine_data = quarantine_output.get("data", {})
+        quality_score = quarantine_data.get("quality_score", {})
+        quarantine_analysis = quarantine_data.get("quarantine_analysis", {})
+        
+        quarantine_score = quality_score.get("overall_score", 0)
+        quarantined_records = quarantine_output.get("summary_metrics", {}).get("quarantined_records", 0)
+        clean_records = quarantine_output.get("summary_metrics", {}).get("clean_records", 0)
+        quarantine_percentage = quarantine_output.get("summary_metrics", {}).get("quarantine_percentage", 0)
+        quality_status = quarantine_data.get("quality_status", "unknown")
+        
+        # Main quarantine status summary
+        executive_summary.append({
+            "summary_id": "exec_quarantine",
+            "title": "Data Quarantine Status",
+            "value": f"{quarantine_score:.1f}",
+            "status": "excellent" if quarantined_records == 0 else "good" if quarantine_percentage < 5 else "needs_attention",
+            "description": f"Quality: {quality_status.replace('_', ' ').title()}, Quarantined: {quarantined_records} records ({quarantine_percentage:.1f}%), Clean: {clean_records} records"
+        })
+        
+        # Quarantine effectiveness metrics
+        metrics = quality_score.get("metrics", {})
+        integrity_rate = metrics.get("data_integrity_rate", 0)
+        efficiency_rate = metrics.get("processing_efficiency_rate", 0)
+        
+        executive_summary.append({
+            "summary_id": "exec_quarantine_effectiveness",
+            "title": "Quarantine Effectiveness",
+            "value": f"{integrity_rate:.1f}%",
+            "status": "excellent" if integrity_rate >= 95 else "good" if integrity_rate >= 85 else "fair",
+            "description": f"Data Integrity: {integrity_rate:.1f}%, Processing Efficiency: {efficiency_rate:.1f}%, {len(quarantine_analysis.get('issue_types', {}))} issue types detected"
+        })
+        
+        # Issue breakdown summary
+        issue_types = quarantine_analysis.get("issue_types", {})
+        severity_breakdown = quarantine_analysis.get("severity_breakdown", {})
+        critical_issues = severity_breakdown.get("critical", 0)
+        high_issues = severity_breakdown.get("high", 0)
+        
+        if critical_issues > 0 or high_issues > 0:
+            executive_summary.append({
+                "summary_id": "exec_quarantine_issues",
+                "title": "Critical Data Quality Issues",
+                "value": f"{critical_issues + high_issues}",
+                "status": "critical" if critical_issues > 0 else "warning",
+                "description": f"Critical: {critical_issues}, High: {high_issues}, Total Issues: {len(issue_types)} types ({', '.join(list(issue_types.keys())[:3])})"
+            })
     
     # Issues and alerts summary
     executive_summary.append({
@@ -732,6 +821,12 @@ def transform_clean_my_data_response(
         type_score = type_fixer_output.get("data", {}).get("fixing_score", {}).get("overall_score", 0)
         type_issues_fixed = type_fixer_output.get("summary_metrics", {}).get("type_issues_fixed", 0)
         analysis_text_parts.append(f"- Type Fixer: Quality Score {type_score:.1f}/100 ({type_issues_fixed} type issues fixed)")
+    
+    if duplicate_resolver_output.get("status") == "success":
+        dedup_score = duplicate_resolver_output.get("data", {}).get("dedup_score", {}).get("overall_score", 0)
+        duplicates_detected = duplicate_resolver_output.get("summary_metrics", {}).get("duplicates_detected", 0)
+        duplicates_resolved = duplicate_resolver_output.get("summary_metrics", {}).get("duplicates_resolved", 0)
+        analysis_text_parts.append(f"- Duplicate Resolver: Quality Score {dedup_score:.1f}/100 ({duplicates_detected} duplicates detected, {duplicates_resolved} resolved)")
     
     if field_standardization_output.get("status") == "success":
         standardization_score = field_standardization_output.get("data", {}).get("standardization_score", {}).get("overall_score", 0)
