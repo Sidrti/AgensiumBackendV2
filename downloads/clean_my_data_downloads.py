@@ -101,6 +101,7 @@ class CleanMyDataDownloads:
             "type-fixer": "Type Fixer",
             "duplicate-resolver": "Duplicate Resolver",
             "field-standardization": "Field Standardization",
+            "cleanse-writeback": "Cleanse Writeback",
             "quarantine-agent": "Quarantine Agent"
         }
         
@@ -202,7 +203,12 @@ class CleanMyDataDownloads:
             if field_standardization_output.get("status") == "success":
                 self._create_field_standardization_sheet(wb, field_standardization_output)
             
-            # 8. QUARANTINE AGENT SHEET
+            # 8. CLEANSE WRITEBACK SHEET
+            cleanse_writeback_output = agent_results.get("cleanse-writeback", {})
+            if cleanse_writeback_output.get("status") == "success":
+                self._create_cleanse_writeback_sheet(wb, cleanse_writeback_output)
+            
+            # 9. QUARANTINE AGENT SHEET
             if quarantine_output.get("status") == "success":
                 self._create_quarantine_sheet(wb, quarantine_output)
             
@@ -1048,6 +1054,200 @@ class CleanMyDataDownloads:
             ws[f'B{row}'] = "Yes" if applied else "No"
             ws[f'A{row}'].border = self.border
             ws[f'B{row}'].border = self.border
+            row += 1
+    
+    def _create_cleanse_writeback_sheet(self, wb, agent_output):
+        """Create cleanse writeback detailed sheet."""
+        ws = wb.create_sheet("Cleanse Writeback", 8)
+        self._set_column_widths(ws, [30, 20, 15, 50])
+        
+        row = 1
+        ws[f'A{row}'] = "CLEANSE WRITEBACK ANALYSIS"
+        ws[f'A{row}'].font = Font(bold=True, size=12, color="FFFFFF")
+        ws[f'A{row}'].fill = self.header_fill
+        row += 2
+        
+        data = agent_output.get("data", {})
+        summary_metrics = agent_output.get("summary_metrics", {})
+        
+        metadata = [
+            ["Status", agent_output.get("status")],
+            ["Execution Time (ms)", agent_output.get("execution_time_ms", 0)],
+            ["Rows Verified", summary_metrics.get("total_rows_verified", 0)],
+            ["Columns Verified", summary_metrics.get("total_columns_verified", 0)],
+            ["Integrity Checks Passed", summary_metrics.get("integrity_checks_passed", 0)],
+            ["Integrity Checks Failed", summary_metrics.get("integrity_checks_failed", 0)],
+            ["Agents in Manifest", summary_metrics.get("agents_in_manifest", 0)],
+            ["Data Ready for Pipeline", "Yes" if summary_metrics.get("data_ready_for_pipeline", False) else "No"],
+            ["Transformations Logged", summary_metrics.get("total_transformations_logged", 0)]
+        ]
+        
+        for key, value in metadata:
+            ws[f'A{row}'] = key
+            ws[f'B{row}'] = value
+            ws[f'A{row}'].font = Font(bold=True)
+            ws[f'A{row}'].fill = self.subheader_fill
+            ws[f'A{row}'].border = self.border
+            ws[f'B{row}'].border = self.border
+            row += 1
+        
+        row += 1
+        
+        # Writeback scores
+        ws[f'A{row}'] = "WRITEBACK QUALITY SCORES"
+        ws[f'A{row}'].font = Font(bold=True, size=10)
+        ws[f'A{row}'].fill = self.subheader_fill
+        row += 1
+        
+        writeback_score = data.get("writeback_score", {})
+        metrics = writeback_score.get("metrics", {})
+        score_items = [
+            ["Overall Score", writeback_score.get("overall_score", 0)],
+            ["Integrity Score", metrics.get("integrity_score", 0)],
+            ["Completeness Score", metrics.get("completeness_score", 0)],
+            ["Auditability Score", metrics.get("auditability_score", 0)],
+            ["Data Ready for Pipeline", "Yes" if metrics.get("data_ready_for_pipeline", False) else "No"]
+        ]
+        
+        for key, value in score_items:
+            ws[f'A{row}'] = key
+            ws[f'B{row}'] = value
+            ws[f'A{row}'].border = self.border
+            ws[f'B{row}'].border = self.border
+            row += 1
+        
+        row += 1
+        
+        # Integrity verification results
+        ws[f'A{row}'] = "INTEGRITY VERIFICATION RESULTS"
+        ws[f'A{row}'].font = Font(bold=True, size=10)
+        ws[f'A{row}'].fill = self.subheader_fill
+        ws.merge_cells(f'A{row}:D{row}')
+        row += 1
+        
+        headers = ["Check Name", "Status", "Details", "Message"]
+        for col_idx, header in enumerate(headers, 1):
+            cell = ws.cell(row=row, column=col_idx, value=header)
+            cell.fill = self.header_fill
+            cell.font = self.header_font
+            cell.border = self.border
+            cell.alignment = self.center_alignment
+        row += 1
+        
+        writeback_analysis = data.get("writeback_analysis", {})
+        integrity_verification = writeback_analysis.get("integrity_verification", {})
+        checks = integrity_verification.get("checks", {})
+        
+        for check_name, check_data in checks.items():
+            ws.cell(row=row, column=1, value=check_data.get("check_name", check_name))
+            ws.cell(row=row, column=2, value="PASSED" if check_data.get("passed", False) else "FAILED")
+            
+            # Format details based on check type
+            details = ""
+            if check_name == "numeric_type_integrity":
+                details = f"Checked {check_data.get('columns_checked', 0)} columns, {check_data.get('issues_found', 0)} issues"
+            elif check_name == "datetime_type_integrity":
+                details = f"Checked {check_data.get('columns_checked', 0)} columns, {check_data.get('issues_found', 0)} issues"
+            elif check_name == "no_new_nulls":
+                details = f"Total nulls: {check_data.get('total_nulls', 0)} ({check_data.get('null_percentage', 0):.2f}%)"
+            elif check_name == "no_new_duplicates":
+                details = f"Duplicates: {check_data.get('duplicate_count', 0)} ({check_data.get('duplicate_percentage', 0):.2f}%)"
+            elif check_name == "data_retention":
+                details = f"Row: {check_data.get('row_retention_percentage', 0):.1f}%, Col: {check_data.get('column_retention_percentage', 0):.1f}%"
+            
+            ws.cell(row=row, column=3, value=details)
+            ws.cell(row=row, column=4, value=check_data.get("message", ""))
+            
+            # Color code status
+            status_cell = ws.cell(row=row, column=2)
+            if check_data.get("passed", False):
+                status_cell.fill = PatternFill(start_color="90EE90", end_color="90EE90", fill_type="solid")
+            else:
+                status_cell.fill = PatternFill(start_color="FFB6C1", end_color="FFB6C1", fill_type="solid")
+            
+            for col_idx in range(1, 5):
+                ws.cell(row=row, column=col_idx).border = self.border
+                ws.cell(row=row, column=col_idx).alignment = self.left_alignment
+            row += 1
+        
+        row += 1
+        
+        # Comprehensive manifest summary
+        ws[f'A{row}'] = "COMPREHENSIVE MANIFEST SUMMARY"
+        ws[f'A{row}'].font = Font(bold=True, size=10)
+        ws[f'A{row}'].fill = self.subheader_fill
+        ws.merge_cells(f'A{row}:B{row}')
+        row += 1
+        
+        comprehensive_manifest = writeback_analysis.get("comprehensive_manifest", {})
+        manifest_items = [
+            ["Manifest Version", comprehensive_manifest.get("manifest_version", "unknown")],
+            ["Created At", comprehensive_manifest.get("created_at", "unknown")],
+            ["Total Transformations", comprehensive_manifest.get("total_transformations", 0)],
+            ["Agents in Pipeline", len(comprehensive_manifest.get("transformation_pipeline", []))],
+            ["Original Rows", comprehensive_manifest.get("original_state", {}).get("row_count", "unknown")],
+            ["Final Rows", comprehensive_manifest.get("final_state", {}).get("row_count", 0)],
+            ["Original Columns", comprehensive_manifest.get("original_state", {}).get("column_count", "unknown")],
+            ["Final Columns", comprehensive_manifest.get("final_state", {}).get("column_count", 0)]
+        ]
+        
+        for key, value in manifest_items:
+            ws[f'A{row}'] = key
+            ws[f'B{row}'] = value
+            ws[f'A{row}'].border = self.border
+            ws[f'B{row}'].border = self.border
+            row += 1
+        
+        row += 1
+        
+        # Transformation pipeline
+        ws[f'A{row}'] = "TRANSFORMATION PIPELINE"
+        ws[f'A{row}'].font = Font(bold=True, size=10)
+        ws[f'A{row}'].fill = self.subheader_fill
+        ws.merge_cells(f'A{row}:D{row}')
+        row += 1
+        
+        headers = ["Agent Name", "Executed At", "Status", "Transformations Applied"]
+        for col_idx, header in enumerate(headers, 1):
+            cell = ws.cell(row=row, column=col_idx, value=header)
+            cell.fill = self.header_fill
+            cell.font = self.header_font
+            cell.border = self.border
+            cell.alignment = self.center_alignment
+        row += 1
+        
+        transformation_pipeline = comprehensive_manifest.get("transformation_pipeline", [])
+        for agent_entry in transformation_pipeline:
+            ws.cell(row=row, column=1, value=agent_entry.get("agent_name", ""))
+            ws.cell(row=row, column=2, value=agent_entry.get("executed_at", ""))
+            ws.cell(row=row, column=3, value=agent_entry.get("status", ""))
+            ws.cell(row=row, column=4, value=len(agent_entry.get("transformations_applied", [])))
+            
+            for col_idx in range(1, 5):
+                ws.cell(row=row, column=col_idx).border = self.border
+                ws.cell(row=row, column=col_idx).alignment = self.left_alignment
+            row += 1
+        
+        row += 1
+        
+        # Recommendations
+        ws[f'A{row}'] = "RECOMMENDATIONS"
+        ws[f'A{row}'].font = Font(bold=True, size=10)
+        ws[f'A{row}'].fill = self.subheader_fill
+        ws.merge_cells(f'A{row}:D{row}')
+        row += 1
+        
+        recommendations = writeback_analysis.get("recommendations", [])
+        for rec in recommendations:
+            ws[f'A{row}'] = f"[{rec.get('priority', 'medium').upper()}] {rec.get('action', 'Unknown')}"
+            ws[f'A{row}'].font = Font(bold=True)
+            ws[f'A{row}'].border = self.border
+            ws.merge_cells(f'A{row}:D{row}')
+            row += 1
+            
+            ws[f'A{row}'] = rec.get("reason", "")
+            ws[f'A{row}'].border = self.border
+            ws.merge_cells(f'A{row}:D{row}')
             row += 1
     
     def _create_governance_sheet(self, wb, agent_output):
