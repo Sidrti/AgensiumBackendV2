@@ -685,7 +685,7 @@ def _apply_type_fixes(df: pd.DataFrame, fix_config: Dict[str, Any]) -> tuple:
                 fix_log.append(f"Converted '{col}' from {original_type} to integer")
                 
             elif target_type == 'datetime':
-                df_fixed[col] = pd.to_datetime(df_fixed[col], errors='coerce')
+                df_fixed[col] = pd.to_datetime(df_fixed[col], errors='coerce', dayfirst=True)
                 fix_log.append(f"Converted '{col}' from {original_type} to datetime")
                 
             elif target_type == 'string':
