@@ -225,28 +225,26 @@ def execute_type_fixer(
             "title": "Type Fixing Status",
             "value": f"{fixing_score['overall_score']:.1f}",
             "status": "excellent" if quality_status == "excellent" else "good" if quality_status == "good" else "needs_improvement",
-            "description": f"Quality: {quality_status}, Issues Fixed: {len(fix_log)}, {len(type_analysis['columns_with_issues'])} columns had type issues, {fixing_score['metrics']['fix_success_percentage']:.1f}% success rate"
+            "description": f"Quality: {quality_status}, Issues Fixed: {len(fix_log)}, {len(type_analysis['columns_with_issues'])} columns had type issues, {fixing_score['metrics']['issue_reduction_rate']:.1f}% success rate"
         }]
         
         # ==================== GENERATE AI ANALYSIS TEXT ====================
         ai_analysis_parts = []
         ai_analysis_parts.append(f"TYPE FIXER ANALYSIS:")
-        ai_analysis_parts.append(f"- Fixing Score: {fixing_score['overall_score']:.1f}/100 (Fix Success: {fixing_score['metrics']['fix_success_score']:.1f}, Data Integrity: {fixing_score['metrics']['data_integrity_score']:.1f}, Type Coverage: {fixing_score['metrics']['type_coverage_score']:.1f})")
-        ai_analysis_parts.append(f"- Type Issues Fixed: {len(fix_log)} issues resolved across {len(type_analysis['columns_with_issues'])} columns, {fixing_score['metrics']['fix_success_percentage']:.1f}% success rate")
+        ai_analysis_parts.append(f"- Fixing Score: {fixing_score['overall_score']:.1f}/100 (Issue Reduction: {fixing_score['metrics']['issue_reduction_rate']:.1f}, Data Retention: {fixing_score['metrics']['data_retention_rate']:.1f}, Column Retention: {fixing_score['metrics']['column_retention_rate']:.1f})")
+        ai_analysis_parts.append(f"- Type Issues Fixed: {len(fix_log)} issues resolved across {len(type_analysis['columns_with_issues'])} columns, {fixing_score['metrics']['issue_reduction_rate']:.1f}% success rate")
         
         cols_with_issues = type_analysis['columns_with_issues']
         ai_analysis_parts.append(f"- Columns Fixed: {', '.join(list(cols_with_issues)[:5])}{'...' if len(cols_with_issues) > 5 else ''}")
-        ai_analysis_parts.append(f"- Data Integrity: {fixing_score['metrics']['data_integrity_percentage']:.1f}% data integrity maintained after type conversions")
-        ai_analysis_parts.append(f"- Conversions Applied: {', '.join(set([log.get('target_type', 'unknown') for log in fix_log]))}")
+        ai_analysis_parts.append(f"- Data Integrity: {fixing_score['metrics']['data_retention_rate']:.1f}% data integrity maintained after type conversions")
+        ai_analysis_parts.append(f"- Conversions Applied: {len(fix_log)} type conversions performed")
         
         if len(type_analysis.get('recommendations', [])) > 0:
             ai_analysis_parts.append(f"- Top Recommendation: {type_analysis['recommendations'][0].get('recommendation', 'Review type conversion strategy')}")
         
         ai_analysis_text = "\n".join(ai_analysis_parts)
         
-        # Add to type_fixing_data
-        type_fixing_data["executive_summary"] = executive_summary
-        type_fixing_data["ai_analysis_text"] = ai_analysis_text
+       
         
         # ==================== GENERATE ALERTS ====================
         alerts = []
@@ -275,12 +273,12 @@ def execute_type_fixer(
             })
         
         # Data integrity after conversion
-        if fixing_score['metrics']['data_integrity_percentage'] < 95:
+        if fixing_score['metrics']['data_retention_rate'] < 95:
             alerts.append({
                 "alert_id": "alert_types_data_integrity",
                 "severity": "high",
                 "category": "data_integrity",
-                "message": f"Data integrity: {fixing_score['metrics']['data_integrity_percentage']:.1f}% after type conversions (below 95% threshold)",
+                "message": f"Data integrity: {fixing_score['metrics']['data_retention_rate']:.1f}% after type conversions (below 95% threshold)",
                 "affected_fields_count": len(cols_with_issues),
                 "recommendation": "Validate type conversions did not corrupt data values. Review conversion logs for errors."
             })
@@ -508,6 +506,8 @@ def execute_type_fixer(
             "alerts": alerts,
             "issues": issues,
             "recommendations": agent_recommendations,
+            "executive_summary" : executive_summary,
+            "ai_analysis_text" : ai_analysis_text,
             "row_level_issues": row_level_issues,
             "issue_summary": issue_summary,
             "cleaned_file": {

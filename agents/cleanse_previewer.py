@@ -524,8 +524,7 @@ def execute_cleanse_previewer(
             "preview_analysis": preview_analysis,
             "summary": f"Preview analysis completed. Quality: {quality_status}. Analyzed {len(preview_rules)} cleaning rules across {len(df)} rows. Safety: {preview_analysis['execution_safety']}.",
             "impact_issues": _extract_impact_issues(simulated_results)[:100],
-            "executive_summary": executive_summary,
-            "ai_analysis_text": ai_analysis_text
+            
         }
 
         return {
@@ -546,6 +545,8 @@ def execute_cleanse_previewer(
             "alerts": alerts,
             "issues": issues,
             "recommendations": agent_recommendations,
+            "executive_summary": executive_summary,
+            "ai_analysis_text": ai_analysis_text,
             "row_level_issues": row_level_issues[:1000],
             "issue_summary": issue_summary
         }

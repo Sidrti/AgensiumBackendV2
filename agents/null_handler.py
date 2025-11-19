@@ -193,18 +193,18 @@ def execute_null_handler(
             "title": "Null Handling Status",
             "value": f"{cleaning_score['overall_score']:.1f}",
             "status": "excellent" if quality_status == "excellent" else "good" if quality_status == "good" else "fair",
-            "description": f"Quality: {quality_status}, Nulls Handled: {null_analysis['total_nulls_detected']}, {len(null_analysis['columns_with_nulls'])} columns affected, {cleaning_score['metrics']['null_reduction_percentage']:.1f}% reduction"
+            "description": f"Quality: {quality_status}, Nulls Handled: {null_analysis['total_nulls_detected']}, {len(null_analysis['columns_with_nulls'])} columns affected, {cleaning_score['metrics']['null_reduction_rate']:.1f}% reduction"
         }]
         
         # ==================== GENERATE AI ANALYSIS TEXT ====================
         ai_analysis_parts = []
         ai_analysis_parts.append(f"NULL HANDLER ANALYSIS:")
-        ai_analysis_parts.append(f"- Cleaning Score: {cleaning_score['overall_score']:.1f}/100 (Null Reduction: {cleaning_score['metrics']['null_reduction_score']:.1f}, Data Retention: {cleaning_score['metrics']['data_retention_score']:.1f}, Column Retention: {cleaning_score['metrics']['column_retention_score']:.1f})")
-        ai_analysis_parts.append(f"- Null Reduction: {null_analysis['total_nulls_detected']} nulls handled, {cleaning_score['metrics']['null_reduction_percentage']:.1f}% reduction achieved")
+        ai_analysis_parts.append(f"- Cleaning Score: {cleaning_score['overall_score']:.1f}/100 (Null Reduction: {cleaning_score['metrics']['null_reduction_rate']:.1f}, Data Retention: {cleaning_score['metrics']['data_retention_rate']:.1f}, Column Retention: {cleaning_score['metrics']['column_retention_rate']:.1f})")
+        ai_analysis_parts.append(f"- Null Reduction: {null_analysis['total_nulls_detected']} nulls handled, {cleaning_score['metrics']['null_reduction_rate']:.1f}% reduction achieved")
         
         cols_with_nulls = null_analysis['columns_with_nulls']
         ai_analysis_parts.append(f"- Columns Affected: {len(cols_with_nulls)} columns had nulls ({', '.join(list(cols_with_nulls)[:5])}{'...' if len(cols_with_nulls) > 5 else ''})")
-        ai_analysis_parts.append(f"- Data Retention: {cleaning_score['metrics']['row_retention_percentage']:.1f}% rows retained, {cleaning_score['metrics']['column_retention_percentage']:.1f}% columns retained")
+        ai_analysis_parts.append(f"- Data Retention: {cleaning_score['metrics']['data_retention_rate']:.1f}% rows retained, {cleaning_score['metrics']['column_retention_rate']:.1f}% columns retained")
         ai_analysis_parts.append(f"- Imputation Applied: {len(imputation_log)} strategies used across columns")
         
         if len(null_analysis.get('recommendations', [])) > 0:
@@ -212,9 +212,7 @@ def execute_null_handler(
         
         ai_analysis_text = "\n".join(ai_analysis_parts)
         
-        # Add to null_handling_data
-        null_handling_data["executive_summary"] = executive_summary
-        null_handling_data["ai_analysis_text"] = ai_analysis_text
+        
         
         # ==================== GENERATE ALERTS ====================
         alerts = []
@@ -258,7 +256,7 @@ def execute_null_handler(
         # Alert 3: Column retention warning
         columns_dropped = len(original_df.columns) - len(df_cleaned.columns)
         if columns_dropped > 0:
-            column_retention_pct = cleaning_score['metrics'].get('column_retention_percentage', 100)
+            column_retention_pct = cleaning_score['metrics'].get('column_retention_rate', 100)
             severity = "high" if column_retention_pct < 80 else "medium"
             alerts.append({
                 "alert_id": "alert_nulls_column_retention",
@@ -270,7 +268,7 @@ def execute_null_handler(
             })
         
         # Alert 4: Data retention alert
-        row_retention_pct = cleaning_score['metrics'].get('row_retention_percentage', 100)
+        row_retention_pct = cleaning_score['metrics'].get('data_retention_rate', 100)
         if row_retention_pct < 90:
             severity = "critical" if row_retention_pct < 70 else "high"
             alerts.append({
@@ -523,6 +521,8 @@ def execute_null_handler(
             "alerts": alerts,
             "issues": issues,
             "recommendations": agent_recommendations,
+            "executive_summary" : executive_summary,
+            "ai_analysis_text" : ai_analysis_text,
             "cleaned_file": {
                 "filename": f"cleaned_{filename}",
                 "content": cleaned_file_base64,

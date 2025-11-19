@@ -69,6 +69,8 @@ def detect_drift(
         # Check for missing/new columns
         baseline_cols = set(baseline_df.columns)
         current_cols = set(current_df.columns)
+        missing_cols = baseline_cols - current_cols
+        new_cols = current_cols - baseline_cols
         
         # Common columns - check for data distribution drift
         common_cols = baseline_cols & current_cols
