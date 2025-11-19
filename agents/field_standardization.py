@@ -239,19 +239,54 @@ def execute_field_standardization(
         
         # Quality score alert
         if standardization_score["overall_score"] < good_threshold:
+            severity = "critical" if standardization_score["overall_score"] < 50 else "high" if standardization_score["overall_score"] < good_threshold else "medium"
             alerts.append({
                 "alert_id": "alert_standardization_quality",
-                "severity": "medium",
+                "severity": severity,
                 "category": "quality_score",
                 "message": f"Standardization quality score: {standardization_score['overall_score']:.1f}/100 ({quality_status})",
                 "affected_fields_count": len(columns_to_process),
-                "recommendation": "Optimize standardization rules and apply advanced normalization techniques."
+                "recommendation": "Optimize standardization rules and apply advanced normalization techniques for better results."
+            })
+        
+        # Format inconsistency alert
+        post_variations = post_analysis.get('total_variations', 0)
+        if post_variations > 0:
+            alerts.append({
+                "alert_id": "alert_standardization_remaining_variations",
+                "severity": "medium",
+                "category": "field_consistency",
+                "message": f"{post_variations} format variations remain after standardization",
+                "affected_fields_count": post_analysis.get('columns_needing_standardization', 0),
+                "recommendation": "Review synonym mappings and add custom normalization rules for remaining variations."
+            })
+        
+        # Transformation failure alert
+        if values_changed < total_variations * 0.5 and total_variations > 0:
+            alerts.append({
+                "alert_id": "alert_standardization_low_transformation",
+                "severity": "high",
+                "category": "effectiveness",
+                "message": f"Low transformation rate: Only {values_changed} of {total_variations} variations addressed ({(values_changed/total_variations*100):.1f}%)",
+                "affected_fields_count": len(columns_to_process),
+                "recommendation": "Enable additional standardization options (case normalization, whitespace handling, synonyms)."
+            })
+        
+        # No synonym mapping configured
+        if not synonym_mappings and len([c for c, d in pre_analysis.get('column_analysis', {}).items() if d.get('variation_score', 0) > 30]) > 0:
+            alerts.append({
+                "alert_id": "alert_standardization_no_synonyms",
+                "severity": "medium",
+                "category": "configuration",
+                "message": "No synonym mappings configured despite high field variation. Synonym mapping can significantly improve standardization.",
+                "affected_fields_count": len([c for c, d in pre_analysis.get('column_analysis', {}).items() if d.get('variation_score', 0) > 30]),
+                "recommendation": "Analyze field values and create synonym mapping rules for common variations."
             })
         
         # ==================== GENERATE ISSUES ====================
         issues = []
         
-        # Convert standardization issues to standardized format
+        # Convert standardization issues to standardized format (row-level changes)
         for std_issue in standardization_issues[:100]:
             issues.append({
                 "issue_id": f"issue_standardization_{std_issue.get('row_index', 0)}_{std_issue.get('column', 'unknown')}",
@@ -260,6 +295,53 @@ def execute_field_standardization(
                 "issue_type": std_issue.get('issue_type', 'field_standardized'),
                 "severity": std_issue.get('severity', 'info'),
                 "message": f"Standardized: '{std_issue.get('original_value', '')}' → '{std_issue.get('standardized_value', '')}'"
+            })
+        
+        # Add column-level issues for high variation columns
+        for col, data in pre_analysis.get('column_analysis', {}).items():
+            if data.get('variation_score', 0) > 50:
+                issues.append({
+                    "issue_id": f"issue_standardization_high_variation_{col}",
+                    "agent_id": "field-standardization",
+                    "field_name": col,
+                    "issue_type": "high_variation",
+                    "severity": "high",
+                    "message": f"Column '{col}' has high variation score ({data.get('variation_score', 0):.1f}%) - {data.get('total_unique_values', 0)} unique values detected"
+                })
+        
+        # Add issues for columns with remaining case variations
+        for col, data in post_analysis.get('column_analysis', {}).items():
+            if data.get('case_variations', 0) > 0:
+                issues.append({
+                    "issue_id": f"issue_standardization_case_remaining_{col}",
+                    "agent_id": "field-standardization",
+                    "field_name": col,
+                    "issue_type": "case_variation_remaining",
+                    "severity": "medium",
+                    "message": f"Column '{col}' still has {data.get('case_variations', 0)} case variations after standardization"
+                })
+        
+        # Add issues for columns with whitespace problems
+        for col, data in post_analysis.get('column_analysis', {}).items():
+            if data.get('whitespace_issues', 0) > 0:
+                issues.append({
+                    "issue_id": f"issue_standardization_whitespace_{col}",
+                    "agent_id": "field-standardization",
+                    "field_name": col,
+                    "issue_type": "whitespace_issues",
+                    "severity": "medium",
+                    "message": f"Column '{col}' has {data.get('whitespace_issues', 0)} whitespace formatting issues"
+                })
+        
+        # Add low improvement issue if standardization didn't help much
+        if improvement_pct < 10 and total_variations > 0:
+            issues.append({
+                "issue_id": "issue_standardization_low_impact",
+                "agent_id": "field-standardization",
+                "field_name": "dataset",
+                "issue_type": "low_effectiveness",
+                "severity": "high",
+                "message": f"Standardization achieved only {improvement_pct:.1f}% improvement despite {total_variations} variations detected - review strategy"
             })
         
         # ==================== GENERATE RECOMMENDATIONS ====================
@@ -330,6 +412,48 @@ def execute_field_standardization(
             "recommendation": "Establish field variation monitoring to detect standardization drift over time",
             "timeline": "3 weeks"
         })
+        
+        # Recommendation 7: Synonym dictionary development
+        if not synonym_mappings and total_variations > len(columns_to_process) * 5:
+            agent_recommendations.append({
+                "recommendation_id": "rec_standardization_synonym_dev",
+                "agent_id": "field-standardization",
+                "field_name": "all",
+                "priority": "high",
+                "recommendation": f"Develop synonym dictionary for {len(columns_to_process)} columns to handle {total_variations} variations",
+                "timeline": "1-2 weeks"
+            })
+        
+        # Recommendation 8: Automated standardization pipeline
+        agent_recommendations.append({
+            "recommendation_id": "rec_standardization_automation",
+            "agent_id": "field-standardization",
+            "field_name": "all",
+            "priority": "medium",
+            "recommendation": "Implement automated standardization pipeline to apply rules consistently across all data ingestion points",
+            "timeline": "2-3 weeks"
+        })
+        
+        # Recommendation 9: Format documentation
+        agent_recommendations.append({
+            "recommendation_id": "rec_standardization_documentation",
+            "agent_id": "field-standardization",
+            "field_name": "all",
+            "priority": "low",
+            "recommendation": "Document standard formats, normalization rules, and synonym mappings for team reference and consistency",
+            "timeline": "3 weeks"
+        })
+        
+        # Recommendation 10: Training data quality
+        if improvement_pct > 20:
+            agent_recommendations.append({
+                "recommendation_id": "rec_standardization_training",
+                "agent_id": "field-standardization",
+                "field_name": "all",
+                "priority": "medium",
+                "recommendation": f"Train data entry personnel on standard formats to reduce {improvement_pct:.1f}% variation rate at source",
+                "timeline": "2 weeks"
+            })
 
         # Generate cleaned file (CSV format)
         cleaned_file_bytes = _generate_cleaned_file(df_standardized, filename)

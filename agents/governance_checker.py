@@ -107,73 +107,138 @@ def execute_governance(
         # ==================== GENERATE ALERTS ====================
         alerts = []
         
+        # Alert 1: Overall compliance status
         if compliance_status != "compliant":
             issues_found = len(governance_issues)
-            
             alerts.append({
-                "alert_id": "alert_governance_001",
+                "alert_id": "alert_governance_001_overall",
                 "severity": "critical" if compliance_status == "non_compliant" else "high",
                 "category": "governance_compliance",
-                "message": f"Governance compliance: {overall_score:.1f}/100 ({compliance_status.upper().replace('_', ' ')})",
+                "message": f"Overall governance compliance: {overall_score:.1f}/100 ({compliance_status.upper().replace('_', ' ')})",
                 "affected_fields_count": issues_found,
                 "recommendation": f"Address {issues_found} governance issue(s) to meet compliance requirements."
             })
         
-        # Component-specific alerts
+        # Alert 2: Data lineage assessment
         if lineage_score < 80:
+            lineage_issues_count = len([i for i in governance_issues if i.get("type", "").startswith("missing_lineage")])
             alerts.append({
-                "alert_id": "alert_governance_lineage",
-                "severity": "high" if lineage_score < 60 else "medium",
+                "alert_id": "alert_governance_002_lineage",
+                "severity": "critical" if lineage_score < 50 else "high" if lineage_score < 65 else "medium",
                 "category": "data_lineage",
-                "message": f"Data lineage score: {lineage_score:.1f}/100",
-                "affected_fields_count": len([i for i in governance_issues if i.get("type", "").startswith("missing_lineage")]),
-                "recommendation": "Implement data lineage tracking to document data sources, transformations, and dependencies"
+                "message": f"Data lineage tracking insufficient: {lineage_score:.1f}/100 - {lineage_issues_count} lineage gaps detected",
+                "affected_fields_count": lineage_issues_count,
+                "recommendation": "Implement comprehensive data lineage: document source systems, transformations, and data dependencies"
             })
         
+        # Alert 3: Consent management
         if consent_score < 80:
+            consent_issues_count = len([i for i in governance_issues if i.get("type", "").startswith("missing_consent")])
             alerts.append({
-                "alert_id": "alert_governance_consent",
-                "severity": "critical" if consent_score < 60 else "high",
+                "alert_id": "alert_governance_003_consent",
+                "severity": "critical" if consent_score < 50 else "high" if consent_score < 65 else "medium",
                 "category": "consent_management",
-                "message": f"Consent management score: {consent_score:.1f}/100",
-                "affected_fields_count": len([i for i in governance_issues if i.get("type", "").startswith("missing_consent")]),
-                "recommendation": "Implement consent tracking and management to comply with privacy regulations (GDPR, CCPA)"
+                "message": f"Consent tracking gaps: {consent_score:.1f}/100 - {consent_issues_count} consent fields missing",
+                "affected_fields_count": consent_issues_count,
+                "recommendation": "Implement consent management system to track user consent, preferences, and withdrawal requests (GDPR/CCPA)"
             })
         
+        # Alert 4: Data classification
         if classification_score < 80:
+            classification_issues_count = len([i for i in governance_issues if i.get("type", "").startswith("missing_classification")])
             alerts.append({
-                "alert_id": "alert_governance_classification",
+                "alert_id": "alert_governance_004_classification",
                 "severity": "high" if classification_score < 60 else "medium",
                 "category": "data_classification",
-                "message": f"Data classification score: {classification_score:.1f}/100",
-                "affected_fields_count": len([i for i in governance_issues if i.get("type", "").startswith("missing_classification")]),
-                "recommendation": "Implement data classification to identify and protect sensitive information"
+                "message": f"Data classification incomplete: {classification_score:.1f}/100 - {classification_issues_count} fields unclassified",
+                "affected_fields_count": classification_issues_count,
+                "recommendation": "Classify all data fields by sensitivity level (public/internal/confidential/restricted)"
             })
         
-        # PII detection alert
+        # Alert 5: PII detection
         pii_issues = [i for i in governance_issues if i.get("type") == "pii_detected"]
         if pii_issues:
             alerts.append({
-                "alert_id": "alert_governance_pii",
+                "alert_id": "alert_governance_005_pii",
                 "severity": "critical",
                 "category": "pii_without_classification",
-                "message": f"{len(pii_issues)} field(s) with PII detected without proper classification",
+                "message": f"PII detected in {len(pii_issues)} field(s): {', '.join([i.get('field', 'N/A') for i in pii_issues[:3]])}",
                 "affected_fields_count": len(pii_issues),
-                "recommendation": "Classify and secure PII fields with appropriate access controls and encryption"
+                "recommendation": "Immediately implement encryption, access controls, and audit logging for all PII fields"
+            })
+        
+        # Alert 6: Missing lineage fields
+        missing_lineage = [i for i in governance_issues if i.get("type") == "missing_lineage_field"]
+        if missing_lineage:
+            alerts.append({
+                "alert_id": "alert_governance_006_missing_lineage",
+                "severity": "critical",
+                "category": "data_lineage",
+                "message": f"Required lineage fields missing: {', '.join([i.get('field', 'N/A') for i in missing_lineage])}",
+                "affected_fields_count": len(missing_lineage),
+                "recommendation": "Add required lineage fields: source_system, transformation_date, data_owner, business_unit"
+            })
+        
+        # Alert 7: Missing consent fields
+        missing_consent = [i for i in governance_issues if i.get("type") == "missing_consent_field"]
+        if missing_consent:
+            alerts.append({
+                "alert_id": "alert_governance_007_missing_consent",
+                "severity": "critical",
+                "category": "consent_management",
+                "message": f"Critical consent fields missing: {', '.join([i.get('field', 'N/A') for i in missing_consent])}",
+                "affected_fields_count": len(missing_consent),
+                "recommendation": "Add required consent fields: consent_status, consent_date, consent_type, withdrawal_date"
+            })
+        
+        # Alert 8: Missing classification fields
+        missing_classification = [i for i in governance_issues if i.get("type") == "missing_classification_field"]
+        if missing_classification:
+            alerts.append({
+                "alert_id": "alert_governance_008_missing_classification",
+                "severity": "high",
+                "category": "data_classification",
+                "message": f"Data classification fields missing: {', '.join([i.get('field', 'N/A') for i in missing_classification[:3]])}",
+                "affected_fields_count": len(missing_classification),
+                "recommendation": "Add data_classification and sensitivity_level fields to all records"
+            })
+        
+        # Alert 9: Critical governance issues detected
+        critical_gov_issues = [i for i in governance_issues if i.get("severity") == "critical"]
+        if critical_gov_issues and len(critical_gov_issues) > 0:
+            alerts.append({
+                "alert_id": "alert_governance_009_critical_issues",
+                "severity": "critical",
+                "category": "governance_compliance",
+                "message": f"Critical governance issues detected: {len(critical_gov_issues)} issue(s) require immediate resolution",
+                "affected_fields_count": len(critical_gov_issues),
+                "recommendation": "Prioritize resolution of critical issues: missing required fields, unprotected PII, compliance violations"
+            })
+        
+        # Alert 10: Governance framework gaps
+        governance_gap_score = 100 - overall_score
+        if governance_gap_score > 20:
+            alerts.append({
+                "alert_id": "alert_governance_010_framework_gaps",
+                "severity": "high",
+                "category": "governance_compliance",
+                "message": f"Governance framework gaps: {governance_gap_score:.1f} points below required threshold",
+                "affected_fields_count": len(df.columns),
+                "recommendation": "Establish comprehensive governance framework: policies, procedures, roles, responsibilities, and controls"
             })
         
         # ==================== GENERATE ISSUES ====================
         issues = []
         
-        # Add governance issues
-        for issue in governance_issues:
+        # Add all governance issues with extended severity mapping
+        for idx, issue in enumerate(governance_issues[:100]):  # Limit to 100 issues
             issue_type = issue.get("type", "governance_issue")
             field = issue.get("field", "N/A")
             severity = issue.get("severity", "medium")
             message = issue.get("message", "Governance issue detected")
             
             issues.append({
-                "issue_id": f"issue_governance_{issue_type}_{field}",
+                "issue_id": f"issue_governance_{issue_type}_{field}_{idx}",
                 "agent_id": "governance-checker",
                 "field_name": field,
                 "issue_type": issue_type,
@@ -181,97 +246,150 @@ def execute_governance(
                 "message": message
             })
         
+        # Add specific lineage violation issues
+        if lineage_score < 80:
+            for idx, col in enumerate(df.columns[:10]):
+                if idx < 3:  # Add for sample columns
+                    issues.append({
+                        "issue_id": f"issue_governance_lineage_gap_{col}",
+                        "agent_id": "governance-checker",
+                        "field_name": col,
+                        "issue_type": "lineage_gap",
+                        "severity": "high" if lineage_score < 50 else "medium",
+                        "message": f"Missing lineage metadata for field '{col}': source system and transformation history not documented"
+                    })
+        
+        # Add specific consent violation issues
+        if consent_score < 80:
+            for idx, col in enumerate(df.columns[:10]):
+                if idx < 3:  # Add for sample columns
+                    issues.append({
+                        "issue_id": f"issue_governance_consent_gap_{col}",
+                        "agent_id": "governance-checker",
+                        "field_name": col,
+                        "issue_type": "consent_gap",
+                        "severity": "critical" if consent_score < 50 else "high",
+                        "message": f"Missing consent tracking for field '{col}': user consent and withdrawal records not available"
+                    })
+        
+        # Add specific classification violation issues
+        if classification_score < 80:
+            for idx, col in enumerate(df.columns[:10]):
+                if idx < 3:  # Add for sample columns
+                    issues.append({
+                        "issue_id": f"issue_governance_classification_gap_{col}",
+                        "agent_id": "governance-checker",
+                        "field_name": col,
+                        "issue_type": "classification_gap",
+                        "severity": "high",
+                        "message": f"Missing data classification for field '{col}': sensitivity level not assigned"
+                    })
+        
         # ==================== GENERATE RECOMMENDATIONS ====================
         recommendations = []
         
-        # Governance recommendations based on critical/high severity issues
+        # Recommendation 1: Critical issues resolution
         critical_issues = [i for i in governance_issues if i.get("severity") == "critical"][:3]
-        for issue in critical_issues:
-            field = issue.get("field", "N/A")
-            issue_type = issue.get("type", "governance_issue")
-            message = issue.get("message", "")
-            
+        if critical_issues:
+            for idx, issue in enumerate(critical_issues):
+                field = issue.get("field", "N/A")
+                issue_type = issue.get("type", "governance_issue")
+                message = issue.get("message", "")
+                
+                recommendations.append({
+                    "recommendation_id": f"rec_governance_critical_{issue_type}_{idx}",
+                    "agent_id": "governance-checker",
+                    "field_name": field,
+                    "priority": "critical",
+                    "recommendation": f"URGENT - {message}. This is a compliance violation requiring immediate corrective action",
+                    "timeline": "immediate"
+                })
+        
+        # Recommendation 2: High-severity issues
+        high_issues = [i for i in governance_issues if i.get("severity") == "high"][:2]
+        if high_issues:
+            for idx, issue in enumerate(high_issues):
+                field = issue.get("field", "N/A")
+                issue_type = issue.get("type", "governance_issue")
+                message = issue.get("message", "")
+                
+                recommendations.append({
+                    "recommendation_id": f"rec_governance_high_{issue_type}_{idx}",
+                    "agent_id": "governance-checker",
+                    "field_name": field,
+                    "priority": "high",
+                    "recommendation": f"{message}. Implement corrective measures to align with governance requirements",
+                    "timeline": "1-2 weeks"
+                })
+        
+        # Recommendation 3: Data lineage implementation
+        if lineage_score < 80:
+            missing_lineage_fields = [i.get("field") for i in governance_issues if i.get("type") == "missing_lineage_field"]
             recommendations.append({
-                "recommendation_id": f"rec_governance_{issue_type}_{field}",
+                "recommendation_id": "rec_governance_lineage_impl",
                 "agent_id": "governance-checker",
-                "field_name": field,
-                "priority": "critical",
-                "recommendation": f"Address governance issue: {message}",
-                "timeline": "immediate"
+                "field_name": "all" if not missing_lineage_fields else ", ".join(missing_lineage_fields[:3]),
+                "priority": "critical" if lineage_score < 50 else "high",
+                "recommendation": f"Implement comprehensive data lineage tracking system: document source systems, data transformations, dependencies, and data flow for {len(missing_lineage_fields) if missing_lineage_fields else 'all'} field(s). Include source_system, transformation_date, data_owner metadata",
+                "timeline": "2-4 weeks"
             })
         
-        high_issues = [i for i in governance_issues if i.get("severity") == "high"][:3]
-        for issue in high_issues:
-            field = issue.get("field", "N/A")
-            issue_type = issue.get("type", "governance_issue")
-            message = issue.get("message", "")
-            
+        # Recommendation 4: Consent management framework
+        if consent_score < 80:
+            missing_consent_fields = [i.get("field") for i in governance_issues if i.get("type") == "missing_consent_field"]
             recommendations.append({
-                "recommendation_id": f"rec_governance_{issue_type}_{field}",
+                "recommendation_id": "rec_governance_consent_impl",
                 "agent_id": "governance-checker",
-                "field_name": field,
-                "priority": "high",
-                "recommendation": f"Address governance issue: {message}",
+                "field_name": "all" if not missing_consent_fields else ", ".join(missing_consent_fields[:3]),
+                "priority": "critical",
+                "recommendation": f"Implement consent management and tracking for {len(missing_consent_fields) if missing_consent_fields else 'all'} field(s): track user consent status, dates, types, and withdrawal requests. Required for GDPR/CCPA compliance",
                 "timeline": "1-2 weeks"
             })
         
-        # Component-based recommendations
-        if lineage_score < 80:
-            missing_lineage_fields = [i.get("field") for i in governance_issues if i.get("type") == "missing_lineage_field"]
-            if missing_lineage_fields:
-                recommendations.append({
-                    "recommendation_id": "rec_governance_lineage",
-                    "agent_id": "governance-checker",
-                    "field_name": ", ".join(missing_lineage_fields[:3]),
-                    "priority": "high",
-                    "recommendation": f"Implement data lineage tracking for {len(missing_lineage_fields)} field(s): document source systems, transformations, and data flow",
-                    "timeline": "2-3 weeks"
-                })
-        
-        if consent_score < 80:
-            missing_consent_fields = [i.get("field") for i in governance_issues if i.get("type") == "missing_consent_field"]
-            if missing_consent_fields:
-                recommendations.append({
-                    "recommendation_id": "rec_governance_consent",
-                    "agent_id": "governance-checker",
-                    "field_name": ", ".join(missing_consent_fields[:3]),
-                    "priority": "critical",
-                    "recommendation": f"Implement consent management for {len(missing_consent_fields)} field(s): track user consent, preferences, and withdrawal requests",
-                    "timeline": "1-2 weeks"
-                })
-        
+        # Recommendation 5: Data classification framework
         if classification_score < 80:
             missing_classification_fields = [i.get("field") for i in governance_issues if i.get("type") == "missing_classification_field"]
-            if missing_classification_fields:
-                recommendations.append({
-                    "recommendation_id": "rec_governance_classification",
-                    "agent_id": "governance-checker",
-                    "field_name": ", ".join(missing_classification_fields[:3]),
-                    "priority": "high",
-                    "recommendation": f"Implement data classification for {len(missing_classification_fields)} field(s): categorize as public, internal, confidential, or restricted",
-                    "timeline": "1-2 weeks"
-                })
+            recommendations.append({
+                "recommendation_id": "rec_governance_classification_impl",
+                "agent_id": "governance-checker",
+                "field_name": "all" if not missing_classification_fields else ", ".join(missing_classification_fields[:3]),
+                "priority": "high",
+                "recommendation": f"Establish data classification framework for {len(missing_classification_fields) if missing_classification_fields else 'all'} field(s): categorize by sensitivity (public/internal/confidential/restricted). Assign ownership and access controls",
+                "timeline": "1-2 weeks"
+            })
         
-        # PII-specific recommendation
+        # Recommendation 6: PII protection
         if pii_issues:
             pii_fields = [i.get("field") for i in pii_issues]
             recommendations.append({
                 "recommendation_id": "rec_governance_pii_protection",
                 "agent_id": "governance-checker",
-                "field_name": ", ".join(pii_fields[:3]),
+                "field_name": ", ".join(pii_fields[:5]),
                 "priority": "critical",
-                "recommendation": f"Protect {len(pii_fields)} PII field(s): implement encryption, access controls, audit logging, and data masking",
+                "recommendation": f"Immediately secure {len(pii_fields)} PII field(s) ({', '.join(pii_fields[:3])}...): implement encryption (AES-256), access controls (RBAC), audit logging, and data masking. Establish retention policies",
                 "timeline": "immediate"
             })
         
-        # Overall governance recommendation
+        # Recommendation 7: Missing governance fields
+        if missing_lineage or missing_consent or missing_classification:
+            all_missing = len(missing_lineage) + len(missing_consent) + len(missing_classification)
+            recommendations.append({
+                "recommendation_id": "rec_governance_fields_add",
+                "agent_id": "governance-checker",
+                "field_name": "all",
+                "priority": "critical",
+                "recommendation": f"Add {all_missing} required governance metadata fields: source_system, transformation_date, consent_status, data_classification, sensitivity_level, data_owner, business_unit. Update all {len(df)} records",
+                "timeline": "1 week"
+            })
+        
+        # Recommendation 8: Overall governance framework
         if compliance_status == "non_compliant":
             recommendations.append({
-                "recommendation_id": "rec_governance_overall",
+                "recommendation_id": "rec_governance_framework",
                 "agent_id": "governance-checker",
                 "field_name": "entire dataset",
                 "priority": "critical",
-                "recommendation": f"Governance compliance is non-compliant ({overall_score:.1f}/100). Implement comprehensive data governance framework with policies, procedures, and controls",
+                "recommendation": f"Dataset is non-compliant ({overall_score:.1f}/100). Establish comprehensive governance framework: define policies, procedures, roles (DPO, data steward), responsibilities, and enforcement controls. Conduct compliance audit",
                 "timeline": "4-6 weeks"
             })
         elif compliance_status == "needs_review":
@@ -280,8 +398,17 @@ def execute_governance(
                 "agent_id": "governance-checker",
                 "field_name": "entire dataset",
                 "priority": "high",
-                "recommendation": f"Governance compliance needs review ({overall_score:.1f}/100). Address identified gaps to meet regulatory requirements",
-                "timeline": "2-4 weeks"
+                "recommendation": f"Governance compliance requires review ({overall_score:.1f}/100). Prioritize gap resolution in lineage ({lineage_score:.0f}), consent ({consent_score:.0f}), and classification ({classification_score:.0f}) components",
+                "timeline": "2-3 weeks"
+            })
+        else:
+            recommendations.append({
+                "recommendation_id": "rec_governance_continuous",
+                "agent_id": "governance-checker",
+                "field_name": "entire dataset",
+                "priority": "medium",
+                "recommendation": f"Maintain governance compliance status: establish continuous monitoring, quarterly audits, and annual reviews. Document changes to data lineage, consent tracking, and classifications",
+                "timeline": "ongoing"
             })
 
         # ==================== GENERATE EXECUTIVE SUMMARY ====================

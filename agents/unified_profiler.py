@@ -267,136 +267,368 @@ def profile_data(
         quality_grade = quality_summary["quality_grade"]
         fields_with_issues = len([f for f in field_profiles if f["quality_score"] < 80])
         
+        # Alert 1: Overall data quality status
         if overall_quality_score < 80:
             alerts.append({
-                "alert_id": "alert_quality_001",
-                "severity": "high" if overall_quality_score < 60 else "medium",
+                "alert_id": "alert_profile_quality_overall",
+                "severity": "critical" if overall_quality_score < 50 else "high" if overall_quality_score < 60 else "medium",
                 "category": "data_quality",
-                "message": f"Data quality score is {overall_quality_score:.1f}/100 (Grade {quality_grade})",
+                "message": f"Data quality score is {overall_quality_score:.1f}/100 (Grade {quality_grade}). {fields_with_issues} field(s) need improvement.",
                 "affected_fields_count": fields_with_issues,
-                "recommendation": f"Quality grade: {quality_grade}. {fields_with_issues} field(s) need improvement."
+                "recommendation": f"Comprehensive data quality remediation required. {fields_with_issues} field(s) with quality < 80. Priority: improve completeness, consistency, and validity."
+            })
+        elif overall_quality_score >= 90:
+            alerts.append({
+                "alert_id": "alert_profile_quality_excellent",
+                "severity": "low",
+                "category": "data_quality",
+                "message": f"Data quality EXCELLENT: {overall_quality_score:.1f}/100 (Grade {quality_grade})",
+                "affected_fields_count": 0,
+                "recommendation": "Maintain current data quality standards and validation practices"
+            })
+        
+        # Alert 2: High null/missing data percentage
+        fields_with_high_nulls = [f for f in field_profiles if f.get("properties", {}).get("null_percentage", 0) > 50]
+        if fields_with_high_nulls:
+            avg_null_pct = np.mean([f.get("properties", {}).get("null_percentage", 0) for f in fields_with_high_nulls])
+            alerts.append({
+                "alert_id": "alert_profile_high_nulls",
+                "severity": "critical" if avg_null_pct > 75 else "high",
+                "category": "missing_data",
+                "message": f"High null/missing data: {len(fields_with_high_nulls)} field(s) with >{50}% missing values (avg: {avg_null_pct:.1f}%)",
+                "affected_fields_count": len(fields_with_high_nulls),
+                "recommendation": f"Address {len(fields_with_high_nulls)} field(s) with excessive missing values through imputation, validation, or column removal"
+            })
+        
+        # Alert 3: Unexpected distribution shape anomalies
+        distribution_anomalies = [f for f in field_profiles if f.get("properties", {}).get("distribution_shape", "") in ["bimodal", "skewed", "highly_skewed"]]
+        if distribution_anomalies:
+            alerts.append({
+                "alert_id": "alert_profile_distribution_anomalies",
+                "severity": "high",
+                "category": "data_distribution",
+                "message": f"Unexpected distribution patterns: {len(distribution_anomalies)} field(s) show bimodal/skewed distributions",
+                "affected_fields_count": len(distribution_anomalies),
+                "recommendation": "Investigate distribution anomalies - may indicate data collection issues, multiple populations, or outlier influence"
+            })
+        
+        # Alert 4: Type/semantic conflicts detected
+        type_conflicts = len([f for f in field_profiles if "type_conflict" in str(f.get("properties", {})).lower()])
+        if type_conflicts > 0 or any(f.get("properties", {}).get("type_mismatch", False) for f in field_profiles):
+            alerts.append({
+                "alert_id": "alert_profile_type_conflicts",
+                "severity": "high",
+                "category": "data_integrity",
+                "message": f"Type/semantic conflicts detected: Values don't match declared field types in {type_conflicts or 1}+ field(s)",
+                "affected_fields_count": type_conflicts or 1,
+                "recommendation": "Review field type definitions and actual data values. Use 'Type Fixer' agent to resolve type mismatches"
+            })
+        
+        # Alert 5: PII/Sensitive data detected
+        pii_fields = [f for f in field_profiles if f.get("properties", {}).get("pii_type") or f.get("properties", {}).get("sensitivity_level") in ["high", "critical"]]
+        if pii_fields:
+            pii_types = set()
+            critical_pii = 0
+            for f in pii_fields:
+                if f.get("properties", {}).get("pii_type"):
+                    pii_types.add(f.get("properties", {}).get("pii_type"))
+                if f.get("properties", {}).get("sensitivity_level") == "critical":
+                    critical_pii += 1
+            
+            alerts.append({
+                "alert_id": "alert_profile_pii_detected",
+                "severity": "critical" if critical_pii > 0 else "high",
+                "category": "pii_detected",
+                "message": f"PII/Sensitive data detected: {len(pii_fields)} field(s) contain {', '.join(pii_types)}",
+                "affected_fields_count": len(pii_fields),
+                "recommendation": f"Implement data protection measures: encryption, access controls, audit logging. {critical_pii} field(s) require immediate attention"
+            })
+        
+        # Alert 6: Cardinality concerns (high/low uniqueness)
+        low_cardinality = [f for f in field_profiles if f.get("properties", {}).get("unique_percentage", 100) < 5]
+        high_cardinality = [f for f in field_profiles if f.get("properties", {}).get("unique_percentage", 0) > 95 and f.get("properties", {}).get("null_percentage", 0) < 10]
+        
+        if low_cardinality:
+            alerts.append({
+                "alert_id": "alert_profile_low_cardinality",
+                "severity": "medium",
+                "category": "column_quality",
+                "message": f"Low cardinality (potential duplicates): {len(low_cardinality)} field(s) with <5% unique values",
+                "affected_fields_count": len(low_cardinality),
+                "recommendation": "Verify low-cardinality fields are intentional (e.g., status flags). Consider consolidation or encoding"
+            })
+        
+        if high_cardinality:
+            alerts.append({
+                "alert_id": "alert_profile_high_cardinality",
+                "severity": "medium",
+                "category": "column_quality",
+                "message": f"High cardinality: {len(high_cardinality)} field(s) with >95% unique values (potential ID fields)",
+                "affected_fields_count": len(high_cardinality),
+                "recommendation": "High-cardinality fields detected - typically IDs or keys. Verify completeness and uniqueness constraints"
+            })
+        
+        # Alert 7: Outlier detection summary
+        fields_with_outliers = [f for f in field_profiles if f.get("statistics", {}).get("outlier_percentage", 0) > 5]
+        if fields_with_outliers:
+            avg_outlier_pct = np.mean([f.get("statistics", {}).get("outlier_percentage", 0) for f in fields_with_outliers])
+            alerts.append({
+                "alert_id": "alert_profile_outliers_detected",
+                "severity": "high" if avg_outlier_pct > 10 else "medium",
+                "category": "data_quality",
+                "message": f"Outliers detected: {len(fields_with_outliers)} numeric field(s) with >{5}% outliers (avg: {avg_outlier_pct:.1f}%)",
+                "affected_fields_count": len(fields_with_outliers),
+                "recommendation": "Review outlier values - may be valid extremes or data errors. Use 'Outlier Remover' for remediation"
+            })
+        
+        # Alert 8: Field completeness analysis
+        avg_completeness = quality_summary.get("completeness_score", 100)
+        if avg_completeness < 80:
+            alerts.append({
+                "alert_id": "alert_profile_completeness_gap",
+                "severity": "high" if avg_completeness < 60 else "medium",
+                "category": "missing_data",
+                "message": f"Low data completeness: Average {avg_completeness:.1f}/100. Multiple fields have missing values",
+                "affected_fields_count": len([f for f in field_profiles if f.get("properties", {}).get("null_percentage", 0) > 0]),
+                "recommendation": "Implement missing data handling strategy: imputation, interpolation, or validation rule enforcement"
             })
         
         # ==================== GENERATE ISSUES ====================
         issues = []
         
-        # Add field-level quality issues
-        for field in field_profiles:
+        # Add field-level quality issues with comprehensive categorization
+        for idx, field in enumerate(field_profiles[:100]):  # Limit to 100 issues
             field_quality = field.get("quality_score", 0)
             field_name = field.get("field_name")
             field_id = field.get("field_id")
             properties = field.get("properties", {})
             
+            # Primary quality score issue
             if field_quality < 80:
                 issues.append({
-                    "issue_id": f"issue_quality_{field_id}",
+                    "issue_id": f"issue_profile_quality_{field_id}",
                     "agent_id": "unified-profiler",
                     "field_name": field_name,
                     "issue_type": "low_quality_score",
-                    "severity": "high" if field_quality < 60 else "medium",
-                    "message": f"Field quality score: {field_quality:.1f}/100"
+                    "severity": "critical" if field_quality < 50 else "high" if field_quality < 60 else "medium",
+                    "message": f"Field quality score: {field_quality:.1f}/100. Requires attention for data validation and cleaning.",
+                    "quality_score": field_quality,
+                    "remediation_priority": "immediate" if field_quality < 50 else "high"
                 })
             
-            # Add outlier issues
-            if "statistics" in field and field["statistics"].get("type") == "numeric":
-                outlier_count = field["statistics"].get("outlier_count", 0)
-                outlier_percentage = field["statistics"].get("outlier_percentage", 0)
+            # Null/Missing value issues
+            missing_pct = properties.get("null_percentage", 0)
+            if missing_pct > 10:
+                issues.append({
+                    "issue_id": f"issue_profile_nulls_{field_id}",
+                    "agent_id": "unified-profiler",
+                    "field_name": field_name,
+                    "issue_type": "high_null_percentage",
+                    "severity": "critical" if missing_pct > 75 else "high" if missing_pct > 50 else "medium",
+                    "message": f"{missing_pct:.1f}% missing/null values in '{field_name}'. Data completeness impacted.",
+                    "null_percentage": missing_pct,
+                    "remediation_priority": "immediate" if missing_pct > 50 else "high"
+                })
+            
+            # Outlier issues (for numeric fields)
+            if field.get("statistics", {}).get("type") == "numeric":
+                outlier_count = field.get("statistics", {}).get("outlier_count", 0)
+                outlier_pct = field.get("statistics", {}).get("outlier_percentage", 0)
                 
-                if outlier_percentage > 5:
+                if outlier_pct > 5:
                     issues.append({
-                        "issue_id": f"issue_outliers_{field_id}",
+                        "issue_id": f"issue_profile_outliers_{field_id}",
                         "agent_id": "unified-profiler",
                         "field_name": field_name,
-                        "issue_type": "high_outlier_count",
-                        "severity": "medium",
-                        "message": f"{outlier_count} outliers detected ({outlier_percentage:.1f}% of values)"
+                        "issue_type": "high_outlier_percentage",
+                        "severity": "high" if outlier_pct > 10 else "medium",
+                        "message": f"{outlier_count} outliers detected ({outlier_pct:.1f}% of {field_name} values)",
+                        "outlier_count": outlier_count,
+                        "outlier_percentage": outlier_pct
                     })
             
-            # Add missing value issues
-            missing_percentage = properties.get("null_percentage", 0)
-            if missing_percentage > 50:
+            # Cardinality issues
+            unique_pct = properties.get("unique_percentage", 100)
+            
+            # Low cardinality (potential duplicates/consolidation candidates)
+            if unique_pct < 5:
                 issues.append({
-                    "issue_id": f"issue_missing_{field_id}",
+                    "issue_id": f"issue_profile_low_cardinality_{field_id}",
                     "agent_id": "unified-profiler",
                     "field_name": field_name,
-                    "issue_type": "high_missing_rate",
-                    "severity": "high" if missing_percentage > 75 else "medium",
-                    "message": f"{missing_percentage:.1f}% missing values"
+                    "issue_type": "low_cardinality",
+                    "severity": "medium",
+                    "message": f"Very low cardinality: Only {unique_pct:.1f}% unique values (potential flag/status field or duplicates)",
+                    "unique_percentage": unique_pct
                 })
             
-            # Add low uniqueness issues for potential ID/key fields
-            unique_percentage = properties.get("unique_percentage", 0)
-            if unique_percentage < 50 and field_name.lower() in ['id', 'key', 'identifier', 'uuid', 'guid']:
+            # High cardinality (potential ID/key field)
+            elif unique_pct > 95 and missing_pct < 10:
                 issues.append({
-                    "issue_id": f"issue_uniqueness_{field_id}",
+                    "issue_id": f"issue_profile_high_cardinality_{field_id}",
                     "agent_id": "unified-profiler",
                     "field_name": field_name,
-                    "issue_type": "low_uniqueness_for_key_field",
+                    "issue_type": "high_cardinality",
+                    "severity": "low",
+                    "message": f"High cardinality field: {unique_pct:.1f}% unique values (likely identifier/key field)",
+                    "unique_percentage": unique_pct
+                })
+            
+            # Type mismatch issues
+            if properties.get("type_mismatch", False) or "type_conflict" in str(properties).lower():
+                issues.append({
+                    "issue_id": f"issue_profile_type_conflict_{field_id}",
+                    "agent_id": "unified-profiler",
+                    "field_name": field_name,
+                    "issue_type": "type_mismatch",
                     "severity": "high",
-                    "message": f"Expected unique identifier has only {unique_percentage:.1f}% unique values"
+                    "message": f"Type conflict: Values in '{field_name}' don't match declared data type",
+                    "declared_type": properties.get("data_type", "unknown"),
+                    "actual_type": field.get("statistics", {}).get("inferred_type", "mixed")
+                })
+            
+            # Distribution anomalies
+            distribution_shape = properties.get("distribution_shape", "")
+            if distribution_shape in ["bimodal", "highly_skewed", "multimodal"]:
+                issues.append({
+                    "issue_id": f"issue_profile_distribution_{field_id}",
+                    "agent_id": "unified-profiler",
+                    "field_name": field_name,
+                    "issue_type": "unexpected_distribution",
+                    "severity": "medium",
+                    "message": f"Unusual distribution shape in '{field_name}': {distribution_shape} (may indicate multiple populations or data collection issues)",
+                    "distribution_shape": distribution_shape
+                })
+            
+            # PII/Sensitivity issues
+            pii_type = properties.get("pii_type")
+            sensitivity = properties.get("sensitivity_level", "low")
+            
+            if pii_type or sensitivity in ["high", "critical"]:
+                issues.append({
+                    "issue_id": f"issue_profile_pii_{field_id}",
+                    "agent_id": "unified-profiler",
+                    "field_name": field_name,
+                    "issue_type": f"pii_{pii_type}" if pii_type else "sensitive_data",
+                    "severity": "critical" if sensitivity == "critical" else "high",
+                    "message": f"Sensitive data detected in '{field_name}': {pii_type or 'sensitive'}. Implement encryption and access controls.",
+                    "pii_type": pii_type,
+                    "sensitivity_level": sensitivity
                 })
         
         # ==================== GENERATE RECOMMENDATIONS ====================
         recommendations = []
         
-        # Quality recommendations for top 5 low-quality fields
+        # Recommendation 1: Critical - Address high null percentage fields
+        fields_with_critical_nulls = [f for f in field_profiles if f.get("properties", {}).get("null_percentage", 0) > 75]
+        if fields_with_critical_nulls:
+            field_names = [f.get("field_name") for f in fields_with_critical_nulls[:3]]
+            recommendations.append({
+                "recommendation_id": "rec_profile_critical_nulls",
+                "agent_id": "unified-profiler",
+                "field_name": ", ".join(field_names),
+                "priority": "critical",
+                "recommendation": f"CRITICAL: Address {len(fields_with_critical_nulls)} field(s) with >75% missing values. Options: 1) Drop columns if not needed, 2) Implement imputation strategy, 3) Investigate data collection gaps",
+                "timeline": "immediate",
+                "estimated_effort_hours": 8,
+                "owner": "Data Quality Team"
+            })
+        
+        # Recommendation 2: High - Data quality improvement strategy
         low_quality_fields = sorted([f for f in field_profiles if f.get("quality_score", 0) < 80], 
                                    key=lambda x: x.get("quality_score", 0))[:5]
         
-        for field in low_quality_fields:
-            field_quality = field.get("quality_score", 0)
-            field_name = field.get("field_name")
-            field_id = field.get("field_id")
-            properties = field.get("properties", {})
-            
-            # Determine specific recommendation based on issues
-            recommendation_text = f"Improve data quality for {field_name}"
-            timeline = "1-2 weeks"
-            priority = "high" if field_quality < 60 else "medium"
-            
-            # Make recommendation more specific
-            missing_pct = properties.get("null_percentage", 0)
-            if missing_pct > 50:
-                recommendation_text = f"Address {missing_pct:.1f}% missing values in {field_name} through imputation or validation"
-                priority = "high" if missing_pct > 75 else "medium"
-            
-            if "statistics" in field and field["statistics"].get("type") == "numeric":
-                outlier_pct = field["statistics"].get("outlier_percentage", 0)
-                if outlier_pct > 5:
-                    recommendation_text = f"Review and handle {outlier_pct:.1f}% outliers in {field_name}"
-                    timeline = "1 week"
-            
+        if low_quality_fields:
             recommendations.append({
-                "recommendation_id": f"rec_quality_{field_id}",
+                "recommendation_id": "rec_profile_quality_improvement",
                 "agent_id": "unified-profiler",
-                "field_name": field_name,
-                "priority": priority,
-                "recommendation": recommendation_text,
-                "timeline": timeline
+                "field_name": f"{len([f for f in field_profiles if f.get('quality_score', 0) < 80])} fields",
+                "priority": "high" if overall_quality_score < 70 else "medium",
+                "recommendation": f"Implement comprehensive quality improvement plan: 1) Profile results show {overall_quality_score:.1f}/100 quality score, 2) Focus on top 5 low-quality fields, 3) Run 'Clean My Data' tool for automated fixes, 4) Implement validation rules for ongoing data quality",
+                "timeline": "1-2 weeks",
+                "estimated_effort_hours": 12,
+                "owner": "Data Governance Team"
             })
         
-        # Add overall data quality recommendation if score is low
-        if overall_quality_score < 70:
+        # Recommendation 3: High - Distribution analysis for anomalies
+        anomaly_fields = [f for f in field_profiles if f.get("properties", {}).get("distribution_shape", "") in ["bimodal", "highly_skewed", "multimodal"]]
+        if anomaly_fields:
             recommendations.append({
-                "recommendation_id": "rec_quality_overall",
+                "recommendation_id": "rec_profile_distribution_analysis",
                 "agent_id": "unified-profiler",
-                "field_name": f"{fields_with_issues} fields",
-                "priority": "critical" if overall_quality_score < 50 else "high",
-                "recommendation": f"Overall data quality is {quality_grade} grade ({overall_quality_score:.1f}/100). Run 'Clean My Data' tool to improve quality across {fields_with_issues} field(s)",
-                "timeline": "2-3 weeks"
+                "field_name": f"{len(anomaly_fields)} field(s)",
+                "priority": "high",
+                "recommendation": f"Investigate {len(anomaly_fields)} field(s) with unusual distributions (bimodal/skewed): 1) Analyze for data collection issues, 2) Check for multiple populations or segments, 3) Identify and handle outlier influence, 4) Consider data stratification or transformation",
+                "timeline": "1 week",
+                "estimated_effort_hours": 6,
+                "owner": "Data Analysis Team"
             })
         
-        # Add completeness recommendation
-        avg_completeness = quality_summary.get("completeness_score", 100)
+        # Recommendation 4: High - Type verification and fixing
+        type_conflict_fields = [f for f in field_profiles if f.get("properties", {}).get("type_mismatch", False)]
+        if type_conflict_fields:
+            recommendations.append({
+                "recommendation_id": "rec_profile_type_resolution",
+                "agent_id": "unified-profiler",
+                "field_name": f"{len(type_conflict_fields)} field(s)",
+                "priority": "high",
+                "recommendation": f"Fix {len(type_conflict_fields)} type mismatch(es): 1) Verify declared field types match actual data, 2) Run 'Type Fixer' agent to resolve conversions, 3) Update schema if needed, 4) Add type validation rules to prevent future mismatches",
+                "timeline": "1 week",
+                "estimated_effort_hours": 8,
+                "owner": "Data Engineering Team"
+            })
+        
+        # Recommendation 5: High/Medium - Outlier handling strategy
+        if fields_with_outliers:
+            recommendations.append({
+                "recommendation_id": "rec_profile_outlier_handling",
+                "agent_id": "unified-profiler",
+                "field_name": f"{len(fields_with_outliers)} field(s)",
+                "priority": "high" if len(fields_with_outliers) > 5 else "medium",
+                "recommendation": f"Develop outlier handling strategy for {len(fields_with_outliers)} numeric field(s): 1) Validate outliers are not data errors, 2) Run 'Outlier Remover' with IQR or Z-score method, 3) Document outlier decisions, 4) Consider domain expertise for business outliers",
+                "timeline": "1-2 weeks",
+                "estimated_effort_hours": 10,
+                "owner": "Data Science Team"
+            })
+        
+        # Recommendation 6: Medium - Missing data handling framework
         if avg_completeness < 80:
-            fields_with_nulls = len([f for f in field_profiles if f.get("properties", {}).get("null_percentage", 0) > 10])
             recommendations.append({
-                "recommendation_id": "rec_completeness",
+                "recommendation_id": "rec_profile_missing_data_strategy",
                 "agent_id": "unified-profiler",
-                "field_name": f"{fields_with_nulls} fields",
+                "field_name": f"all ({len([f for f in field_profiles if f.get('properties', {}).get('null_percentage', 0) > 0])} fields with nulls)",
                 "priority": "high" if avg_completeness < 60 else "medium",
-                "recommendation": f"Data completeness is {avg_completeness:.1f}/100. Implement data validation rules and handle missing values in {fields_with_nulls} field(s)",
-                "timeline": "1-2 weeks"
+                "recommendation": f"Implement missing data handling: 1) Completeness score {avg_completeness:.1f}/100, 2) Choose strategy per field: drop, impute, or interpolate, 3) Use 'Null Handler' agent for automated imputation, 4) Document all missing data decisions and assumptions",
+                "timeline": "1-2 weeks",
+                "estimated_effort_hours": 10,
+                "owner": "Data Quality Team"
+            })
+        
+        # Recommendation 7: Medium - PII/Sensitive data protection
+        if pii_fields:
+            critical_pii_count = len([f for f in pii_fields if f.get("properties", {}).get("sensitivity_level") == "critical"])
+            recommendations.append({
+                "recommendation_id": "rec_profile_pii_protection",
+                "agent_id": "unified-profiler",
+                "field_name": f"{len(pii_fields)} PII field(s)",
+                "priority": "critical" if critical_pii_count > 0 else "high",
+                "recommendation": f"Implement PII protection for {len(pii_fields)} sensitive field(s): 1) Encrypt critical PII ({critical_pii_count} field(s)), 2) Implement role-based access controls, 3) Add comprehensive audit logging, 4) Use 'Score Risk' agent for compliance assessment, 5) Document data lineage and usage",
+                "timeline": "immediate" if critical_pii_count > 0 else "1 week",
+                "estimated_effort_hours": 16 if critical_pii_count > 0 else 10,
+                "owner": "Privacy & Security Officer"
+            })
+        
+        # Recommendation 8: Medium - Cardinality optimization
+        if low_cardinality or high_cardinality:
+            recommendations.append({
+                "recommendation_id": "rec_profile_cardinality_review",
+                "agent_id": "unified-profiler",
+                "field_name": f"{len(low_cardinality) + len(high_cardinality)} field(s)",
+                "priority": "medium",
+                "recommendation": f"Optimize cardinality: 1) Review {len(low_cardinality)} low-cardinality fields (consolidation candidates), 2) Verify {len(high_cardinality)} high-cardinality fields are properly indexed, 3) Ensure uniqueness constraints on key fields, 4) Consider encoding categorical variables",
+                "timeline": "2 weeks",
+                "estimated_effort_hours": 6,
+                "owner": "Database Administrator"
             })
         
         # ==================== GENERATE EXECUTIVE SUMMARY ====================

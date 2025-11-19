@@ -197,19 +197,56 @@ def execute_outlier_remover(
         
         # Quality score alert
         if cleaning_score["overall_score"] < good_threshold:
+            severity = "critical" if cleaning_score["overall_score"] < 50 else "high" if cleaning_score["overall_score"] < good_threshold else "medium"
             alerts.append({
                 "alert_id": "alert_outliers_quality",
-                "severity": "medium",
+                "severity": severity,
                 "category": "quality_score",
                 "message": f"Outlier removal quality score: {cleaning_score['overall_score']:.1f}/100 ({quality_status})",
                 "affected_fields_count": len(numeric_cols),
-                "recommendation": "Optimize outlier detection thresholds and removal strategies."
+                "recommendation": "Optimize outlier detection thresholds and removal strategies for better results."
+            })
+        
+        # Detection method effectiveness alert
+        if len(outlier_analysis.get('outlier_summary', {})) > 0:
+            avg_outlier_pct = sum(data.get('outlier_percentage', 0) for data in outlier_analysis['outlier_summary'].values()) / len(outlier_analysis['outlier_summary'])
+            if avg_outlier_pct < 1:
+                alerts.append({
+                    "alert_id": "alert_outliers_low_detection",
+                    "severity": "low",
+                    "category": "detection_effectiveness",
+                    "message": f"Low outlier detection rate: {avg_outlier_pct:.2f}% average across columns. Detection may be too strict.",
+                    "affected_fields_count": len(outlier_analysis['outlier_summary']),
+                    "recommendation": "Consider relaxing detection thresholds if outliers are expected in your data distribution."
+                })
+        
+        # Distribution skewness alert
+        skewed_columns = [col for col in numeric_cols if abs(original_df[col].dropna().skew()) > 2 if len(original_df[col].dropna()) > 0]
+        if len(skewed_columns) > 0:
+            alerts.append({
+                "alert_id": "alert_outliers_skewed_distribution",
+                "severity": "medium",
+                "category": "data_distribution",
+                "message": f"{len(skewed_columns)} column(s) have highly skewed distributions which may affect outlier detection accuracy",
+                "affected_fields_count": len(skewed_columns),
+                "recommendation": f"Consider data transformation (log, sqrt) for skewed columns: {', '.join(skewed_columns[:3])}"
+            })
+        
+        # Removal strategy effectiveness
+        if removal_strategy == 'remove' and cleaning_score['metrics']['row_retention_percentage'] < 85:
+            alerts.append({
+                "alert_id": "alert_outliers_excessive_removal",
+                "severity": "high",
+                "category": "data_retention",
+                "message": f"Excessive data removal: {100 - cleaning_score['metrics']['row_retention_percentage']:.1f}% of data lost",
+                "affected_fields_count": len(original_df) - len(df_cleaned),
+                "recommendation": "Switch to imputation strategy to preserve more data while handling outliers."
             })
         
         # ==================== GENERATE ISSUES ====================
         issues = []
         
-        # Convert outlier issues to standardized format
+        # Convert outlier issues to standardized format (row-level outliers)
         for outlier_issue in outlier_issues[:100]:
             issues.append({
                 "issue_id": f"issue_outliers_{outlier_issue.get('row_index', 0)}_{outlier_issue.get('column', 'unknown')}",
@@ -218,6 +255,43 @@ def execute_outlier_remover(
                 "issue_type": outlier_issue.get('issue_type', 'outlier_detected'),
                 "severity": outlier_issue.get('severity', 'warning'),
                 "message": outlier_issue.get('description', 'Outlier detected')
+            })
+        
+        # Add column-level issues for high outlier columns
+        for col in high_outlier_cols[:20]:
+            outlier_pct = outlier_analysis.get('outlier_summary', {}).get(col, {}).get('outlier_percentage', 0)
+            issues.append({
+                "issue_id": f"issue_outliers_column_high_{col}",
+                "agent_id": "outlier-remover",
+                "field_name": col,
+                "issue_type": "high_outlier_column",
+                "severity": "high",
+                "message": f"Column '{col}' has {outlier_pct:.1f}% outliers (exceeds 15% threshold)"
+            })
+        
+        # Add extreme outlier issues (Z-score > 4 or extreme IQR)
+        for col_name, col_data in outlier_analysis.get('outlier_summary', {}).items():
+            extreme_outliers = [o for o in col_data.get('outliers', []) if o.get('severity') == 'critical']
+            if len(extreme_outliers) > 0:
+                issues.append({
+                    "issue_id": f"issue_outliers_extreme_{col_name}",
+                    "agent_id": "outlier-remover",
+                    "field_name": col_name,
+                    "issue_type": "extreme_outliers",
+                    "severity": "critical",
+                    "message": f"Column '{col_name}' has {len(extreme_outliers)} extreme outlier(s) requiring immediate review"
+                })
+        
+        # Add data retention issue if significant data loss
+        rows_removed = len(original_df) - len(df_cleaned)
+        if rows_removed > len(original_df) * 0.1:
+            issues.append({
+                "issue_id": "issue_outliers_data_loss",
+                "agent_id": "outlier-remover",
+                "field_name": "dataset",
+                "issue_type": "data_retention",
+                "severity": "critical",
+                "message": f"Significant data loss: {rows_removed} rows ({(rows_removed/len(original_df)*100):.1f}%) removed during outlier handling"
             })
         
         # ==================== GENERATE RECOMMENDATIONS ====================
@@ -283,6 +357,48 @@ def execute_outlier_remover(
             "field_name": "all",
             "priority": "low",
             "recommendation": "Establish outlier rate monitoring to detect distribution shifts or data quality degradation early",
+            "timeline": "3 weeks"
+        })
+        
+        # Recommendation 7: Threshold tuning
+        if outlier_pct > 15 or outlier_pct < 1:
+            agent_recommendations.append({
+                "recommendation_id": "rec_outliers_threshold_tuning",
+                "agent_id": "outlier-remover",
+                "field_name": "all",
+                "priority": "high" if outlier_pct > 15 else "medium",
+                "recommendation": f"Current detection yields {outlier_pct:.1f}% outliers. Tune thresholds: {'increase' if outlier_pct > 15 else 'decrease'} sensitivity for optimal results",
+                "timeline": "1 week"
+            })
+        
+        # Recommendation 8: Distribution analysis
+        if len(skewed_columns) > 0:
+            agent_recommendations.append({
+                "recommendation_id": "rec_outliers_distribution_transform",
+                "agent_id": "outlier-remover",
+                "field_name": ", ".join(skewed_columns[:3]) + ("..." if len(skewed_columns) > 3 else ""),
+                "priority": "medium",
+                "recommendation": f"Apply distribution transformation (log, Box-Cox) to {len(skewed_columns)} skewed column(s) before outlier detection",
+                "timeline": "2 weeks"
+            })
+        
+        # Recommendation 9: Per-column strategy
+        agent_recommendations.append({
+            "recommendation_id": "rec_outliers_column_specific",
+            "agent_id": "outlier-remover",
+            "field_name": "all",
+            "priority": "medium",
+            "recommendation": f"Implement column-specific outlier handling strategies based on distribution characteristics of {len(numeric_cols)} numeric columns",
+            "timeline": "2-3 weeks"
+        })
+        
+        # Recommendation 10: Documentation
+        agent_recommendations.append({
+            "recommendation_id": "rec_outliers_documentation",
+            "agent_id": "outlier-remover",
+            "field_name": "all",
+            "priority": "low",
+            "recommendation": "Document outlier handling decisions, thresholds used, and business rules for distinguishing genuine extreme values from data errors",
             "timeline": "3 weeks"
         })
 
