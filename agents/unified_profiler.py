@@ -248,6 +248,115 @@ def profile_data(
         # Calculate overall quality score
         overall_quality_score = round(np.mean([f["quality_score"] for f in field_profiles]), 2) if field_profiles else 100
         
+        # ==================== GENERATE ROW-LEVEL-ISSUES ====================
+        row_level_issues = []
+        
+        for col_idx, col in enumerate(df.columns):
+            col_data = df[col]
+            non_null_data = col_data.dropna()
+            data_type = str(col_data.dtype)
+            
+            # Issue 1: Null values
+            null_mask = col_data.isna()
+            for row_idx in df[null_mask].index:
+                row_level_issues.append({
+                    "row_index": int(row_idx),
+                    "column": col,
+                    "issue_type": "null",
+                    "severity": "warning",
+                    "message": f"Null/missing value in column '{col}'",
+                    "value": None
+                })
+            
+            # Issue 2: Outliers (numeric fields only)
+            if data_type in ['int64', 'float64'] and len(non_null_data) > 0:
+                Q1 = col_data.quantile(0.25)
+                Q3 = col_data.quantile(0.75)
+                IQR = Q3 - Q1
+                lower_bound = Q1 - outlier_iqr_multiplier * IQR
+                upper_bound = Q3 + outlier_iqr_multiplier * IQR
+                
+                outlier_mask = (col_data < lower_bound) | (col_data > upper_bound)
+                for row_idx in df[outlier_mask].index:
+                    row_value = col_data.loc[row_idx]
+                    row_level_issues.append({
+                        "row_index": int(row_idx),
+                        "column": col,
+                        "issue_type": "outlier",
+                        "severity": "warning",
+                        "message": f"Outlier detected in '{col}': value {row_value} outside IQR bounds [{lower_bound:.2f}, {upper_bound:.2f}]",
+                        "value": float(row_value),
+                        "bounds": {
+                            "lower": float(lower_bound),
+                            "upper": float(upper_bound)
+                        }
+                    })
+            
+            # Issue 3: Type mismatches (check if non-null values don't match expected type)
+            if data_type == 'object' and len(non_null_data) > 0:
+                # Try to detect numeric values in string columns (or vice versa)
+                try:
+                    numeric_attempt = pd.to_numeric(non_null_data, errors='coerce')
+                    type_mismatch_mask = numeric_attempt.notna() & non_null_data.notna() & (numeric_attempt != non_null_data)
+                    
+                    for row_idx in df[type_mismatch_mask].index:
+                        if not pd.isna(col_data.loc[row_idx]):
+                            row_level_issues.append({
+                                "row_index": int(row_idx),
+                                "column": col,
+                                "issue_type": "type_mismatch",
+                                "severity": "info",
+                                "message": f"Value in '{col}' could be interpreted as numeric: {col_data.loc[row_idx]}",
+                                "value": str(col_data.loc[row_idx])
+                            })
+                except:
+                    pass
+            
+            # Issue 4: Distribution anomalies (values in low-probability areas)
+            if data_type in ['int64', 'float64'] and len(non_null_data) > 2:
+                # Calculate z-scores to identify values far from mean
+                mean_val = non_null_data.mean()
+                std_val = non_null_data.std()
+                
+                if std_val > 0:
+                    z_scores = np.abs((col_data - mean_val) / std_val)
+                    extreme_mask = (z_scores > 3) & (col_data.notna())
+                    
+                    for row_idx in df[extreme_mask].index:
+                        row_value = col_data.loc[row_idx]
+                        z_score = (row_value - mean_val) / std_val
+                        row_level_issues.append({
+                            "row_index": int(row_idx),
+                            "column": col,
+                            "issue_type": "distribution_anomaly",
+                            "severity": "info",
+                            "message": f"Value in '{col}' is statistically unusual (z-score: {abs(z_score):.2f}): {row_value}",
+                            "value": float(row_value),
+                            "z_score": float(z_score)
+                        })
+        
+        # Cap row-level-issues at 1000 to avoid memory issues
+        row_level_issues = row_level_issues[:1000]
+        
+        # Calculate issue summary
+        issue_summary = {
+            "total_issues": len(row_level_issues),
+            "by_type": {},
+            "by_severity": {},
+            "affected_rows": len(set(issue["row_index"] for issue in row_level_issues)),
+            "affected_columns": sorted(list(set(issue["column"] for issue in row_level_issues)))
+        }
+        
+        # Count by type
+        for issue in row_level_issues:
+            issue_type = issue["issue_type"]
+            issue_summary["by_type"][issue_type] = issue_summary["by_type"].get(issue_type, 0) + 1
+        
+        # Count by severity
+        for issue in row_level_issues:
+            severity = issue["severity"]
+            issue_summary["by_severity"][severity] = issue_summary["by_severity"].get(severity, 0) + 1
+        
         # Create quality summary
         quality_summary = {
             "overall_quality_score": overall_quality_score,
@@ -676,7 +785,9 @@ def profile_data(
             "issues": issues,
             "recommendations": recommendations,
             "executive_summary": executive_summary,
-            "ai_analysis_text": ai_analysis_text
+            "ai_analysis_text": ai_analysis_text,
+            "row_level_issues": row_level_issues,
+            "issue_summary": issue_summary
         }
     
     except Exception as e:

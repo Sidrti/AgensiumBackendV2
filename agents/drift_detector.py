@@ -226,6 +226,114 @@ def detect_drift(
         drift_percentage = (drift_detected_count / len(common_cols) * 100) if len(common_cols) > 0 else 0
         dataset_stability = "warning" if overall_drift_score > 0.1 else "stable"
         
+        # ==================== GENERATE ROW-LEVEL-ISSUES ====================
+        row_level_issues = []
+        
+        for col in common_cols:
+            baseline_col = baseline_df[col].dropna()
+            current_col = current_df[col].dropna()
+            
+            # Skip if insufficient data
+            if len(baseline_col) < min_sample_size or len(current_col) < min_sample_size:
+                continue
+            
+            # Get drift analysis for this field
+            field_drift = next((f for f in field_drift_details if f.get("field_id") == col), None)
+            if not field_drift or not field_drift.get("drift_analysis", {}).get("drift_detected"):
+                continue
+            
+            # For numeric columns: identify rows with values outside baseline range
+            if baseline_col.dtype in ['int64', 'float64', 'int32', 'float32']:
+                baseline_mean = baseline_col.mean()
+                baseline_std = baseline_col.std()
+                baseline_min = baseline_col.quantile(0.05)  # 5th percentile
+                baseline_max = baseline_col.quantile(0.95)  # 95th percentile
+                current_mean = current_col.mean()
+                current_std = current_col.std()
+                
+                # Calculate z-scores based on baseline distribution
+                current_z_scores = (current_df[col] - baseline_mean) / (baseline_std + 1e-10)
+                
+                # Issue 1: Values far outside baseline range (z-score > 2)
+                outlier_mask = (np.abs(current_z_scores) > 2) & (current_df[col].notna())
+                for row_idx in current_df[outlier_mask].index:
+                    row_value = current_df.loc[row_idx, col]
+                    z_score = (row_value - baseline_mean) / (baseline_std + 1e-10)
+                    row_level_issues.append({
+                        "row_index": int(row_idx),
+                        "column": col,
+                        "issue_type": "distribution_shift",
+                        "severity": "warning",
+                        "message": f"Value {row_value} is outside baseline distribution range (z-score: {z_score:.2f}). Baseline mean: {baseline_mean:.2f}",
+                        "value": float(row_value),
+                        "bounds": {
+                            "lower": float(baseline_min),
+                            "upper": float(baseline_max)
+                        },
+                        "z_score": float(z_score)
+                    })
+                
+                # Issue 2: Values from shifted distribution (different mean/std)
+                mean_shift_significant = abs(current_mean - baseline_mean) > baseline_std * 0.5
+                
+                if mean_shift_significant:
+                    # Flag rows that align more with current distribution (far from baseline)
+                    shift_threshold = baseline_mean + (1.5 * baseline_std)
+                    shifted_mask = (current_df[col] > shift_threshold) & (current_df[col].notna())
+                    
+                    for row_idx in current_df[shifted_mask].index:
+                        row_value = current_df.loc[row_idx, col]
+                        row_level_issues.append({
+                            "row_index": int(row_idx),
+                            "column": col,
+                            "issue_type": "value_range_change",
+                            "severity": "info",
+                            "message": f"Value {row_value} consistent with shifted distribution (baseline mean: {baseline_mean:.2f}, current mean: {current_mean:.2f})",
+                            "value": float(row_value),
+                            "baseline_mean": float(baseline_mean),
+                            "current_mean": float(current_mean)
+                        })
+            else:
+                # For categorical columns: identify rows with values not in baseline
+                baseline_categories = set(baseline_col.unique())
+                current_categories = set(current_df[col].dropna().unique())
+                new_categories = current_categories - baseline_categories
+                
+                if new_categories:
+                    for category in new_categories:
+                        category_mask = (current_df[col] == category) & (current_df[col].notna())
+                        for row_idx in current_df[category_mask].index:
+                            row_level_issues.append({
+                                "row_index": int(row_idx),
+                                "column": col,
+                                "issue_type": "distribution_shift",
+                                "severity": "warning",
+                                "message": f"Category '{category}' not present in baseline data",
+                                "value": str(category)
+                            })
+        
+        # Cap row-level-issues at 1000
+        row_level_issues = row_level_issues[:1000]
+        
+        # Calculate issue summary
+        issue_summary = {
+            "total_issues": len(row_level_issues),
+            "by_type": {},
+            "by_severity": {},
+            "affected_rows": len(set(issue["row_index"] for issue in row_level_issues)),
+            "affected_columns": sorted(list(set(issue["column"] for issue in row_level_issues)))
+        }
+        
+        # Count by type
+        for issue in row_level_issues:
+            issue_type = issue["issue_type"]
+            issue_summary["by_type"][issue_type] = issue_summary["by_type"].get(issue_type, 0) + 1
+        
+        # Count by severity
+        for issue in row_level_issues:
+            severity = issue["severity"]
+            issue_summary["by_severity"][severity] = issue_summary["by_severity"].get(severity, 0) + 1
+        
         # ==================== GENERATE ALERTS ====================
         alerts = []
         
@@ -605,7 +713,9 @@ def detect_drift(
             "issues": issues,
             "recommendations": recommendations,
             "executive_summary": executive_summary,
-            "ai_analysis_text": ai_analysis_text
+            "ai_analysis_text": ai_analysis_text,
+            "row_level_issues": row_level_issues,
+            "issue_summary": issue_summary
         }
     
     except Exception as e:

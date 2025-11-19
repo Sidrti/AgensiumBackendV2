@@ -24,6 +24,7 @@ def transform_clean_my_data_response(
     all_alerts = []
     all_issues = []
     all_recommendations = []
+    all_row_level_issues = []
     agent_executive_summaries = []
     agent_ai_analysis_texts = []
     
@@ -32,6 +33,7 @@ def transform_clean_my_data_response(
             all_alerts.extend(agent_output.get("alerts", []))
             all_issues.extend(agent_output.get("issues", []))
             all_recommendations.extend(agent_output.get("recommendations", []))
+            all_row_level_issues.extend(agent_output.get("row_level_issues", []))
             agent_executive_summaries.extend(agent_output.get("executive_summary", []))
             
             agent_ai_text = agent_output.get("ai_analysis_text", "")
@@ -151,6 +153,33 @@ def transform_clean_my_data_response(
         print(f"Warning: Routing AI agent failed: {str(e)}")
         routing_decisions = []
     
+    # ==================== CALCULATE ISSUE SUMMARY ====================
+    issue_summary = {
+        "total_issues": len(all_row_level_issues),
+        "by_type": {},
+        "by_severity": {
+            "critical": 0,
+            "warning": 0,
+            "info": 0
+        },
+        "affected_rows": len(set(issue.get("row_index") for issue in all_row_level_issues if issue.get("row_index") is not None)),
+        "affected_columns": list(set(issue.get("column") for issue in all_row_level_issues if issue.get("column") and issue.get("column") != "global"))
+    }
+    
+    for issue in all_row_level_issues:
+        issue_type = issue.get("issue_type", "unknown")
+        severity = issue.get("severity", "info")
+        
+        if issue_type not in issue_summary["by_type"]:
+            issue_summary["by_type"][issue_type] = 0
+        issue_summary["by_type"][issue_type] += 1
+        
+        if severity in issue_summary["by_severity"]:
+            issue_summary["by_severity"][severity] += 1
+    
+    # Cap row_level_issues at 1000 to prevent memory issues
+    all_row_level_issues = all_row_level_issues[:1000]
+    
     # ==================== DOWNLOADS ====================
     # Collect cleaned files from agents
     cleaned_files = {}
@@ -192,6 +221,8 @@ def transform_clean_my_data_response(
             "recommendations": all_recommendations,
             "executiveSummary": executive_summary,
             "analysisSummary": analysis_summary,
+            "rowLevelIssues": all_row_level_issues,
+            "issueSummary": issue_summary,
             "visualizations": [],
             "routing_decisions": routing_decisions,
             **{agent_id: output for agent_id, output in agent_results.items() if output.get("status") == "success"},

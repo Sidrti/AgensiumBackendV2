@@ -118,6 +118,74 @@ def execute_duplicate_resolver(
         else:
             quality_status = "needs_improvement"
         
+        # Identify type fixing issues
+        type_issues = _identify_type_issues(original_df, df_fixed, type_analysis)
+        
+        # Generate ROW-LEVEL-ISSUES
+        row_level_issues = []
+        
+        # Add issues for each duplicate row detected
+        dup_methods = duplicate_analysis.get("duplicate_summary", {})
+        
+        # Track which detection methods found each duplicate
+        row_detection_map = {}  # row_idx -> list of detection methods
+        for method, method_data in dup_methods.items():
+            if isinstance(method_data, dict):
+                for affected_row in method_data.get("affected_rows", []):
+                    if affected_row not in row_detection_map:
+                        row_detection_map[affected_row] = []
+                    row_detection_map[affected_row].append(method)
+        
+        # Generate row-level issues for each duplicate
+        for row_idx, detection_methods in row_detection_map.items():
+            if len(row_level_issues) >= 1000:
+                break
+            
+            # Determine issue type based on detection methods
+            if "conflicting" in detection_methods:
+                issue_type = "key_conflict"
+                severity = "critical"
+                message = f"Key conflict: Same key but different values detected - conflicting duplicate record"
+            elif "exact" in detection_methods:
+                issue_type = "duplicate_row"
+                severity = "warning"
+                message = f"Exact duplicate: Row {row_idx} is identical to another row in dataset"
+            else:
+                issue_type = "partial_duplicate"
+                severity = "info"
+                message = f"Partial duplicate: Row {row_idx} matches via {', '.join(detection_methods)}"
+            
+            row_level_issues.append({
+                "row_index": int(row_idx),
+                "column": "all",
+                "issue_type": issue_type,
+                "severity": severity,
+                "message": message,
+                "detection_methods": detection_methods
+            })
+        
+        # Cap at 1000 issues
+        row_level_issues = row_level_issues[:1000]
+        
+        # Calculate issue summary
+        issue_summary = {
+            "total_issues": len(row_level_issues),
+            "by_type": {},
+            "by_severity": {},
+            "affected_rows": len(set(issue["row_index"] for issue in row_level_issues)),
+            "affected_columns": []  # Duplicates affect all columns
+        }
+        
+        # Aggregate by type
+        for issue in row_level_issues:
+            issue_type = issue.get("issue_type", "unknown")
+            issue_summary["by_type"][issue_type] = issue_summary["by_type"].get(issue_type, 0) + 1
+        
+        # Aggregate by severity
+        for issue in row_level_issues:
+            severity = issue.get("severity", "info")
+            issue_summary["by_severity"][severity] = issue_summary["by_severity"].get(severity, 0) + 1
+        
         # Build results
         dedup_data = {
             "dedup_score": dedup_score,
@@ -125,7 +193,8 @@ def execute_duplicate_resolver(
             "duplicate_analysis": duplicate_analysis,
             "resolution_log": resolution_log,
             "summary": f"Duplicate resolution completed. Quality: {quality_status}. Processed {len(original_df)} rows, resolved {duplicate_analysis.get('total_duplicates', 0)} duplicate records.",
-            "row_level_issues": duplicate_issues[:100]  # Limit to first 100
+            "row_level_issues": row_level_issues[:100],  # Limit to first 100
+            "issue_summary": issue_summary
         }
         
         # ==================== GENERATE EXECUTIVE SUMMARY ====================
@@ -436,6 +505,8 @@ def execute_duplicate_resolver(
             "alerts": alerts,
             "issues": issues,
             "recommendations": agent_recommendations,
+            "row_level_issues": row_level_issues,
+            "issue_summary": issue_summary,
             "cleaned_file": {
                 "filename": f"cleaned_{filename}",
                 "content": cleaned_file_base64,

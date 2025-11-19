@@ -217,6 +217,207 @@ def execute_cleanse_writeback(
         writeback_data["executive_summary"] = executive_summary
         writeback_data["ai_analysis_text"] = ai_analysis_text
         
+        # ==================== GENERATE ROW-LEVEL-ISSUES ====================
+        row_level_issues = []
+        
+        # Extract row-level issues from integrity verification
+        for check_name, check_data in integrity_results.get("checks", {}).items():
+            if not check_data.get("passed", False):
+                # Check-specific row-level issue generation
+                if check_name == "numeric_type_integrity":
+                    issues_list = check_data.get("issues", [])
+                    for col_issue in issues_list[:50]:
+                        col = col_issue.get("column", "unknown")
+                        row_level_issues.append({
+                            "row_index": 0,  # System-level issue indicator
+                            "column": col,
+                            "issue_type": "writeback_failed",
+                            "severity": "critical",
+                            "message": f"Type integrity failure in '{col}': {col_issue.get('issue', 'Invalid type detected')}",
+                            "value": None,
+                            "check_name": check_name
+                        })
+                
+                elif check_name == "datetime_type_integrity":
+                    issues_list = check_data.get("issues", [])
+                    for col_issue in issues_list[:50]:
+                        col = col_issue.get("column", "unknown")
+                        invalid_count = col_issue.get("invalid_count", 0)
+                        row_level_issues.append({
+                            "row_index": 0,  # System-level issue indicator
+                            "column": col,
+                            "issue_type": "integrity_violation",
+                            "severity": "critical",
+                            "message": f"Datetime integrity failure in '{col}': {invalid_count} invalid datetime values detected",
+                            "value": None,
+                            "check_name": check_name
+                        })
+                
+                elif check_name == "no_new_nulls":
+                    high_null_cols = check_data.get("columns_with_high_nulls", [])
+                    for col_issue in high_null_cols[:50]:
+                        col = col_issue.get("column", "unknown")
+                        null_pct = col_issue.get("null_percentage", 0)
+                        row_level_issues.append({
+                            "row_index": 0,  # System-level issue indicator
+                            "column": col,
+                            "issue_type": "writeback_failed",
+                            "severity": "critical",
+                            "message": f"Excessive null values in '{col}': {null_pct:.1f}% null ({col_issue.get('null_count', 0)} rows)",
+                            "value": None,
+                            "null_percentage": round(null_pct, 2),
+                            "check_name": check_name
+                        })
+                
+                elif check_name == "no_new_duplicates_introduced":
+                    dup_count = check_data.get("duplicate_count", 0)
+                    dup_pct = check_data.get("duplicate_percentage", 0)
+                    if dup_count > 0:
+                        row_level_issues.append({
+                            "row_index": 0,  # System-level issue indicator
+                            "column": "global",
+                            "issue_type": "integrity_violation",
+                            "severity": "warning",
+                            "message": f"Duplicate rows detected: {dup_count} duplicate records ({dup_pct:.1f}% of data)",
+                            "value": None,
+                            "duplicate_count": dup_count,
+                            "check_name": check_name
+                        })
+                
+                elif check_name == "data_retention":
+                    retention_issues = check_data.get("issues", [])
+                    for ret_issue in retention_issues[:50]:
+                        issue_type = ret_issue.get("type", "data_loss")
+                        if issue_type == "excessive_row_loss":
+                            row_level_issues.append({
+                                "row_index": 0,  # System-level issue indicator
+                                "column": "global",
+                                "issue_type": "rollback_needed",
+                                "severity": "critical",
+                                "message": f"Excessive row loss: {ret_issue.get('loss_count', 0)} rows removed ({100 - ret_issue.get('retention_percentage', 100):.1f}%)",
+                                "value": None,
+                                "original_count": ret_issue.get("original", 0),
+                                "final_count": ret_issue.get("current", 0),
+                                "check_name": check_name
+                            })
+                        elif issue_type == "column_loss":
+                            row_level_issues.append({
+                                "row_index": 0,  # System-level issue indicator
+                                "column": "global",
+                                "issue_type": "integrity_violation",
+                                "severity": "high",
+                                "message": f"Column loss detected: {ret_issue.get('loss_count', 0)} columns removed",
+                                "value": None,
+                                "original_count": ret_issue.get("original", 0),
+                                "final_count": ret_issue.get("current", 0),
+                                "check_name": check_name
+                            })
+        
+        # Extract row-level issues from failed agents
+        failed_agents = [aid for aid, m in agent_manifests.items() if m.get('status') == 'error']
+        for agent_id in failed_agents[:50]:
+            agent_manifest = agent_manifests[agent_id]
+            row_level_issues.append({
+                "row_index": 0,  # System-level issue indicator
+                "column": "global",
+                "issue_type": "writeback_failed",
+                "severity": "critical",
+                "message": f"Upstream agent error: {agent_id} reported failure - {agent_manifest.get('error', 'Unknown error')}",
+                "value": None,
+                "agent_id": agent_id,
+                "upstream_error": True
+            })
+        
+        # Identify rows that may have integrity issues based on checks
+        # For columns with type mismatches, mark rows with problematic values
+        if "numeric_type_integrity" in integrity_results.get("checks", {}):
+            numeric_check = integrity_results["checks"]["numeric_type_integrity"]
+            if not numeric_check.get("passed", False):
+                for col in df.columns:
+                    if pd.api.types.is_numeric_dtype(df[col]):
+                        # Find rows with non-numeric-like values
+                        try:
+                            numeric_rows = pd.to_numeric(df[col], errors='coerce')
+                            problem_rows = df[numeric_rows.isna() & df[col].notna()].index.tolist()
+                            
+                            for idx in problem_rows[:50]:
+                                row_level_issues.append({
+                                    "row_index": int(idx),
+                                    "column": col,
+                                    "issue_type": "integrity_violation",
+                                    "severity": "critical",
+                                    "message": f"Type mismatch in numeric column '{col}' at row {idx}: non-numeric value '{df.loc[idx, col]}'",
+                                    "value": str(df.loc[idx, col]),
+                                    "expected_type": "numeric",
+                                    "check_name": "numeric_type_integrity"
+                                })
+                        except Exception:
+                            pass
+        
+        # For datetime columns with issues, mark specific rows
+        if "datetime_type_integrity" in integrity_results.get("checks", {}):
+            datetime_check = integrity_results["checks"]["datetime_type_integrity"]
+            if not datetime_check.get("passed", False):
+                for col in df.columns:
+                    if pd.api.types.is_datetime64_any_dtype(df[col]):
+                        invalid_rows = df[df[col].isna()].index.tolist()
+                        
+                        for idx in invalid_rows[:50]:
+                            row_level_issues.append({
+                                "row_index": int(idx),
+                                "column": col,
+                                "issue_type": "integrity_violation",
+                                "severity": "critical",
+                                "message": f"Invalid datetime value in column '{col}' at row {idx}",
+                                "value": str(df.loc[idx, col]) if not pd.isna(df.loc[idx, col]) else None,
+                                "expected_type": "datetime",
+                                "check_name": "datetime_type_integrity"
+                            })
+        
+        # Identify duplicate rows if they were introduced
+        if "no_new_duplicates_introduced" in integrity_results.get("checks", {}):
+            dup_check = integrity_results["checks"]["no_new_duplicates_introduced"]
+            if not dup_check.get("passed", False) and dup_check.get("duplicate_count", 0) > 0:
+                duplicate_rows = df[df.duplicated(keep=False)].index.tolist()
+                
+                for idx in duplicate_rows[:50]:
+                    row_level_issues.append({
+                        "row_index": int(idx),
+                        "column": "global",
+                        "issue_type": "integrity_violation",
+                        "severity": "warning",
+                        "message": f"Duplicate row detected at index {idx}",
+                        "value": None,
+                        "check_name": "no_new_duplicates_introduced"
+                    })
+        
+        # Cap at 1000 issues
+        row_level_issues = row_level_issues[:1000]
+        
+        # Calculate row-level-issues summary
+        issue_summary = {
+            "total_issues": len(row_level_issues),
+            "by_type": {},
+            "by_severity": {
+                "critical": 0,
+                "warning": 0,
+                "info": 0
+            },
+            "affected_rows": len(set(issue["row_index"] for issue in row_level_issues if issue["row_index"] != 0)),
+            "affected_columns": list(set(issue["column"] for issue in row_level_issues))
+        }
+        
+        for issue in row_level_issues:
+            issue_type = issue.get("issue_type", "writeback_failed")
+            severity = issue.get("severity", "info")
+            
+            if issue_type not in issue_summary["by_type"]:
+                issue_summary["by_type"][issue_type] = 0
+            issue_summary["by_type"][issue_type] += 1
+            
+            if severity in issue_summary["by_severity"]:
+                issue_summary["by_severity"][severity] += 1
+        
         # ==================== GENERATE ALERTS ====================
         alerts = []
         
@@ -437,7 +638,9 @@ def execute_cleanse_writeback(
             "data": writeback_data,
             "alerts": alerts,
             "issues": issues,
-            "recommendations": agent_recommendations
+            "recommendations": agent_recommendations,
+            "row_level_issues": row_level_issues,
+            "issue_summary": issue_summary
         }
 
     except Exception as e:

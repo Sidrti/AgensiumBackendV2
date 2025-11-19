@@ -110,6 +110,104 @@ def execute_type_fixer(
         # Identify type fixing issues
         type_issues = _identify_type_issues(original_df, df_fixed, type_analysis)
         
+        # Generate ROW-LEVEL-ISSUES
+        row_level_issues = []
+        
+        # Iterate through each column with type issues and mark affected rows
+        for col in type_analysis.get("columns_with_issues", []):
+            if col not in original_df.columns:
+                continue
+            
+            type_data = type_analysis.get("type_summary", {}).get(col, {})
+            current_type = type_data.get("current_type", "object")
+            suggested_type = type_data.get("suggested_type", current_type)
+            
+            # Iterate through rows to identify type violations
+            for row_idx, value in enumerate(original_df[col]):
+                if pd.isna(value):
+                    continue
+                
+                # Determine if row has type issue
+                has_type_issue = False
+                issue_type = "type_mismatch"
+                severity = "warning"
+                message = ""
+                
+                # Check for numeric-should-be type issues
+                if suggested_type == "numeric" and current_type == "object":
+                    if not _is_numeric_string(str(value)):
+                        has_type_issue = True
+                        issue_type = "type_mismatch"
+                        severity = "warning"
+                        message = f"Non-numeric value '{value}' found in column '{col}' that should contain numeric values"
+                
+                # Check for datetime-should-be type issues
+                elif suggested_type == "datetime" and current_type == "object":
+                    if not _is_date_string(str(value)):
+                        has_type_issue = True
+                        issue_type = "format_violation"
+                        severity = "warning"
+                        message = f"Non-datetime value '{value}' found in column '{col}' that should contain datetime values"
+                
+                # Check for float-should-be-integer issues
+                elif suggested_type == "integer" and current_type == "float64":
+                    try:
+                        if not float(value).is_integer():
+                            has_type_issue = True
+                            issue_type = "type_conflict"
+                            severity = "info"
+                            message = f"Float value '{value}' found in column '{col}' that contains only integers"
+                    except (ValueError, TypeError):
+                        pass
+                
+                # Check for mixed types in object columns
+                elif current_type == "object":
+                    type_check_results = []
+                    if _is_numeric_string(str(value)):
+                        type_check_results.append("numeric")
+                    if _is_date_string(str(value)):
+                        type_check_results.append("datetime")
+                    if len(type_check_results) > 1 or len(type_check_results) == 0:
+                        has_type_issue = True
+                        issue_type = "type_conflict"
+                        severity = "warning" if suggested_type != "string" else "info"
+                        detected_type = type_check_results[0] if type_check_results else "unknown"
+                        message = f"Mixed or ambiguous type in column '{col}' - value '{value}' type: {detected_type}"
+                
+                if has_type_issue and len(row_level_issues) < 1000:
+                    row_level_issues.append({
+                        "row_index": int(row_idx),
+                        "column": str(col),
+                        "issue_type": issue_type,
+                        "severity": severity,
+                        "message": message,
+                        "value": str(value),
+                        "current_type": str(current_type),
+                        "suggested_type": str(suggested_type)
+                    })
+        
+        # Cap at 1000 issues
+        row_level_issues = row_level_issues[:1000]
+        
+        # Calculate issue summary
+        issue_summary = {
+            "total_issues": len(row_level_issues),
+            "by_type": {},
+            "by_severity": {},
+            "affected_rows": len(set(issue["row_index"] for issue in row_level_issues)),
+            "affected_columns": sorted(list(set(issue["column"] for issue in row_level_issues)))
+        }
+        
+        # Aggregate by type
+        for issue in row_level_issues:
+            issue_type = issue.get("issue_type", "unknown")
+            issue_summary["by_type"][issue_type] = issue_summary["by_type"].get(issue_type, 0) + 1
+        
+        # Aggregate by severity
+        for issue in row_level_issues:
+            severity = issue.get("severity", "info")
+            issue_summary["by_severity"][severity] = issue_summary["by_severity"].get(severity, 0) + 1
+        
         # Build results
         type_fixing_data = {
             "fixing_score": fixing_score,
@@ -117,7 +215,8 @@ def execute_type_fixer(
             "type_analysis": type_analysis,
             "fix_log": fix_log,
             "summary": f"Type fixing completed. Quality: {quality_status}. Processed {len(original_df)} rows, fixed {len(fix_log)} type issues.",
-            "row_level_issues": type_issues[:100]  # Limit to first 100
+            "row_level_issues": row_level_issues[:100],  # Limit to first 100
+            "issue_summary": issue_summary
         }
         
         # ==================== GENERATE EXECUTIVE SUMMARY ====================
@@ -409,6 +508,8 @@ def execute_type_fixer(
             "alerts": alerts,
             "issues": issues,
             "recommendations": agent_recommendations,
+            "row_level_issues": row_level_issues,
+            "issue_summary": issue_summary,
             "cleaned_file": {
                 "filename": f"cleaned_{filename}",
                 "content": cleaned_file_base64,

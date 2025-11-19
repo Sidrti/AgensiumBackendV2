@@ -90,6 +90,115 @@ def execute_governance(
         # Identify governance issues
         governance_issues = _identify_governance_issues(df, parameters)
 
+        # Generate ROW-LEVEL-ISSUES
+        row_level_issues = []
+        
+        # Add row-level issues for missing required governance fields
+        required_lineage_fields = parameters.get('required_lineage_fields', [])
+        required_consent_fields = parameters.get('required_consent_fields', [])
+        required_classification_fields = parameters.get('required_classification_fields', [])
+        
+        all_required_fields = required_lineage_fields + required_consent_fields + required_classification_fields
+        
+        # Check each row for missing required governance data
+        for row_idx, row in df.iterrows():
+            if len(row_level_issues) >= 1000:
+                break
+            
+            missing_fields = []
+            for field in all_required_fields:
+                if field in df.columns and pd.isna(row[field]):
+                    missing_fields.append(field)
+            
+            if missing_fields:
+                # Categorize the issue
+                if any(f in required_lineage_fields for f in missing_fields):
+                    issue_type = "policy_violation"
+                    severity = "warning"
+                    field_category = "lineage"
+                elif any(f in required_consent_fields for f in missing_fields):
+                    issue_type = "compliance_issue"
+                    severity = "critical"
+                    field_category = "consent"
+                else:
+                    issue_type = "policy_violation"
+                    severity = "warning"
+                    field_category = "classification"
+                
+                row_level_issues.append({
+                    "row_index": int(row_idx),
+                    "column": "multiple",
+                    "issue_type": issue_type,
+                    "severity": severity,
+                    "message": f"Missing {field_category} fields: {', '.join(missing_fields)}",
+                    "missing_fields": missing_fields
+                })
+        
+        # Add row-level issues for PII without proper classification
+        pii_patterns = parameters.get('pii_patterns', {
+            'email': r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b',
+            'phone': r'\b\d{3}[-.]?\d{3}[-.]?\d{4}\b',
+            'ssn': r'\b\d{3}-\d{2}-\d{4}\b'
+        })
+        
+        # Identify PII columns
+        pii_columns = {}  # col -> pii_type
+        for col in df.select_dtypes(include=['object']).columns:
+            col_data = df[col].astype(str)
+            for pii_type, pattern in pii_patterns.items():
+                if col_data.str.contains(pattern, regex=True, na=False).any():
+                    pii_columns[col] = pii_type
+                    break
+        
+        # Check if PII rows have proper classification
+        if pii_columns and 'data_classification' in df.columns:
+            for row_idx, row in df.iterrows():
+                if len(row_level_issues) >= 1000:
+                    break
+                
+                # Check if row has PII data
+                has_pii = False
+                pii_cols_in_row = []
+                for pii_col, pii_type in pii_columns.items():
+                    if pii_col in row.index and pd.notna(row[pii_col]):
+                        has_pii = True
+                        pii_cols_in_row.append(pii_col)
+                
+                if has_pii:
+                    # Check classification
+                    classification = row['data_classification'] if 'data_classification' in row.index else None
+                    if pd.isna(classification) or classification == 'public':
+                        row_level_issues.append({
+                            "row_index": int(row_idx),
+                            "column": ", ".join(pii_cols_in_row),
+                            "issue_type": "compliance_issue",
+                            "severity": "critical",
+                            "message": f"PII data detected in {', '.join(pii_cols_in_row)} without proper classification or incorrectly classified as public",
+                            "pii_columns": pii_cols_in_row
+                        })
+        
+        # Cap at 1000 issues
+        row_level_issues = row_level_issues[:1000]
+        
+        # Calculate issue summary
+        issue_summary = {
+            "total_issues": len(row_level_issues),
+            "by_type": {},
+            "by_severity": {},
+            "affected_rows": len(set(issue["row_index"] for issue in row_level_issues)),
+            "affected_columns": sorted(list(set(issue.get("column", "") for issue in row_level_issues if issue.get("column") != "all" and issue.get("column") != "multiple")))
+        }
+        
+        # Aggregate by type
+        for issue in row_level_issues:
+            issue_type = issue.get("issue_type", "unknown")
+            issue_summary["by_type"][issue_type] = issue_summary["by_type"].get(issue_type, 0) + 1
+        
+        # Aggregate by severity
+        for issue in row_level_issues:
+            severity = issue.get("severity", "info")
+            issue_summary["by_severity"][severity] = issue_summary["by_severity"].get(severity, 0) + 1
+        
         # Build results
         governance_data = {
             "governance_scores": {
@@ -101,7 +210,9 @@ def execute_governance(
             "compliance_status": compliance_status,
             "total_records": len(df),
             "fields_analyzed": list(df.columns),
-            "governance_issues": governance_issues
+            "governance_issues": governance_issues,
+            "row_level_issues": row_level_issues[:100],
+            "issue_summary": issue_summary
         }
         
         # ==================== GENERATE ALERTS ====================
@@ -466,6 +577,8 @@ def execute_governance(
             "alerts": alerts,
             "issues": issues,
             "recommendations": recommendations,
+            "row_level_issues": row_level_issues,
+            "issue_summary": issue_summary,
             "executive_summary": executive_summary,
             "ai_analysis_text": ai_analysis_text
         }
