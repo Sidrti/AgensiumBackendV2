@@ -389,6 +389,134 @@ def execute_cleanse_previewer(
         ai_analysis_parts.append(f"- Simulations: {preview_score['metrics']['successful_simulations']}/{preview_score['metrics']['total_simulations']} successful")
         ai_analysis_text = "\n".join(ai_analysis_parts)
         
+        # ==================== GENERATE ROW-LEVEL-ISSUES ====================
+        row_level_issues = []
+        
+        # Extract row-level issues from simulated results
+        for rule_idx, result in enumerate(simulated_results):
+            if result.get("status") == "error":
+                # Simulation failure - flag all affected rows as problematic
+                try:
+                    target_cols = result.get("target_columns", [])
+                    rule_type = result.get("rule_type", "unknown")
+                    
+                    # Add one issue per affected column
+                    for col_idx, col in enumerate(target_cols[:10]):  # Limit to 10 columns per rule
+                        row_level_issues.append({
+                            "row_index": 0,  # Indicates system-level issue, not specific row
+                            "column": col,
+                            "issue_type": "simulation_failed",
+                            "severity": "critical",
+                            "message": f"Simulation failed for rule on column '{col}': {result.get('error', 'Unknown error')}",
+                            "value": None,
+                            "rule_id": result.get("rule_id"),
+                            "rule_type": rule_type
+                        })
+                except Exception as e:
+                    pass
+            else:
+                # Extract row-level impacts from successful simulations
+                changes = result.get("changes", {})
+                impact_level = result.get("impact_level", "low")
+                risk_assessment = result.get("risk_assessment", {})
+                
+                # High-impact changes - flag affected rows
+                if impact_level == "high" or risk_assessment.get("is_risky"):
+                    row_change = changes.get("row_change", 0)
+                    row_change_pct = changes.get("row_change_percentage", 0)
+                    
+                    # For rows that will be removed (negative row_change)
+                    if row_change < 0:
+                        # Estimate affected rows based on operation type
+                        affected_rows_count = min(abs(row_change), max(1, len(df) // 100))  # Sample up to 1% of rows
+                        
+                        for row_idx in range(affected_rows_count):
+                            row_level_issues.append({
+                                "row_index": row_idx,
+                                "column": "global",
+                                "issue_type": "unsafe_operation",
+                                "severity": "critical" if abs(row_change_pct) > 20 else "warning",
+                                "message": f"Row will be affected by high-impact operation: {result.get('rule_description', 'Unknown rule')}. Total impact: {abs(row_change_pct):.1f}% rows affected",
+                                "value": None,
+                                "rule_id": result.get("rule_id"),
+                                "impact_percentage": round(row_change_pct, 2)
+                            })
+                    
+                    # Column-level changes that affect rows
+                    col_changes = changes.get("column_level_changes", {})
+                    for col_name, col_change_info in col_changes.items():
+                        if isinstance(col_change_info, dict):
+                            # High mean/median changes indicate significant value shifts
+                            mean_change_pct = col_change_info.get("mean_change_pct", 0)
+                            
+                            if abs(mean_change_pct) > 30:
+                                # Find rows with values far from mean (will be significantly affected)
+                                if col_name in df.columns and pd.api.types.is_numeric_dtype(df[col_name]):
+                                    col_data = df[col_name].dropna()
+                                    if len(col_data) > 0:
+                                        col_mean = col_data.mean()
+                                        col_std = col_data.std()
+                                        
+                                        # Find extreme rows
+                                        for idx, val in enumerate(col_data.items()):
+                                            if col_std > 0 and abs(val[1] - col_mean) > 2 * col_std:
+                                                row_level_issues.append({
+                                                    "row_index": idx,
+                                                    "column": col_name,
+                                                    "issue_type": "high_impact_change",
+                                                    "severity": "warning",
+                                                    "message": f"High-impact change on '{col_name}': value will change significantly ({abs(mean_change_pct):.1f}% mean shift)",
+                                                    "value": float(val[1]),
+                                                    "rule_id": result.get("rule_id"),
+                                                    "change_percentage": round(mean_change_pct, 2)
+                                                })
+                                                
+                                                if len(row_level_issues) >= 1000:
+                                                    break
+                            
+                            if len(row_level_issues) >= 1000:
+                                break
+                
+                # Risky operations detected
+                if risk_assessment.get("is_risky"):
+                    for risk_factor in risk_assessment.get("risk_factors", [])[:3]:
+                        row_level_issues.append({
+                            "row_index": 0,  # System-level risk indicator
+                            "column": "global",
+                            "issue_type": "preview_issue",
+                            "severity": "critical",
+                            "message": f"Risk detected: {risk_factor}",
+                            "value": None,
+                            "rule_id": result.get("rule_id")
+                        })
+            
+            if len(row_level_issues) >= 1000:
+                break
+        
+        # Calculate row-level-issues summary
+        issue_summary = {
+            "total_issues": len(row_level_issues),
+            "by_type": {},
+            "by_severity": {
+                "critical": 0,
+                "warning": 0,
+                "info": 0
+            },
+            "affected_rows": len(set(issue["row_index"] for issue in row_level_issues if issue["row_index"] != 0)),
+            "affected_columns": list(set(issue["column"] for issue in row_level_issues))
+        }
+        
+        for issue in row_level_issues:
+            issue_type = issue.get("issue_type", "preview_issue")
+            severity = issue.get("severity", "info")
+            
+            if issue_type not in issue_summary["by_type"]:
+                issue_summary["by_type"][issue_type] = 0
+            issue_summary["by_type"][issue_type] += 1
+            
+            if severity in issue_summary["by_severity"]:
+                issue_summary["by_severity"][severity] += 1
+
         # Build results
         preview_data = {
             "preview_score": preview_score,
@@ -417,7 +545,9 @@ def execute_cleanse_previewer(
             "data": preview_data,
             "alerts": alerts,
             "issues": issues,
-            "recommendations": agent_recommendations
+            "recommendations": agent_recommendations,
+            "row_level_issues": row_level_issues[:1000],
+            "issue_summary": issue_summary
         }
 
     except Exception as e:

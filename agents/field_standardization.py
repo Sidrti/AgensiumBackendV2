@@ -135,6 +135,112 @@ def execute_field_standardization(
         else:
             quality_status = "needs_improvement"
         
+        # Generate ROW-LEVEL-ISSUES
+        row_level_issues = []
+        
+        # Iterate through standardization issues to create row-level entries
+        for std_issue in standardization_issues:
+            issue_type = "inconsistent_format"  # Default for case/whitespace issues
+            severity = "info"
+            
+            original_val = std_issue.get("original_value", "")
+            standardized_val = std_issue.get("standardized_value", "")
+            
+            # Determine issue type based on change type
+            if original_val != standardized_val:
+                # Check if it's whitespace issue
+                if original_val.strip() == standardized_val:
+                    issue_type = "format_violation"
+                    severity = "info"
+                # Check if it's case issue
+                elif original_val.lower() == standardized_val.lower():
+                    issue_type = "inconsistent_format"
+                    severity = "info"
+                # Otherwise it's a standardization/normalization issue
+                else:
+                    issue_type = "standardization_needed"
+                    severity = "info"
+            
+            if len(row_level_issues) < 1000:
+                row_level_issues.append({
+                    "row_index": int(std_issue.get("row_index", 0)),
+                    "column": str(std_issue.get("column", "")),
+                    "issue_type": issue_type,
+                    "severity": severity,
+                    "message": f"Standardized: '{original_val}' → '{standardized_val}'",
+                    "value": original_val,
+                    "standardized_value": standardized_val
+                })
+        
+        # Also add row-level issues for values with format inconsistencies (not yet changed)
+        for col in columns_to_process:
+            if col not in original_df.columns:
+                continue
+            
+            col_analysis = pre_analysis.get("column_analysis", {}).get(col, {})
+            
+            # Only add issues if column has case or whitespace variations
+            if col_analysis.get("case_variations", 0) > 0 or col_analysis.get("whitespace_issues", 0) > 0:
+                for row_idx, value in enumerate(original_df[col]):
+                    if pd.isna(value) or len(row_level_issues) >= 1000:
+                        continue
+                    
+                    value_str = str(value)
+                    has_issue = False
+                    issue_type = "format_violation"
+                    
+                    # Check for leading/trailing whitespace
+                    if value_str != value_str.strip():
+                        has_issue = True
+                        issue_type = "format_violation"
+                    
+                    # Check for multiple internal spaces
+                    elif '  ' in value_str:
+                        has_issue = True
+                        issue_type = "format_violation"
+                    
+                    # Check if value appears multiple times with different cases (case variation)
+                    elif col_analysis.get("case_variations", 0) > 0:
+                        # Try to find if this value has case variants
+                        unique_vals = original_df[col].dropna().unique()
+                        lowercase_version = value_str.lower()
+                        case_variants = [v for v in unique_vals if pd.notna(v) and str(v).lower() == lowercase_version and str(v) != value_str]
+                        if case_variants:
+                            has_issue = True
+                            issue_type = "inconsistent_format"
+                    
+                    if has_issue:
+                        row_level_issues.append({
+                            "row_index": int(row_idx),
+                            "column": str(col),
+                            "issue_type": issue_type,
+                            "severity": "info",
+                            "message": f"Format inconsistency: '{value_str}' - {issue_type.replace('_', ' ')}",
+                            "value": value_str
+                        })
+        
+        # Cap at 1000 issues
+        row_level_issues = row_level_issues[:1000]
+        
+        # Calculate issue summary
+        issue_summary = {
+            "total_issues": len(row_level_issues),
+            "by_type": {},
+            "by_severity": {},
+            "affected_rows": len(set(issue["row_index"] for issue in row_level_issues)),
+            "affected_columns": sorted(list(set(issue["column"] for issue in row_level_issues)))
+        }
+        
+        # Aggregate by type
+        for issue in row_level_issues:
+            issue_type = issue.get("issue_type", "unknown")
+            issue_summary["by_type"][issue_type] = issue_summary["by_type"].get(issue_type, 0) + 1
+        
+        # Aggregate by severity
+        for issue in row_level_issues:
+            severity = issue.get("severity", "info")
+            issue_summary["by_severity"][severity] = issue_summary["by_severity"].get(severity, 0) + 1
+        
         # Build standardization analysis
         standardization_analysis = {
             "columns_standardized": len(columns_to_process),
@@ -161,7 +267,8 @@ def execute_field_standardization(
             "standardization_analysis": standardization_analysis,
             "standardization_log": standardization_log,
             "summary": f"Field standardization completed. Quality: {quality_status}. Processed {len(columns_to_process)} columns across {len(original_df)} rows.",
-            "row_level_issues": standardization_issues[:100]  # Limit to first 100
+            "row_level_issues": row_level_issues[:100],  # Limit to first 100
+            "issue_summary": issue_summary
         }
         
         # ==================== GENERATE EXECUTIVE SUMMARY ====================
@@ -475,6 +582,8 @@ def execute_field_standardization(
             "alerts": alerts,
             "issues": issues,
             "recommendations": agent_recommendations,
+            "row_level_issues": row_level_issues,
+            "issue_summary": issue_summary,
             "cleaned_file": {
                 "filename": f"cleaned_{filename}",
                 "content": cleaned_file_base64,

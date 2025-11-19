@@ -236,6 +236,140 @@ def score_risk(
             "estimated_remediation_time_hours": _estimate_remediation_time(total_high_risk, total_medium_risk, governance_gaps)
         }
         
+        # Generate ROW-LEVEL-ISSUES
+        row_level_issues = []
+        
+        # Iterate through data to identify rows with high-risk data
+        high_risk_pii_columns = [f["field_name"] for f in field_risk_assessments if f.get("risk_level") == "high" and any(rf.get("pii_type") for rf in f.get("risk_factors", []))]
+        
+        for row_idx, row in df.iterrows():
+            if len(row_level_issues) >= 1000:
+                break
+            
+            has_pii = False
+            pii_types_found = []
+            
+            # Check if row has PII or high-risk data
+            for col in high_risk_pii_columns:
+                if col in row.index and pd.notna(row[col]):
+                    has_pii = True
+                    # Try to identify PII type from field assessment
+                    for field_assess in field_risk_assessments:
+                        if field_assess["field_name"] == col:
+                            for risk_factor in field_assess.get("risk_factors", []):
+                                if risk_factor.get("pii_type"):
+                                    pii_types_found.append(risk_factor.get("pii_type"))
+                            break
+            
+            if has_pii:
+                # Determine severity based on PII type
+                severity = "critical"
+                if "ssn" in pii_types_found or "credit_card" in pii_types_found:
+                    severity = "critical"
+                elif "email" in pii_types_found or "phone" in pii_types_found:
+                    severity = "warning"
+                else:
+                    severity = "info"
+                
+                row_level_issues.append({
+                    "row_index": int(row_idx),
+                    "column": ", ".join(high_risk_pii_columns),
+                    "issue_type": "risk_high",
+                    "severity": severity,
+                    "message": f"Row contains {', '.join(set(pii_types_found))} data with high risk score",
+                    "pii_types": list(set(pii_types_found))
+                })
+        
+        # Add compliance violation issues for rows with compliance-impacted fields
+        compliance_frameworks = _get_impacted_frameworks(field_risk_assessments)
+        compliance_columns = [f["field_name"] for f in field_risk_assessments if f.get("compliance_issues")]
+        
+        if compliance_columns:
+            for row_idx, row in df.iterrows():
+                if len(row_level_issues) >= 1000:
+                    break
+                
+                # Check if row has data in compliance-sensitive columns
+                has_compliance_data = False
+                affected_frameworks = set()
+                
+                for col in compliance_columns:
+                    if col in row.index and pd.notna(row[col]):
+                        has_compliance_data = True
+                        # Find which frameworks are affected
+                        for field_assess in field_risk_assessments:
+                            if field_assess["field_name"] == col:
+                                for issue in field_assess.get("compliance_issues", []):
+                                    if "GDPR" in issue:
+                                        affected_frameworks.add("GDPR")
+                                    if "HIPAA" in issue:
+                                        affected_frameworks.add("HIPAA")
+                                    if "CCPA" in issue:
+                                        affected_frameworks.add("CCPA")
+                                break
+                
+                if has_compliance_data and affected_frameworks:
+                    severity = "critical" if any(f in ["GDPR", "HIPAA"] for f in affected_frameworks) else "warning"
+                    
+                    row_level_issues.append({
+                        "row_index": int(row_idx),
+                        "column": ", ".join(compliance_columns),
+                        "issue_type": "compliance_violation",
+                        "severity": severity,
+                        "message": f"Row subject to {', '.join(affected_frameworks)} compliance requirements",
+                        "frameworks": list(affected_frameworks)
+                    })
+        
+        # Add remediation needed issues for rows with medium/high risk fields
+        medium_high_risk_cols = [f["field_name"] for f in field_risk_assessments if f.get("risk_level") in ["high", "medium"]]
+        
+        for row_idx, row in df.iterrows():
+            if len(row_level_issues) >= 1000:
+                break
+            
+            needs_remediation = False
+            risk_fields_affected = []
+            
+            for col in medium_high_risk_cols:
+                if col in row.index and pd.notna(row[col]):
+                    needs_remediation = True
+                    risk_fields_affected.append(col)
+            
+            if needs_remediation and risk_fields_affected:
+                # Only add if not already added as PII or compliance issue
+                is_duplicate = any(issue["row_index"] == row_idx for issue in row_level_issues)
+                if not is_duplicate:
+                    row_level_issues.append({
+                        "row_index": int(row_idx),
+                        "column": ", ".join(risk_fields_affected),
+                        "issue_type": "remediation_needed",
+                        "severity": "warning",
+                        "message": f"Row contains {len(risk_fields_affected)} field(s) requiring security remediation",
+                        "affected_fields": risk_fields_affected
+                    })
+        
+        # Cap at 1000 issues
+        row_level_issues = row_level_issues[:1000]
+        
+        # Calculate issue summary
+        issue_summary = {
+            "total_issues": len(row_level_issues),
+            "by_type": {},
+            "by_severity": {},
+            "affected_rows": len(set(issue["row_index"] for issue in row_level_issues)),
+            "affected_columns": sorted(list(set(col for issue in row_level_issues for col in issue.get("column", "").split(", "))))
+        }
+        
+        # Aggregate by type
+        for issue in row_level_issues:
+            issue_type = issue.get("issue_type", "unknown")
+            issue_summary["by_type"][issue_type] = issue_summary["by_type"].get(issue_type, 0) + 1
+        
+        # Aggregate by severity
+        for issue in row_level_issues:
+            severity = issue.get("severity", "info")
+            issue_summary["by_severity"][severity] = issue_summary["by_severity"].get(severity, 0) + 1
+        
         # ==================== GENERATE ALERTS ====================
         alerts = []
         sensitive_non_pii = sensitive_fields_detected - pii_fields_detected
@@ -719,11 +853,15 @@ def score_risk(
             },
             "data": {
                 "fields": field_risk_assessments,
-                "risk_summary": risk_summary
+                "risk_summary": risk_summary,
+                "row_level_issues": row_level_issues[:100],
+                "issue_summary": issue_summary
             },
             "alerts": alerts,
             "issues": issues,
             "recommendations": recommendations,
+            "row_level_issues": row_level_issues,
+            "issue_summary": issue_summary,
             "executive_summary": executive_summary,
             "ai_analysis_text": ai_analysis_text
         }

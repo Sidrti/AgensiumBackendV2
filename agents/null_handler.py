@@ -107,6 +107,72 @@ def execute_null_handler(
         # Identify null handling issues
         null_issues = _identify_null_issues(original_df, df_cleaned)
         
+        # ==================== GENERATE ROW-LEVEL-ISSUES ====================
+        row_level_issues = []
+        
+        for idx, row in original_df.iterrows():
+            null_cols = row[row.isnull()].index.tolist()
+            
+            if null_cols:
+                # Issue 1: Individual null values
+                for col in null_cols:
+                    if len(row_level_issues) < 1000:
+                        row_level_issues.append({
+                            "row_index": int(idx),
+                            "column": str(col),
+                            "issue_type": "null",
+                            "severity": "warning",
+                            "message": f"Null/missing value found in column '{col}'",
+                            "value": None
+                        })
+                
+                # Issue 2: Rows with multiple nulls (suspicious pattern)
+                null_count = len(null_cols)
+                null_ratio = null_count / len(original_df.columns)
+                
+                if null_ratio > 0.3 and len(row_level_issues) < 1000:
+                    row_level_issues.append({
+                        "row_index": int(idx),
+                        "column": "multiple",
+                        "issue_type": "null_pattern",
+                        "severity": "critical",
+                        "message": f"Row has {null_count} null values ({null_ratio*100:.1f}% of columns are null). This may indicate data collection failure.",
+                        "null_count": null_count,
+                        "null_ratio": round(null_ratio, 2)
+                    })
+                elif null_ratio > 0.15 and len(row_level_issues) < 1000:
+                    row_level_issues.append({
+                        "row_index": int(idx),
+                        "column": "multiple",
+                        "issue_type": "missing_data_anomaly",
+                        "severity": "warning",
+                        "message": f"Row has {null_count} null values ({null_ratio*100:.1f}% of columns). Anomalous null pattern detected.",
+                        "null_count": null_count,
+                        "null_ratio": round(null_ratio, 2)
+                    })
+        
+        # Cap row-level-issues at 1000
+        row_level_issues = row_level_issues[:1000]
+        
+        # Calculate issue summary
+        issue_summary = {
+            "total_issues": len(row_level_issues),
+            "by_type": {},
+            "by_severity": {},
+            "affected_rows": len(set(issue["row_index"] for issue in row_level_issues)),
+            "affected_columns": sorted(list(set(issue.get("column", "") for issue in row_level_issues if issue.get("column") != "multiple")))
+        }
+        
+        # Count by type
+        for issue in row_level_issues:
+            issue_type = issue["issue_type"]
+            issue_summary["by_type"][issue_type] = issue_summary["by_type"].get(issue_type, 0) + 1
+        
+        # Count by severity
+        for issue in row_level_issues:
+            severity = issue["severity"]
+            issue_summary["by_severity"][severity] = issue_summary["by_severity"].get(severity, 0) + 1
+        
         # Generate cleaned file (CSV format)
         cleaned_file_bytes = _generate_cleaned_file(df_cleaned, filename)
         cleaned_file_base64 = base64.b64encode(cleaned_file_bytes).decode('utf-8')
@@ -462,7 +528,9 @@ def execute_null_handler(
                 "content": cleaned_file_base64,
                 "size_bytes": len(cleaned_file_bytes),
                 "format": filename.split('.')[-1].lower()
-            }
+            },
+            "row_level_issues": row_level_issues,
+            "issue_summary": issue_summary
         }
 
     except Exception as e:

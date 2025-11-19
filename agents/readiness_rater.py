@@ -657,6 +657,150 @@ def rate_readiness(
         
         ai_analysis_text = "\n".join(ai_analysis_text_parts)
         
+        # ==================== GENERATE ROW-LEVEL-ISSUES ====================
+        row_level_issues = []
+        
+        # Extract row-level issues from identified problems
+        
+        # 1. Add issues for rows with high null percentages
+        for idx in df.index:
+            row_null_count = df.loc[idx].isna().sum()
+            row_null_pct = (row_null_count / len(df.columns) * 100) if len(df.columns) > 0 else 0
+            
+            if row_null_pct > 30:
+                row_level_issues.append({
+                    "row_index": int(idx),
+                    "column": "global",
+                    "issue_type": "readiness_low",
+                    "severity": "critical" if row_null_pct > 50 else "warning",
+                    "message": f"Row {idx} has {row_null_pct:.1f}% null values ({int(row_null_count)} of {len(df.columns)} columns) - exceeds 30% threshold",
+                    "value": None,
+                    "null_percentage": round(row_null_pct, 2)
+                })
+        
+        # 2. Add issues for rows with outlier values
+        for col in df.columns:
+            if df[col].dtype in ['int64', 'float64']:
+                col_data = df[col].dropna()
+                if len(col_data) > 0:
+                    Q1 = col_data.quantile(0.25)
+                    Q3 = col_data.quantile(0.75)
+                    IQR = Q3 - Q1
+                    
+                    if IQR > 0:
+                        lower_bound = Q1 - 1.5 * IQR
+                        upper_bound = Q3 + 1.5 * IQR
+                        
+                        outlier_mask = (df[col] < lower_bound) | (df[col] > upper_bound)
+                        outlier_indices = df[outlier_mask].index.tolist()
+                        
+                        for idx in outlier_indices[:100]:
+                            row_level_issues.append({
+                                "row_index": int(idx),
+                                "column": col,
+                                "issue_type": "validation_failed",
+                                "severity": "warning",
+                                "message": f"Row {idx} has outlier value in '{col}': {df.loc[idx, col]}",
+                                "value": float(df.loc[idx, col]),
+                                "bounds": {
+                                    "lower": float(lower_bound),
+                                    "upper": float(upper_bound)
+                                }
+                            })
+        
+        # 3. Add issues for duplicate rows
+        dup_mask = df.duplicated(keep=False)
+        dup_indices = df[dup_mask].index.tolist()
+        
+        for idx in dup_indices[:100]:
+            row_level_issues.append({
+                "row_index": int(idx),
+                "column": "global",
+                "issue_type": "quality_gate_failed",
+                "severity": "high",
+                "message": f"Row {idx} is a duplicate record - affects data integrity and analysis results",
+                "value": None
+            })
+        
+        # 4. Add issues for rows with format inconsistencies
+        date_patterns = ['date', 'time', 'created', 'updated', 'timestamp', 'datetime']
+        for col in df.columns:
+            col_lower = col.lower()
+            if any(x in col_lower for x in date_patterns):
+                for idx in df.index:
+                    try:
+                        pd.to_datetime(df.loc[idx, col])
+                    except:
+                        if pd.notna(df.loc[idx, col]):
+                            row_level_issues.append({
+                                "row_index": int(idx),
+                                "column": col,
+                                "issue_type": "validation_failed",
+                                "severity": "warning",
+                                "message": f"Row {idx} has invalid date/time format in '{col}': {df.loc[idx, col]}",
+                                "value": str(df.loc[idx, col])
+                            })
+                            
+                            if len(row_level_issues) >= 1000:
+                                break
+            
+            if len(row_level_issues) >= 1000:
+                break
+        
+        # 5. Add issues for rows with type mismatches in numeric columns
+        for col in df.columns:
+            if df[col].dtype == 'object':
+                for idx in df.index:
+                    val = df.loc[idx, col]
+                    if pd.notna(val):
+                        try:
+                            float(val)
+                        except (ValueError, TypeError):
+                            # Check if this is supposed to be numeric based on column name
+                            col_lower = col.lower()
+                            if any(x in col_lower for x in ['price', 'amount', 'quantity', 'count', 'value', 'rate', 'score', 'id']):
+                                row_level_issues.append({
+                                    "row_index": int(idx),
+                                    "column": col,
+                                    "issue_type": "validation_failed",
+                                    "severity": "medium",
+                                    "message": f"Row {idx} has non-numeric value in numeric column '{col}': {val}",
+                                    "value": str(val)
+                                })
+                                
+                                if len(row_level_issues) >= 1000:
+                                    break
+            
+            if len(row_level_issues) >= 1000:
+                break
+        
+        # Cap at 1000 issues
+        row_level_issues = row_level_issues[:1000]
+        
+        # Calculate row-level-issues summary
+        issue_summary = {
+            "total_issues": len(row_level_issues),
+            "by_type": {},
+            "by_severity": {
+                "critical": 0,
+                "warning": 0,
+                "info": 0
+            },
+            "affected_rows": len(set(issue["row_index"] for issue in row_level_issues)),
+            "affected_columns": list(set(issue["column"] for issue in row_level_issues))
+        }
+        
+        for issue in row_level_issues:
+            issue_type = issue.get("issue_type", "validation_failed")
+            severity = issue.get("severity", "info")
+            
+            if issue_type not in issue_summary["by_type"]:
+                issue_summary["by_type"][issue_type] = 0
+            issue_summary["by_type"][issue_type] += 1
+            
+            if severity in issue_summary["by_severity"]:
+                issue_summary["by_severity"][severity] += 1
+        
         return {
             "status": "success",
             "agent_id": "readiness-rater",
@@ -683,7 +827,9 @@ def rate_readiness(
             "issues": issues,
             "recommendations": recommendations,
             "executive_summary": executive_summary,
-            "ai_analysis_text": ai_analysis_text
+            "ai_analysis_text": ai_analysis_text,
+            "row_level_issues": row_level_issues,
+            "issue_summary": issue_summary
         }
     
     except Exception as e:

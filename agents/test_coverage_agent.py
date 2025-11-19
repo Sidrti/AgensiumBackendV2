@@ -89,20 +89,132 @@ def execute_test_coverage(
 
         # Identify test coverage issues
         test_issues = _identify_test_coverage_issues(df, parameters)
-
-        # Build results
-        test_coverage_data = {
-            "test_coverage_scores": {
-                "overall": round(overall_score, 1),
-                "uniqueness": round(uniqueness_score, 1),
-                "range": round(range_score, 1),
-                "format": round(format_score, 1)
-            },
-            "coverage_status": coverage_status,
-            "total_records": len(df),
-            "fields_analyzed": list(df.columns),
-            "test_coverage_issues": test_issues
+        
+        # ==================== GENERATE ROW-LEVEL-ISSUES ====================
+        row_level_issues = []
+        
+        # Check uniqueness constraints at row level
+        unique_columns = parameters.get('unique_columns', [])
+        for col in unique_columns:
+            if col in df.columns:
+                # Find rows with duplicate values
+                dup_mask = df[col].duplicated(keep=False)
+                for idx in df[dup_mask].index:
+                    if len(row_level_issues) >= 1000:
+                        break
+                    row_level_issues.append({
+                        "row_index": int(idx),
+                        "column": str(col),
+                        "issue_type": "test_coverage_gap",
+                        "severity": "critical",
+                        "message": f"Row {idx}, column '{col}': Duplicate value {df.loc[idx, col]} violates uniqueness constraint",
+                        "value": str(df.loc[idx, col]),
+                        "validation_type": "uniqueness"
+                    })
+        
+        # Check range constraints at row level
+        range_tests = parameters.get('range_tests', {})
+        for col, constraints in range_tests.items():
+            if col in df.columns and pd.api.types.is_numeric_dtype(df[col]):
+                min_val = constraints.get('min')
+                max_val = constraints.get('max')
+                
+                for idx, val in df[col].items():
+                    if len(row_level_issues) >= 1000:
+                        break
+                    if pd.isna(val):
+                        continue
+                    
+                    out_of_range = False
+                    if min_val is not None and val < min_val:
+                        out_of_range = True
+                    elif max_val is not None and val > max_val:
+                        out_of_range = True
+                    
+                    if out_of_range:
+                        row_level_issues.append({
+                            "row_index": int(idx),
+                            "column": str(col),
+                            "issue_type": "validation_missing",
+                            "severity": "warning",
+                            "message": f"Row {idx}, column '{col}': Value {val} outside range [{min_val}, {max_val}]",
+                            "value": float(val),
+                            "bounds": {"lower": min_val, "upper": max_val},
+                            "validation_type": "range"
+                        })
+        
+        # Check format constraints at row level
+        format_tests = parameters.get('format_tests', {})
+        for col, pattern_info in format_tests.items():
+            if col in df.columns:
+                pattern = pattern_info.get('pattern') if isinstance(pattern_info, dict) else pattern_info
+                description = pattern_info.get('description', 'format') if isinstance(pattern_info, dict) else 'format'
+                
+                try:
+                    for idx, val in df[col].items():
+                        if len(row_level_issues) >= 1000:
+                            break
+                        if pd.isna(val):
+                            continue
+                        
+                        val_str = str(val)
+                        matches = re.match(pattern, val_str)
+                        
+                        if not matches:
+                            row_level_issues.append({
+                                "row_index": int(idx),
+                                "column": str(col),
+                                "issue_type": "edge_case_uncovered",
+                                "severity": "warning",
+                                "message": f"Row {idx}, column '{col}': Value '{val_str}' does not match {description} pattern",
+                                "value": val_str,
+                                "expected_format": description,
+                                "validation_type": "format"
+                            })
+                except re.error:
+                    pass  # Skip invalid regex patterns
+        
+        # Check for edge cases (null, empty, boundary values)
+        for idx, row in df.iterrows():
+            if len(row_level_issues) >= 1000:
+                break
+            
+            # Check for rows with many null values (edge case coverage gap)
+            null_count = row.isna().sum()
+            null_ratio = null_count / len(df.columns) if len(df.columns) > 0 else 0
+            
+            if null_ratio > 0.2:  # >20% nulls indicates potential edge case issue
+                row_level_issues.append({
+                    "row_index": int(idx),
+                    "column": "N/A",
+                    "issue_type": "edge_case_uncovered",
+                    "severity": "info",
+                    "message": f"Row {idx} has {null_ratio*100:.1f}% null values - edge case coverage may be insufficient",
+                    "null_count": int(null_count),
+                    "validation_type": "edge_case"
+                })
+        
+        # Cap row-level-issues at 1000
+        row_level_issues = row_level_issues[:1000]
+        
+        # Calculate issue summary
+        issue_summary = {
+            "total_issues": len(row_level_issues),
+            "by_type": {},
+            "by_severity": {},
+            "affected_rows": len(set(issue["row_index"] for issue in row_level_issues)),
+            "affected_columns": list(set(issue["column"] for issue in row_level_issues if issue["column"] != "N/A"))
         }
+        
+        # Aggregate by type
+        for issue in row_level_issues:
+            issue_type = issue["issue_type"]
+            issue_summary["by_type"][issue_type] = issue_summary["by_type"].get(issue_type, 0) + 1
+        
+        # Aggregate by severity
+        for issue in row_level_issues:
+            severity = issue["severity"]
+            issue_summary["by_severity"][severity] = issue_summary["by_severity"].get(severity, 0) + 1
         
         # ==================== GENERATE ALERTS ====================
         alerts = []
@@ -533,12 +645,27 @@ def execute_test_coverage(
                 "coverage_status": coverage_status,
                 "issues_found": len(test_issues)
             },
-            "data": test_coverage_data,
+            "data": {
+                "test_coverage_scores": {
+                    "overall": round(overall_score, 1),
+                    "uniqueness": round(uniqueness_score, 1),
+                    "range": round(range_score, 1),
+                    "format": round(format_score, 1)
+                },
+                "coverage_status": coverage_status,
+                "total_records": len(df),
+                "fields_analyzed": list(df.columns),
+                "test_coverage_issues": test_issues,
+                "row_level_issues": row_level_issues[:100],
+                "issue_summary": issue_summary
+            },
             "alerts": alerts,
             "issues": issues,
             "recommendations": recommendations,
             "executive_summary": executive_summary,
-            "ai_analysis_text": ai_analysis_text
+            "ai_analysis_text": ai_analysis_text,
+            "row_level_issues": row_level_issues,
+            "issue_summary": issue_summary
         }
 
     except Exception as e:

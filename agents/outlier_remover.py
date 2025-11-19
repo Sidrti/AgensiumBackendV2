@@ -90,6 +90,66 @@ def execute_outlier_remover(
         # Remove/impute outliers
         df_cleaned, removal_log, outlier_issues = _remove_outliers(df, outlier_analysis, removal_strategy)
         
+        # ==================== GENERATE ROW-LEVEL-ISSUES ====================
+        row_level_issues = []
+        
+        for col, col_analysis in outlier_analysis["outlier_summary"].items():
+            outliers = col_analysis["outliers"]
+            
+            for outlier in outliers:
+                row_idx = outlier["row_index"]
+                original_value = outlier["value"]
+                
+                # Determine issue type based on detection method
+                issue_type = "outlier"
+                if outlier.get("severity") == "critical":
+                    issue_type = "extreme_value"
+                
+                # Build issue object with bounds if available
+                issue = {
+                    "row_index": int(row_idx),
+                    "column": str(col),
+                    "issue_type": issue_type,
+                    "severity": outlier["severity"],
+                    "message": f"Outlier detected in '{col}' using {outlier.get('method', 'unknown')} method: {original_value}",
+                    "value": float(original_value)
+                }
+                
+                # Add method-specific bounds
+                if "lower_bound" in outlier and "upper_bound" in outlier:
+                    issue["bounds"] = {
+                        "lower": float(outlier["lower_bound"]),
+                        "upper": float(outlier["upper_bound"])
+                    }
+                
+                # Add z-score if available
+                if "z_score" in outlier:
+                    issue["z_score"] = float(outlier["z_score"])
+                
+                row_level_issues.append(issue)
+        
+        # Cap row-level-issues at 1000
+        row_level_issues = row_level_issues[:1000]
+        
+        # Calculate issue summary
+        issue_summary = {
+            "total_issues": len(row_level_issues),
+            "by_type": {},
+            "by_severity": {},
+            "affected_rows": len(set(issue["row_index"] for issue in row_level_issues)),
+            "affected_columns": sorted(list(set(issue["column"] for issue in row_level_issues)))
+        }
+        
+        # Count by type
+        for issue in row_level_issues:
+            issue_type = issue["issue_type"]
+            issue_summary["by_type"][issue_type] = issue_summary["by_type"].get(issue_type, 0) + 1
+        
+        # Count by severity
+        for issue in row_level_issues:
+            severity = issue["severity"]
+            issue_summary["by_severity"][severity] = issue_summary["by_severity"].get(severity, 0) + 1
+        
         # Calculate cleaning effectiveness
         total_outliers = sum(col_data["outlier_count"] for col_data in outlier_analysis["outlier_summary"].values())
         cleaning_score = _calculate_cleaning_score(original_df, df_cleaned, total_outliers, {
@@ -423,7 +483,9 @@ def execute_outlier_remover(
                 "content": base64.b64encode(_generate_cleaned_file(df_cleaned, filename)).decode('utf-8'),
                 "size_bytes": len(_generate_cleaned_file(df_cleaned, filename)),
                 "format": filename.split('.')[-1].lower()
-            }
+            },
+            "row_level_issues": row_level_issues,
+            "issue_summary": issue_summary
         }
 
     except Exception as e:

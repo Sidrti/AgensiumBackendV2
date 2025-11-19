@@ -198,6 +198,94 @@ def execute_quarantine_agent(
         quarantine_data["executive_summary"] = executive_summary
         quarantine_data["ai_analysis_text"] = ai_analysis_text
         
+        # ==================== GENERATE ROW-LEVEL-ISSUES ====================
+        row_level_issues = []
+        
+        # Extract row-level issues from quarantine analysis
+        for issue in quarantine_analysis.get("quarantine_issues", [])[:500]:
+            row_level_issues.append({
+                "row_index": int(issue.get("row_index", 0)),
+                "column": issue.get("column", "unknown"),
+                "issue_type": "quarantine_flagged" if issue.get("issue_type") == "corrupted_record" else issue.get("issue_type", "data_anomaly"),
+                "severity": issue.get("severity", "high"),
+                "message": issue.get("description", "Data quality issue detected"),
+                "value": None,
+                "detection_method": issue.get("issue_type", "unknown")
+            })
+        
+        # Add rows with multiple issues as "suspicious_row" indicators
+        row_issue_counts = {}
+        for issue in row_level_issues:
+            row_idx = issue["row_index"]
+            row_issue_counts[row_idx] = row_issue_counts.get(row_idx, 0) + 1
+        
+        # Identify suspicious rows (multiple issues in single row)
+        for row_idx, count in row_issue_counts.items():
+            if count >= 2 and len(row_level_issues) < 1000:
+                row_level_issues.append({
+                    "row_index": int(row_idx),
+                    "column": "global",
+                    "issue_type": "suspicious_row",
+                    "severity": "critical" if count >= 3 else "warning",
+                    "message": f"Row {row_idx} has {count} quality issues detected - suspicious data pattern",
+                    "value": None,
+                    "issue_count": count
+                })
+        
+        # Add severity-based flagging for system-level concerns
+        critical_issue_count = severity_breakdown.get("critical", 0)
+        if critical_issue_count > 0 and len(row_level_issues) < 1000:
+            row_level_issues.append({
+                "row_index": 0,  # System-level indicator
+                "column": "global",
+                "issue_type": "high_risk_flag",
+                "severity": "critical",
+                "message": f"Dataset contains {critical_issue_count} critical-severity quarantine issues - data integrity at risk",
+                "value": None,
+                "critical_issue_count": critical_issue_count
+            })
+        
+        # Add data quality anomaly for rows in quarantine zone
+        if len(quarantined_data) > 0:
+            for idx in quarantined_data.index[:100]:
+                reason = quarantined_data.loc[idx, "_quarantine_reason"] if "_quarantine_reason" in quarantined_data.columns else "Data quality anomaly"
+                row_level_issues.append({
+                    "row_index": int(idx),
+                    "column": "global",
+                    "issue_type": "data_anomaly",
+                    "severity": "critical",
+                    "message": f"Row flagged for quarantine: {reason}",
+                    "value": None,
+                    "quarantined": True
+                })
+        
+        # Cap at 1000 issues
+        row_level_issues = row_level_issues[:1000]
+        
+        # Calculate row-level-issues summary
+        issue_summary = {
+            "total_issues": len(row_level_issues),
+            "by_type": {},
+            "by_severity": {
+                "critical": 0,
+                "warning": 0,
+                "info": 0
+            },
+            "affected_rows": len(set(issue["row_index"] for issue in row_level_issues if issue["row_index"] != 0)),
+            "affected_columns": list(set(issue["column"] for issue in row_level_issues))
+        }
+        
+        for issue in row_level_issues:
+            issue_type = issue.get("issue_type", "data_anomaly")
+            severity = issue.get("severity", "info")
+            
+            if issue_type not in issue_summary["by_type"]:
+                issue_summary["by_type"][issue_type] = 0
+            issue_summary["by_type"][issue_type] += 1
+            
+            if severity in issue_summary["by_severity"]:
+                issue_summary["by_severity"][severity] += 1
+        
         # ==================== GENERATE ALERTS ====================
         alerts = []
         
@@ -460,7 +548,9 @@ def execute_quarantine_agent(
                 "content": quarantine_file_base64,
                 "size_bytes": len(quarantine_file_bytes),
                 "format": filename.split('.')[-1].lower()
-            }
+            },
+            "row_level_issues": row_level_issues,
+            "issue_summary": issue_summary
         }
 
     except Exception as e:
