@@ -10,14 +10,14 @@
     "available_agents": [
       "cleanse-previewer",
       "quarantine-agent",
+      "type-fixer",
+      "field-standardization",
+      "duplicate-resolver",
       "null-handler",
       "outlier-remover",
-      "type-fixer",
-      "duplicate-resolver",
-      "field-standardization",
-      "cleanse-writeback",
       "governance-checker",
-      "test-coverage-agent"
+      "test-coverage-agent",
+      "cleanse-writeback"
     ],
     "files": {
       "primary": {
@@ -288,6 +288,357 @@
         }
       }
     },
+    "type-fixer": {
+      "id": "type-fixer",
+      "name": "Type Fixer",
+      "description": "Detects and fixes data type inconsistencies in columns. Analyzes column types and applies configurable type conversion strategies to ensure proper data types (numeric, integer, datetime, string, category).",
+      "icon": "🔤",
+      "category": "Data Cleaning",
+      "accuracy": "96%",
+      "features": [
+        "Type Detection",
+        "Type Mismatch Analysis",
+        "Automatic Type Conversion",
+        "Quality Scoring"
+      ],
+      "input": { "type": "CSV, JSON, XLSX" },
+      "version": "1.0.0",
+      "required_files": ["primary"],
+      "parameters": {
+        "auto_convert_numeric": {
+          "type": "boolean",
+          "description": "Automatically convert to numeric type",
+          "default": true
+        },
+        "auto_convert_datetime": {
+          "type": "boolean",
+          "description": "Automatically convert to datetime type",
+          "default": true
+        },
+        "auto_convert_category": {
+          "type": "boolean",
+          "description": "Automatically convert to category type",
+          "default": true
+        },
+        "preserve_mixed_types": {
+          "type": "boolean",
+          "description": "Keep columns with mixed types as object",
+          "default": false
+        },
+        "type_reduction_weight": {
+          "type": "float",
+          "description": "Weight for type issue reduction in scoring",
+          "default": 0.5,
+          "min": 0,
+          "max": 1
+        },
+        "data_retention_weight": {
+          "type": "float",
+          "description": "Weight for data retention in scoring",
+          "default": 0.3,
+          "min": 0,
+          "max": 1
+        },
+        "column_retention_weight": {
+          "type": "float",
+          "description": "Weight for column retention in scoring",
+          "default": 0.2,
+          "min": 0,
+          "max": 1
+        },
+        "excellent_threshold": {
+          "type": "integer",
+          "description": "Score threshold for excellent quality",
+          "default": 90,
+          "min": 0,
+          "max": 100
+        },
+        "good_threshold": {
+          "type": "integer",
+          "description": "Score threshold for good quality",
+          "default": 75,
+          "min": 0,
+          "max": 100
+        }
+      },
+      "output_structure": {
+        "agent_id": "string",
+        "agent_name": "string",
+        "status": "string",
+        "execution_time_ms": "integer",
+        "summary_metrics": {
+          "total_rows_processed": "integer",
+          "type_issues_fixed": "integer",
+          "original_type_issues": "integer",
+          "remaining_type_issues": "integer",
+          "total_issues": "integer"
+        },
+        "data": {
+          "fixing_score": "object",
+          "type_analysis": "object",
+          "fix_log": "array",
+          "summary": "string",
+          "row_level_issues": "array"
+        }
+      }
+    },
+    "field-standardization": {
+      "id": "field-standardization",
+      "name": "Field Standardization",
+      "description": "Standardizes field values across datasets with comprehensive normalization strategies. Handles case normalization, whitespace trimming, synonym replacement, and unit alignment to ensure data consistency and uniformity.",
+      "icon": "✨",
+      "category": "Data Cleaning",
+      "accuracy": "98%",
+      "features": [
+        "Case Normalization (lowercase, uppercase, titlecase)",
+        "Whitespace Trimming & Internal Spacing Normalization",
+        "Synonym Replacement",
+        "Unit Alignment & Conversion",
+        "Column-Specific Standardization"
+      ],
+      "input": { "type": "CSV, JSON, XLSX" },
+      "version": "1.0.0",
+      "required_files": ["primary"],
+      "parameters": {
+        "case_strategy": {
+          "type": "string",
+          "description": "Case normalization strategy to apply",
+          "default": "lowercase",
+          "allowed": ["lowercase", "uppercase", "titlecase", "none"]
+        },
+        "trim_whitespace": {
+          "type": "boolean",
+          "description": "Remove leading and trailing whitespace",
+          "default": true
+        },
+        "normalize_internal_spacing": {
+          "type": "boolean",
+          "description": "Normalize internal spacing (collapse multiple spaces to single space)",
+          "default": true
+        },
+        "apply_synonyms": {
+          "type": "boolean",
+          "description": "Apply synonym replacement mappings",
+          "default": true
+        },
+        "synonym_mappings": {
+          "type": "object",
+          "description": "Column-specific synonym mappings (column -> {synonym -> standard_value}). Example: {'address': {'St.': 'Street', 'Ave.': 'Avenue', 'Rd.': 'Road'}}",
+          "default": {}
+        },
+        "unit_standardization": {
+          "type": "boolean",
+          "description": "Apply unit conversion and standardization",
+          "default": false
+        },
+        "unit_mappings": {
+          "type": "object",
+          "description": "Column-specific unit conversion mappings (column -> {unit_pattern -> {factor: number, target_unit: string}}). Example: {'height': {'ft': {'factor': 12, 'target_unit': 'inches'}}}",
+          "default": {}
+        },
+        "target_columns": {
+          "type": "array",
+          "description": "Specific columns to standardize (all columns if empty)",
+          "default": [],
+          "items": "string"
+        },
+        "preserve_columns": {
+          "type": "array",
+          "description": "Columns to exclude from standardization",
+          "default": [],
+          "items": "string"
+        },
+        "standardization_effectiveness_weight": {
+          "type": "float",
+          "description": "Weight for standardization effectiveness in scoring",
+          "default": 0.5,
+          "min": 0,
+          "max": 1
+        },
+        "data_retention_weight": {
+          "type": "float",
+          "description": "Weight for data retention in scoring",
+          "default": 0.3,
+          "min": 0,
+          "max": 1
+        },
+        "column_retention_weight": {
+          "type": "float",
+          "description": "Weight for column retention in scoring",
+          "default": 0.2,
+          "min": 0,
+          "max": 1
+        },
+        "excellent_threshold": {
+          "type": "integer",
+          "description": "Score threshold for excellent quality",
+          "default": 90,
+          "min": 0,
+          "max": 100
+        },
+        "good_threshold": {
+          "type": "integer",
+          "description": "Score threshold for good quality",
+          "default": 75,
+          "min": 0,
+          "max": 100
+        }
+      },
+      "output_structure": {
+        "agent_id": "string",
+        "agent_name": "string",
+        "status": "string",
+        "execution_time_ms": "integer",
+        "summary_metrics": {
+          "total_rows_processed": "integer",
+          "columns_standardized": "integer",
+          "values_changed": "integer",
+          "variations_reduced": "integer",
+          "total_issues": "integer"
+        },
+        "data": {
+          "standardization_score": "object",
+          "quality_status": "string",
+          "standardization_analysis": "object",
+          "standardization_log": "array",
+          "summary": "string",
+          "row_level_issues": "array"
+        },
+        "cleaned_file": {
+          "filename": "string",
+          "content": "string (base64)",
+          "size_bytes": "integer",
+          "format": "string"
+        }
+      }
+    },
+    "duplicate-resolver": {
+      "id": "duplicate-resolver",
+      "name": "Duplicate Resolver",
+      "description": "Detects and resolves duplicate records with comprehensive duplicate detection strategies. Handles exact duplicates, case/whitespace variations, email case-insensitivity, missing value duplicates, and conflicting duplicates with configurable merge strategies.",
+      "icon": "🔗",
+      "category": "Data Cleaning",
+      "accuracy": "99%",
+      "features": [
+        "Exact Duplicate Detection",
+        "Case & Whitespace Normalization",
+        "Email Case-Insensitivity",
+        "Missing Value Handling",
+        "Conflicting Duplicate Detection",
+        "Smart Merge Strategies"
+      ],
+      "input": { "type": "CSV, JSON, XLSX" },
+      "version": "1.0.0",
+      "required_files": ["primary"],
+      "parameters": {
+        "detection_types": {
+          "type": "array",
+          "description": "Types of duplicates to detect (exact, case_variations, email_case, missing_values, conflicting)",
+          "default": [
+            "exact",
+            "case_variations",
+            "email_case",
+            "missing_values",
+            "conflicting"
+          ],
+          "items": "string",
+          "allowed": [
+            "exact",
+            "case_variations",
+            "email_case",
+            "missing_values",
+            "conflicting"
+          ]
+        },
+        "merge_strategy": {
+          "type": "string",
+          "description": "Strategy for handling duplicates",
+          "default": "remove_duplicates",
+          "allowed": ["remove_duplicates", "merge_smart"]
+        },
+        "email_columns": {
+          "type": "array",
+          "description": "Column names containing email addresses (auto-detected if empty)",
+          "default": [],
+          "items": "string"
+        },
+        "key_columns": {
+          "type": "array",
+          "description": "Columns to use as deduplication key (all columns if empty)",
+          "default": [],
+          "items": "string"
+        },
+        "null_handling": {
+          "type": "string",
+          "description": "How to handle null values in duplicate detection",
+          "default": "ignore_nulls",
+          "allowed": ["ignore_nulls", "match_nulls"]
+        },
+        "conflict_resolution": {
+          "type": "string",
+          "description": "Strategy for resolving conflicting duplicate values",
+          "default": "keep_first",
+          "allowed": ["keep_first", "keep_last", "merge_smart"]
+        },
+        "dedup_reduction_weight": {
+          "type": "float",
+          "description": "Weight for deduplication effectiveness in scoring",
+          "default": 0.5,
+          "min": 0,
+          "max": 1
+        },
+        "data_retention_weight": {
+          "type": "float",
+          "description": "Weight for data retention in scoring",
+          "default": 0.3,
+          "min": 0,
+          "max": 1
+        },
+        "column_retention_weight": {
+          "type": "float",
+          "description": "Weight for column retention in scoring",
+          "default": 0.2,
+          "min": 0,
+          "max": 1
+        },
+        "excellent_threshold": {
+          "type": "integer",
+          "description": "Score threshold for excellent quality",
+          "default": 90,
+          "min": 0,
+          "max": 100
+        },
+        "good_threshold": {
+          "type": "integer",
+          "description": "Score threshold for good quality",
+          "default": 75,
+          "min": 0,
+          "max": 100
+        }
+      },
+      "output_structure": {
+        "agent_id": "string",
+        "agent_name": "string",
+        "status": "string",
+        "execution_time_ms": "integer",
+        "summary_metrics": {
+          "total_rows_processed": "integer",
+          "duplicates_detected": "integer",
+          "duplicates_resolved": "integer",
+          "remaining_rows": "integer",
+          "rows_removed": "integer",
+          "total_issues": "integer"
+        },
+        "data": {
+          "dedup_score": "object",
+          "quality_status": "string",
+          "duplicate_analysis": "object",
+          "resolution_log": "array",
+          "summary": "string",
+          "row_level_issues": "array"
+        }
+      }
+    },
     "null-handler": {
       "id": "null-handler",
       "name": "Null Handler",
@@ -499,485 +850,6 @@
         }
       }
     },
-    "type-fixer": {
-      "id": "type-fixer",
-      "name": "Type Fixer",
-      "description": "Detects and fixes data type inconsistencies in columns. Analyzes column types and applies configurable type conversion strategies to ensure proper data types (numeric, integer, datetime, string, category).",
-      "icon": "🔤",
-      "category": "Data Cleaning",
-      "accuracy": "96%",
-      "features": [
-        "Type Detection",
-        "Type Mismatch Analysis",
-        "Automatic Type Conversion",
-        "Quality Scoring"
-      ],
-      "input": { "type": "CSV, JSON, XLSX" },
-      "version": "1.0.0",
-      "required_files": ["primary"],
-      "parameters": {
-        "auto_convert_numeric": {
-          "type": "boolean",
-          "description": "Automatically convert to numeric type",
-          "default": true
-        },
-        "auto_convert_datetime": {
-          "type": "boolean",
-          "description": "Automatically convert to datetime type",
-          "default": true
-        },
-        "auto_convert_category": {
-          "type": "boolean",
-          "description": "Automatically convert to category type",
-          "default": true
-        },
-        "preserve_mixed_types": {
-          "type": "boolean",
-          "description": "Keep columns with mixed types as object",
-          "default": false
-        },
-        "type_reduction_weight": {
-          "type": "float",
-          "description": "Weight for type issue reduction in scoring",
-          "default": 0.5,
-          "min": 0,
-          "max": 1
-        },
-        "data_retention_weight": {
-          "type": "float",
-          "description": "Weight for data retention in scoring",
-          "default": 0.3,
-          "min": 0,
-          "max": 1
-        },
-        "column_retention_weight": {
-          "type": "float",
-          "description": "Weight for column retention in scoring",
-          "default": 0.2,
-          "min": 0,
-          "max": 1
-        },
-        "excellent_threshold": {
-          "type": "integer",
-          "description": "Score threshold for excellent quality",
-          "default": 90,
-          "min": 0,
-          "max": 100
-        },
-        "good_threshold": {
-          "type": "integer",
-          "description": "Score threshold for good quality",
-          "default": 75,
-          "min": 0,
-          "max": 100
-        }
-      },
-      "output_structure": {
-        "agent_id": "string",
-        "agent_name": "string",
-        "status": "string",
-        "execution_time_ms": "integer",
-        "summary_metrics": {
-          "total_rows_processed": "integer",
-          "type_issues_fixed": "integer",
-          "original_type_issues": "integer",
-          "remaining_type_issues": "integer",
-          "total_issues": "integer"
-        },
-        "data": {
-          "fixing_score": "object",
-          "type_analysis": "object",
-          "fix_log": "array",
-          "summary": "string",
-          "row_level_issues": "array"
-        }
-      }
-    },
-    "duplicate-resolver": {
-      "id": "duplicate-resolver",
-      "name": "Duplicate Resolver",
-      "description": "Detects and resolves duplicate records with comprehensive duplicate detection strategies. Handles exact duplicates, case/whitespace variations, email case-insensitivity, missing value duplicates, and conflicting duplicates with configurable merge strategies.",
-      "icon": "🔗",
-      "category": "Data Cleaning",
-      "accuracy": "99%",
-      "features": [
-        "Exact Duplicate Detection",
-        "Case & Whitespace Normalization",
-        "Email Case-Insensitivity",
-        "Missing Value Handling",
-        "Conflicting Duplicate Detection",
-        "Smart Merge Strategies"
-      ],
-      "input": { "type": "CSV, JSON, XLSX" },
-      "version": "1.0.0",
-      "required_files": ["primary"],
-      "parameters": {
-        "detection_types": {
-          "type": "array",
-          "description": "Types of duplicates to detect (exact, case_variations, email_case, missing_values, conflicting)",
-          "default": [
-            "exact",
-            "case_variations",
-            "email_case",
-            "missing_values",
-            "conflicting"
-          ],
-          "items": "string",
-          "allowed": [
-            "exact",
-            "case_variations",
-            "email_case",
-            "missing_values",
-            "conflicting"
-          ]
-        },
-        "merge_strategy": {
-          "type": "string",
-          "description": "Strategy for handling duplicates",
-          "default": "remove_duplicates",
-          "allowed": ["remove_duplicates", "merge_smart"]
-        },
-        "email_columns": {
-          "type": "array",
-          "description": "Column names containing email addresses (auto-detected if empty)",
-          "default": [],
-          "items": "string"
-        },
-        "key_columns": {
-          "type": "array",
-          "description": "Columns to use as deduplication key (all columns if empty)",
-          "default": [],
-          "items": "string"
-        },
-        "null_handling": {
-          "type": "string",
-          "description": "How to handle null values in duplicate detection",
-          "default": "ignore_nulls",
-          "allowed": ["ignore_nulls", "match_nulls"]
-        },
-        "conflict_resolution": {
-          "type": "string",
-          "description": "Strategy for resolving conflicting duplicate values",
-          "default": "keep_first",
-          "allowed": ["keep_first", "keep_last", "merge_smart"]
-        },
-        "dedup_reduction_weight": {
-          "type": "float",
-          "description": "Weight for deduplication effectiveness in scoring",
-          "default": 0.5,
-          "min": 0,
-          "max": 1
-        },
-        "data_retention_weight": {
-          "type": "float",
-          "description": "Weight for data retention in scoring",
-          "default": 0.3,
-          "min": 0,
-          "max": 1
-        },
-        "column_retention_weight": {
-          "type": "float",
-          "description": "Weight for column retention in scoring",
-          "default": 0.2,
-          "min": 0,
-          "max": 1
-        },
-        "excellent_threshold": {
-          "type": "integer",
-          "description": "Score threshold for excellent quality",
-          "default": 90,
-          "min": 0,
-          "max": 100
-        },
-        "good_threshold": {
-          "type": "integer",
-          "description": "Score threshold for good quality",
-          "default": 75,
-          "min": 0,
-          "max": 100
-        }
-      },
-      "output_structure": {
-        "agent_id": "string",
-        "agent_name": "string",
-        "status": "string",
-        "execution_time_ms": "integer",
-        "summary_metrics": {
-          "total_rows_processed": "integer",
-          "duplicates_detected": "integer",
-          "duplicates_resolved": "integer",
-          "remaining_rows": "integer",
-          "rows_removed": "integer",
-          "total_issues": "integer"
-        },
-        "data": {
-          "dedup_score": "object",
-          "quality_status": "string",
-          "duplicate_analysis": "object",
-          "resolution_log": "array",
-          "summary": "string",
-          "row_level_issues": "array"
-        }
-      }
-    },
-    "field-standardization": {
-      "id": "field-standardization",
-      "name": "Field Standardization",
-      "description": "Standardizes field values across datasets with comprehensive normalization strategies. Handles case normalization, whitespace trimming, synonym replacement, and unit alignment to ensure data consistency and uniformity.",
-      "icon": "✨",
-      "category": "Data Cleaning",
-      "accuracy": "98%",
-      "features": [
-        "Case Normalization (lowercase, uppercase, titlecase)",
-        "Whitespace Trimming & Internal Spacing Normalization",
-        "Synonym Replacement",
-        "Unit Alignment & Conversion",
-        "Column-Specific Standardization"
-      ],
-      "input": { "type": "CSV, JSON, XLSX" },
-      "version": "1.0.0",
-      "required_files": ["primary"],
-      "parameters": {
-        "case_strategy": {
-          "type": "string",
-          "description": "Case normalization strategy to apply",
-          "default": "lowercase",
-          "allowed": ["lowercase", "uppercase", "titlecase", "none"]
-        },
-        "trim_whitespace": {
-          "type": "boolean",
-          "description": "Remove leading and trailing whitespace",
-          "default": true
-        },
-        "normalize_internal_spacing": {
-          "type": "boolean",
-          "description": "Normalize internal spacing (collapse multiple spaces to single space)",
-          "default": true
-        },
-        "apply_synonyms": {
-          "type": "boolean",
-          "description": "Apply synonym replacement mappings",
-          "default": true
-        },
-        "synonym_mappings": {
-          "type": "object",
-          "description": "Column-specific synonym mappings (column -> {synonym -> standard_value}). Example: {'address': {'St.': 'Street', 'Ave.': 'Avenue', 'Rd.': 'Road'}}",
-          "default": {}
-        },
-        "unit_standardization": {
-          "type": "boolean",
-          "description": "Apply unit conversion and standardization",
-          "default": false
-        },
-        "unit_mappings": {
-          "type": "object",
-          "description": "Column-specific unit conversion mappings (column -> {unit_pattern -> {factor: number, target_unit: string}}). Example: {'height': {'ft': {'factor': 12, 'target_unit': 'inches'}}}",
-          "default": {}
-        },
-        "target_columns": {
-          "type": "array",
-          "description": "Specific columns to standardize (all columns if empty)",
-          "default": [],
-          "items": "string"
-        },
-        "preserve_columns": {
-          "type": "array",
-          "description": "Columns to exclude from standardization",
-          "default": [],
-          "items": "string"
-        },
-        "standardization_effectiveness_weight": {
-          "type": "float",
-          "description": "Weight for standardization effectiveness in scoring",
-          "default": 0.5,
-          "min": 0,
-          "max": 1
-        },
-        "data_retention_weight": {
-          "type": "float",
-          "description": "Weight for data retention in scoring",
-          "default": 0.3,
-          "min": 0,
-          "max": 1
-        },
-        "column_retention_weight": {
-          "type": "float",
-          "description": "Weight for column retention in scoring",
-          "default": 0.2,
-          "min": 0,
-          "max": 1
-        },
-        "excellent_threshold": {
-          "type": "integer",
-          "description": "Score threshold for excellent quality",
-          "default": 90,
-          "min": 0,
-          "max": 100
-        },
-        "good_threshold": {
-          "type": "integer",
-          "description": "Score threshold for good quality",
-          "default": 75,
-          "min": 0,
-          "max": 100
-        }
-      },
-      "output_structure": {
-        "agent_id": "string",
-        "agent_name": "string",
-        "status": "string",
-        "execution_time_ms": "integer",
-        "summary_metrics": {
-          "total_rows_processed": "integer",
-          "columns_standardized": "integer",
-          "values_changed": "integer",
-          "variations_reduced": "integer",
-          "total_issues": "integer"
-        },
-        "data": {
-          "standardization_score": "object",
-          "quality_status": "string",
-          "standardization_analysis": "object",
-          "standardization_log": "array",
-          "summary": "string",
-          "row_level_issues": "array"
-        },
-        "cleaned_file": {
-          "filename": "string",
-          "content": "string (base64)",
-          "size_bytes": "integer",
-          "format": "string"
-        }
-      }
-    },
-    "cleanse-writeback": {
-      "id": "cleanse-writeback",
-      "name": "Cleanse Writeback",
-      "description": "Final quality assurance and documentation step that guarantees the dataset leaving the 'Cleanse My Data' tool is not only fixed but also perfectly documented and ready for the next tool. Performs integrity verification, finalizes comprehensive manifest of all cleaning operations, and packages data with complete audit log for chain integrity and auditability.",
-      "icon": "✅",
-      "category": "Data Quality Assurance",
-      "accuracy": "99%",
-      "features": [
-        "Integrity Verification",
-        "Manifest Finalization",
-        "Comprehensive Audit Log",
-        "Data Packaging",
-        "Chain Integrity Enforcement",
-        "Lineage Documentation"
-      ],
-      "input": { "type": "CSV, JSON, XLSX (cleaned data)" },
-      "version": "1.0.0",
-      "required_files": ["primary"],
-      "parameters": {
-        "verify_numeric_types": {
-          "type": "boolean",
-          "description": "Verify that numeric columns are truly numeric after cleaning",
-          "default": true
-        },
-        "verify_datetime_types": {
-          "type": "boolean",
-          "description": "Verify that datetime columns are properly formatted",
-          "default": true
-        },
-        "verify_no_new_nulls": {
-          "type": "boolean",
-          "description": "Verify that cleaning operations did not introduce new nulls",
-          "default": true
-        },
-        "verify_no_duplicates": {
-          "type": "boolean",
-          "description": "Verify that no duplicate rows were introduced during cleaning",
-          "default": true
-        },
-        "verify_data_retention": {
-          "type": "boolean",
-          "description": "Verify that data retention is within acceptable limits",
-          "default": true
-        },
-        "generate_comprehensive_manifest": {
-          "type": "boolean",
-          "description": "Generate comprehensive cleansing manifest with all agent actions",
-          "default": true
-        },
-        "include_transformation_summary": {
-          "type": "boolean",
-          "description": "Include high-level transformation summary in manifest",
-          "default": true
-        },
-        "agent_manifests": {
-          "type": "object",
-          "description": "Dictionary of agent_id -> agent output for manifest aggregation",
-          "default": {}
-        },
-        "original_row_count": {
-          "type": "integer",
-          "description": "Original row count before cleaning (for retention verification)",
-          "default": null
-        },
-        "original_column_count": {
-          "type": "integer",
-          "description": "Original column count before cleaning (for retention verification)",
-          "default": null
-        },
-        "integrity_weight": {
-          "type": "float",
-          "description": "Weight for integrity verification in scoring",
-          "default": 0.4,
-          "min": 0,
-          "max": 1
-        },
-        "completeness_weight": {
-          "type": "float",
-          "description": "Weight for manifest completeness in scoring",
-          "default": 0.3,
-          "min": 0,
-          "max": 1
-        },
-        "auditability_weight": {
-          "type": "float",
-          "description": "Weight for auditability in scoring",
-          "default": 0.3,
-          "min": 0,
-          "max": 1
-        },
-        "excellent_threshold": {
-          "type": "integer",
-          "description": "Score threshold for excellent quality",
-          "default": 95,
-          "min": 0,
-          "max": 100
-        },
-        "good_threshold": {
-          "type": "integer",
-          "description": "Score threshold for good quality",
-          "default": 85,
-          "min": 0,
-          "max": 100
-        }
-      },
-      "output_structure": {
-        "agent_id": "string",
-        "agent_name": "string",
-        "status": "string",
-        "execution_time_ms": "integer",
-        "summary_metrics": {
-          "total_rows_verified": "integer",
-          "total_columns_verified": "integer",
-          "integrity_checks_passed": "integer",
-          "integrity_checks_failed": "integer",
-          "agents_in_manifest": "integer",
-          "data_ready_for_pipeline": "boolean",
-          "total_transformations_logged": "integer"
-        },
-        "data": {
-          "writeback_score": "object",
-          "quality_status": "string",
-          "writeback_analysis": "object",
-          "summary": "string",
-          "integrity_issues": "array"
-        }
-      }
-    },
     "governance-checker": {
       "id": "governance-checker",
       "name": "Governance Checker",
@@ -1157,6 +1029,134 @@
           "total_records": "integer",
           "fields_analyzed": "array",
           "test_coverage_issues": "array"
+        }
+      }
+    },
+    "cleanse-writeback": {
+      "id": "cleanse-writeback",
+      "name": "Cleanse Writeback",
+      "description": "Final quality assurance and documentation step that guarantees the dataset leaving the 'Cleanse My Data' tool is not only fixed but also perfectly documented and ready for the next tool. Performs integrity verification, finalizes comprehensive manifest of all cleaning operations, and packages data with complete audit log for chain integrity and auditability.",
+      "icon": "✅",
+      "category": "Data Quality Assurance",
+      "accuracy": "99%",
+      "features": [
+        "Integrity Verification",
+        "Manifest Finalization",
+        "Comprehensive Audit Log",
+        "Data Packaging",
+        "Chain Integrity Enforcement",
+        "Lineage Documentation"
+      ],
+      "input": { "type": "CSV, JSON, XLSX (cleaned data)" },
+      "version": "1.0.0",
+      "required_files": ["primary"],
+      "parameters": {
+        "verify_numeric_types": {
+          "type": "boolean",
+          "description": "Verify that numeric columns are truly numeric after cleaning",
+          "default": true
+        },
+        "verify_datetime_types": {
+          "type": "boolean",
+          "description": "Verify that datetime columns are properly formatted",
+          "default": true
+        },
+        "verify_no_new_nulls": {
+          "type": "boolean",
+          "description": "Verify that cleaning operations did not introduce new nulls",
+          "default": true
+        },
+        "verify_no_duplicates": {
+          "type": "boolean",
+          "description": "Verify that no duplicate rows were introduced during cleaning",
+          "default": true
+        },
+        "verify_data_retention": {
+          "type": "boolean",
+          "description": "Verify that data retention is within acceptable limits",
+          "default": true
+        },
+        "generate_comprehensive_manifest": {
+          "type": "boolean",
+          "description": "Generate comprehensive cleansing manifest with all agent actions",
+          "default": true
+        },
+        "include_transformation_summary": {
+          "type": "boolean",
+          "description": "Include high-level transformation summary in manifest",
+          "default": true
+        },
+        "agent_manifests": {
+          "type": "object",
+          "description": "Dictionary of agent_id -> agent output for manifest aggregation",
+          "default": {}
+        },
+        "original_row_count": {
+          "type": "integer",
+          "description": "Original row count before cleaning (for retention verification)",
+          "default": null
+        },
+        "original_column_count": {
+          "type": "integer",
+          "description": "Original column count before cleaning (for retention verification)",
+          "default": null
+        },
+        "integrity_weight": {
+          "type": "float",
+          "description": "Weight for integrity verification in scoring",
+          "default": 0.4,
+          "min": 0,
+          "max": 1
+        },
+        "completeness_weight": {
+          "type": "float",
+          "description": "Weight for manifest completeness in scoring",
+          "default": 0.3,
+          "min": 0,
+          "max": 1
+        },
+        "auditability_weight": {
+          "type": "float",
+          "description": "Weight for auditability in scoring",
+          "default": 0.3,
+          "min": 0,
+          "max": 1
+        },
+        "excellent_threshold": {
+          "type": "integer",
+          "description": "Score threshold for excellent quality",
+          "default": 95,
+          "min": 0,
+          "max": 100
+        },
+        "good_threshold": {
+          "type": "integer",
+          "description": "Score threshold for good quality",
+          "default": 85,
+          "min": 0,
+          "max": 100
+        }
+      },
+      "output_structure": {
+        "agent_id": "string",
+        "agent_name": "string",
+        "status": "string",
+        "execution_time_ms": "integer",
+        "summary_metrics": {
+          "total_rows_verified": "integer",
+          "total_columns_verified": "integer",
+          "integrity_checks_passed": "integer",
+          "integrity_checks_failed": "integer",
+          "agents_in_manifest": "integer",
+          "data_ready_for_pipeline": "boolean",
+          "total_transformations_logged": "integer"
+        },
+        "data": {
+          "writeback_score": "object",
+          "quality_status": "string",
+          "writeback_analysis": "object",
+          "summary": "string",
+          "integrity_issues": "array"
         }
       }
     }
