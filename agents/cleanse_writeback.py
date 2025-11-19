@@ -181,7 +181,24 @@ def execute_cleanse_writeback(
             "quality_status": quality_status,
             "writeback_analysis": writeback_analysis,
             "summary": f"Cleanse writeback completed. Quality: {quality_status}. Data ready: {integrity_results['all_checks_passed']}. Verified {len(df)} rows across {len(df.columns)} columns.",
-            "integrity_issues": _extract_integrity_issues(integrity_results)
+            "integrity_issues": _extract_integrity_issues(integrity_results),
+            "overrides": {
+                "verify_numeric_types": verify_numeric_types,
+                "verify_datetime_types": verify_datetime_types,
+                "verify_no_new_nulls": verify_no_new_nulls,
+                "verify_no_duplicates": verify_no_duplicates,
+                "verify_data_retention": verify_data_retention,
+                "generate_comprehensive_manifest": generate_comprehensive_manifest,
+                "include_transformation_summary": include_transformation_summary,
+                "agent_manifests": agent_manifests,
+                "original_row_count": original_row_count,
+                "original_column_count": original_column_count,
+                "integrity_weight": integrity_weight,
+                "completeness_weight": completeness_weight,
+                "auditability_weight": auditability_weight,
+                "excellent_threshold": excellent_threshold,
+                "good_threshold": good_threshold
+            }
         }
         
         # ==================== GENERATE EXECUTIVE SUMMARY ====================

@@ -779,7 +779,15 @@ def profile_data(
             },
             "data": {
                 "fields": field_profiles,
-                "quality_summary": quality_summary
+                "quality_summary": quality_summary,
+                "overrides": {
+                    "null_alert_threshold": null_alert_threshold,
+                    "categorical_threshold": categorical_threshold,
+                    "categorical_ratio_threshold": categorical_ratio_threshold,
+                    "top_n_values": top_n_values,
+                    "outlier_iqr_multiplier": outlier_iqr_multiplier,
+                    "outlier_alert_threshold": outlier_alert_threshold
+                }
             },
             "alerts": alerts,
             "issues": issues,

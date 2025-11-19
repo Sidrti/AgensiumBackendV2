@@ -160,7 +160,24 @@ def execute_quarantine_agent(
             "quarantine_analysis": quarantine_analysis,
             "quarantine_log": quarantine_log,
             "summary": f"Quarantine agent completed. Identified {len(quarantined_data)} problematic records. Quality: {quality_status}.",
-            "row_level_issues": _extract_row_level_issues(quarantined_data, quarantine_analysis)
+            "row_level_issues": _extract_row_level_issues(quarantined_data, quarantine_analysis),
+            "overrides": {
+                "detect_missing_fields": detect_missing_fields,
+                "detect_type_mismatches": detect_type_mismatches,
+                "detect_out_of_range": detect_out_of_range,
+                "detect_invalid_formats": detect_invalid_formats,
+                "detect_broken_records": detect_broken_records,
+                "detect_schema_mismatches": detect_schema_mismatches,
+                "required_fields": required_fields,
+                "range_constraints": range_constraints,
+                "format_constraints": format_constraints,
+                "expected_schema": expected_schema,
+                "quarantine_reduction_weight": quarantine_reduction_weight,
+                "data_integrity_weight": data_integrity_weight,
+                "processing_efficiency_weight": processing_efficiency_weight,
+                "excellent_threshold": excellent_threshold,
+                "good_threshold": good_threshold
+            }
         }
         
         # ==================== GENERATE EXECUTIVE SUMMARY ====================

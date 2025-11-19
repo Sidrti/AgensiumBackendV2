@@ -11,9 +11,9 @@
       "unified-profiler",
       "drift-detector",
       "score-risk",
-      "readiness-rater",
       "governance-checker",
-      "test-coverage-agent"
+      "test-coverage-agent",
+      "readiness-rater"
     ],
     "files": {
       "primary": {
@@ -266,78 +266,6 @@
         }
       }
     },
-    "readiness-rater": {
-      "id": "readiness-rater",
-      "name": "Readiness Rater",
-      "description": "Rates data readiness for analysis based on quality metrics. Evaluates completeness, consistency, and schema health to determine if data is production-ready.",
-      "icon": "✅",
-      "category": "Quality Assessment",
-      "accuracy": "98%",
-      "features": [
-        "Readiness Scoring",
-        "Quality Assessment",
-        "Completeness Check",
-        "Health Status"
-      ],
-      "input": { "type": "CSV, JSON, XLSX" },
-      "version": "1.0.0",
-      "required_files": ["primary"],
-      "parameters": {
-        "ready_threshold": {
-          "type": "integer",
-          "description": "Score threshold for 'READY' status (0-100)",
-          "default": 80,
-          "min": 0,
-          "max": 100
-        },
-        "needs_review_threshold": {
-          "type": "integer",
-          "description": "Score threshold for 'NEEDS_REVIEW' status (0-100)",
-          "default": 50,
-          "min": 0,
-          "max": 100
-        },
-        "completeness_weight": {
-          "type": "float",
-          "description": "Weight for completeness component",
-          "default": 0.3,
-          "min": 0,
-          "max": 1
-        },
-        "consistency_weight": {
-          "type": "float",
-          "description": "Weight for consistency component",
-          "default": 0.3,
-          "min": 0,
-          "max": 1
-        },
-        "schema_health_weight": {
-          "type": "float",
-          "description": "Weight for schema health component",
-          "default": 0.4,
-          "min": 0,
-          "max": 1
-        }
-      },
-      "output_structure": {
-        "agent_id": "string",
-        "agent_name": "string",
-        "status": "string",
-        "execution_time_ms": "integer",
-        "summary_metrics": {
-          "readiness_score": "number",
-          "readiness_status": "string",
-          "components_ready": "integer",
-          "components_needs_review": "integer",
-          "components_not_ready": "integer"
-        },
-        "data": {
-          "readiness_assessment": "object",
-          "component_scores": "array",
-          "deductions": "array"
-        }
-      }
-    },
     "governance-checker": {
       "id": "governance-checker",
       "name": "Governance Checker",
@@ -517,6 +445,78 @@
           "total_records": "integer",
           "fields_analyzed": "array",
           "test_coverage_issues": "array"
+        }
+      }
+    },
+    "readiness-rater": {
+      "id": "readiness-rater",
+      "name": "Readiness Rater",
+      "description": "Rates data readiness for analysis based on quality metrics. Evaluates completeness, consistency, and schema health to determine if data is production-ready.",
+      "icon": "✅",
+      "category": "Quality Assessment",
+      "accuracy": "98%",
+      "features": [
+        "Readiness Scoring",
+        "Quality Assessment",
+        "Completeness Check",
+        "Health Status"
+      ],
+      "input": { "type": "CSV, JSON, XLSX" },
+      "version": "1.0.0",
+      "required_files": ["primary"],
+      "parameters": {
+        "ready_threshold": {
+          "type": "integer",
+          "description": "Score threshold for 'READY' status (0-100)",
+          "default": 80,
+          "min": 0,
+          "max": 100
+        },
+        "needs_review_threshold": {
+          "type": "integer",
+          "description": "Score threshold for 'NEEDS_REVIEW' status (0-100)",
+          "default": 50,
+          "min": 0,
+          "max": 100
+        },
+        "completeness_weight": {
+          "type": "float",
+          "description": "Weight for completeness component",
+          "default": 0.3,
+          "min": 0,
+          "max": 1
+        },
+        "consistency_weight": {
+          "type": "float",
+          "description": "Weight for consistency component",
+          "default": 0.3,
+          "min": 0,
+          "max": 1
+        },
+        "schema_health_weight": {
+          "type": "float",
+          "description": "Weight for schema health component",
+          "default": 0.4,
+          "min": 0,
+          "max": 1
+        }
+      },
+      "output_structure": {
+        "agent_id": "string",
+        "agent_name": "string",
+        "status": "string",
+        "execution_time_ms": "integer",
+        "summary_metrics": {
+          "readiness_score": "number",
+          "readiness_status": "string",
+          "components_ready": "integer",
+          "components_needs_review": "integer",
+          "components_not_ready": "integer"
+        },
+        "data": {
+          "readiness_assessment": "object",
+          "component_scores": "array",
+          "deductions": "array"
         }
       }
     }

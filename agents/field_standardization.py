@@ -268,7 +268,23 @@ def execute_field_standardization(
             "standardization_log": standardization_log,
             "summary": f"Field standardization completed. Quality: {quality_status}. Processed {len(columns_to_process)} columns across {len(original_df)} rows.",
             "row_level_issues": row_level_issues[:100],  # Limit to first 100
-            "issue_summary": issue_summary
+            "issue_summary": issue_summary,
+            "overrides": {
+                "case_strategy": case_strategy,
+                "trim_whitespace": trim_whitespace,
+                "normalize_internal_spacing": normalize_internal_spacing,
+                "apply_synonyms": apply_synonyms,
+                "synonym_mappings": synonym_mappings,
+                "unit_standardization": unit_standardization,
+                "unit_mappings": unit_mappings,
+                "target_columns": target_columns,
+                "preserve_columns": preserve_columns,
+                "standardization_effectiveness_weight": standardization_effectiveness_weight,
+                "data_retention_weight": data_retention_weight,
+                "column_retention_weight": column_retention_weight,
+                "excellent_threshold": excellent_threshold,
+                "good_threshold": good_threshold
+            }
         }
         
         # ==================== GENERATE EXECUTIVE SUMMARY ====================
