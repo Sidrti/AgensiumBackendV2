@@ -110,6 +110,104 @@ def execute_type_fixer(
         # Identify type fixing issues
         type_issues = _identify_type_issues(original_df, df_fixed, type_analysis)
         
+        # Generate ROW-LEVEL-ISSUES
+        row_level_issues = []
+        
+        # Iterate through each column with type issues and mark affected rows
+        for col in type_analysis.get("columns_with_issues", []):
+            if col not in original_df.columns:
+                continue
+            
+            type_data = type_analysis.get("type_summary", {}).get(col, {})
+            current_type = type_data.get("current_type", "object")
+            suggested_type = type_data.get("suggested_type", current_type)
+            
+            # Iterate through rows to identify type violations
+            for row_idx, value in enumerate(original_df[col]):
+                if pd.isna(value):
+                    continue
+                
+                # Determine if row has type issue
+                has_type_issue = False
+                issue_type = "type_mismatch"
+                severity = "warning"
+                message = ""
+                
+                # Check for numeric-should-be type issues
+                if suggested_type == "numeric" and current_type == "object":
+                    if not _is_numeric_string(str(value)):
+                        has_type_issue = True
+                        issue_type = "type_mismatch"
+                        severity = "warning"
+                        message = f"Non-numeric value '{value}' found in column '{col}' that should contain numeric values"
+                
+                # Check for datetime-should-be type issues
+                elif suggested_type == "datetime" and current_type == "object":
+                    if not _is_date_string(str(value)):
+                        has_type_issue = True
+                        issue_type = "format_violation"
+                        severity = "warning"
+                        message = f"Non-datetime value '{value}' found in column '{col}' that should contain datetime values"
+                
+                # Check for float-should-be-integer issues
+                elif suggested_type == "integer" and current_type == "float64":
+                    try:
+                        if not float(value).is_integer():
+                            has_type_issue = True
+                            issue_type = "type_conflict"
+                            severity = "info"
+                            message = f"Float value '{value}' found in column '{col}' that contains only integers"
+                    except (ValueError, TypeError):
+                        pass
+                
+                # Check for mixed types in object columns
+                elif current_type == "object":
+                    type_check_results = []
+                    if _is_numeric_string(str(value)):
+                        type_check_results.append("numeric")
+                    if _is_date_string(str(value)):
+                        type_check_results.append("datetime")
+                    if len(type_check_results) > 1 or len(type_check_results) == 0:
+                        has_type_issue = True
+                        issue_type = "type_conflict"
+                        severity = "warning" if suggested_type != "string" else "info"
+                        detected_type = type_check_results[0] if type_check_results else "unknown"
+                        message = f"Mixed or ambiguous type in column '{col}' - value '{value}' type: {detected_type}"
+                
+                if has_type_issue and len(row_level_issues) < 1000:
+                    row_level_issues.append({
+                        "row_index": int(row_idx),
+                        "column": str(col),
+                        "issue_type": issue_type,
+                        "severity": severity,
+                        "message": message,
+                        "value": str(value),
+                        "current_type": str(current_type),
+                        "suggested_type": str(suggested_type)
+                    })
+        
+        # Cap at 1000 issues
+        row_level_issues = row_level_issues[:1000]
+        
+        # Calculate issue summary
+        issue_summary = {
+            "total_issues": len(row_level_issues),
+            "by_type": {},
+            "by_severity": {},
+            "affected_rows": len(set(issue["row_index"] for issue in row_level_issues)),
+            "affected_columns": sorted(list(set(issue["column"] for issue in row_level_issues)))
+        }
+        
+        # Aggregate by type
+        for issue in row_level_issues:
+            issue_type = issue.get("issue_type", "unknown")
+            issue_summary["by_type"][issue_type] = issue_summary["by_type"].get(issue_type, 0) + 1
+        
+        # Aggregate by severity
+        for issue in row_level_issues:
+            severity = issue.get("severity", "info")
+            issue_summary["by_severity"][severity] = issue_summary["by_severity"].get(severity, 0) + 1
+        
         # Build results
         type_fixing_data = {
             "fixing_score": fixing_score,
@@ -117,8 +215,276 @@ def execute_type_fixer(
             "type_analysis": type_analysis,
             "fix_log": fix_log,
             "summary": f"Type fixing completed. Quality: {quality_status}. Processed {len(original_df)} rows, fixed {len(fix_log)} type issues.",
-            "row_level_issues": type_issues[:100]  # Limit to first 100
+            "row_level_issues": row_level_issues[:100],  # Limit to first 100
+            "issue_summary": issue_summary
         }
+        
+        # ==================== GENERATE EXECUTIVE SUMMARY ====================
+        executive_summary = [{
+            "summary_id": "exec_type_fixing",
+            "title": "Type Fixing Status",
+            "value": f"{fixing_score['overall_score']:.1f}",
+            "status": "excellent" if quality_status == "excellent" else "good" if quality_status == "good" else "needs_improvement",
+            "description": f"Quality: {quality_status}, Issues Fixed: {len(fix_log)}, {len(type_analysis['columns_with_issues'])} columns had type issues, {fixing_score['metrics']['issue_reduction_rate']:.1f}% success rate"
+        }]
+        
+        # ==================== GENERATE AI ANALYSIS TEXT ====================
+        ai_analysis_parts = []
+        ai_analysis_parts.append(f"TYPE FIXER ANALYSIS:")
+        ai_analysis_parts.append(f"- Fixing Score: {fixing_score['overall_score']:.1f}/100 (Issue Reduction: {fixing_score['metrics']['issue_reduction_rate']:.1f}, Data Retention: {fixing_score['metrics']['data_retention_rate']:.1f}, Column Retention: {fixing_score['metrics']['column_retention_rate']:.1f})")
+        ai_analysis_parts.append(f"- Type Issues Fixed: {len(fix_log)} issues resolved across {len(type_analysis['columns_with_issues'])} columns, {fixing_score['metrics']['issue_reduction_rate']:.1f}% success rate")
+        
+        cols_with_issues = type_analysis['columns_with_issues']
+        ai_analysis_parts.append(f"- Columns Fixed: {', '.join(list(cols_with_issues)[:5])}{'...' if len(cols_with_issues) > 5 else ''}")
+        ai_analysis_parts.append(f"- Data Integrity: {fixing_score['metrics']['data_retention_rate']:.1f}% data integrity maintained after type conversions")
+        ai_analysis_parts.append(f"- Conversions Applied: {len(fix_log)} type conversions performed")
+        
+        if len(type_analysis.get('recommendations', [])) > 0:
+            ai_analysis_parts.append(f"- Top Recommendation: {type_analysis['recommendations'][0].get('recommendation', 'Review type conversion strategy')}")
+        
+        ai_analysis_text = "\n".join(ai_analysis_parts)
+        
+       
+        
+        # ==================== GENERATE ALERTS ====================
+        alerts = []
+        
+        # High type mismatch alert
+        if type_analysis['total_issues'] > len(df.columns) * 0.3:
+            alerts.append({
+                "alert_id": "alert_types_high_mismatches",
+                "severity": "critical",
+                "category": "type_integrity",
+                "message": f"High type mismatch rate: {type_analysis['total_issues']} issues across {len(cols_with_issues)} columns ({(type_analysis['total_issues']/len(df.columns)*100):.1f}% of columns)",
+                "affected_fields_count": len(cols_with_issues),
+                "recommendation": "Review data schema and implement strict type validation at data ingestion."
+            })
+        
+        # Failed conversions alert
+        failed_fixes = type_analysis['total_issues'] - len(fix_log)
+        if failed_fixes > 0:
+            alerts.append({
+                "alert_id": "alert_types_conversion_failures",
+                "severity": "high",
+                "category": "type_conversion",
+                "message": f"{failed_fixes} type conversion(s) failed out of {type_analysis['total_issues']} attempted",
+                "affected_fields_count": failed_fixes,
+                "recommendation": "Review failed conversions and implement data cleaning before type conversion."
+            })
+        
+        # Data integrity after conversion
+        if fixing_score['metrics']['data_retention_rate'] < 95:
+            alerts.append({
+                "alert_id": "alert_types_data_integrity",
+                "severity": "high",
+                "category": "data_integrity",
+                "message": f"Data integrity: {fixing_score['metrics']['data_retention_rate']:.1f}% after type conversions (below 95% threshold)",
+                "affected_fields_count": len(cols_with_issues),
+                "recommendation": "Validate type conversions did not corrupt data values. Review conversion logs for errors."
+            })
+        
+        # Quality score alert
+        if fixing_score["overall_score"] < good_threshold:
+            severity = "critical" if fixing_score["overall_score"] < 50 else "high" if fixing_score["overall_score"] < good_threshold else "medium"
+            alerts.append({
+                "alert_id": "alert_types_quality",
+                "severity": severity,
+                "category": "quality_score",
+                "message": f"Type fixing quality score: {fixing_score['overall_score']:.1f}/100 ({quality_status})",
+                "affected_fields_count": len(cols_with_issues),
+                "recommendation": "Optimize type conversion strategies and handle edge cases for better results."
+            })
+        
+        # Mixed type columns alert
+        mixed_type_cols = [col for col, data in type_analysis.get('type_summary', {}).items() 
+                          if 'mixed' in str(data.get('issues', [])).lower()]
+        if len(mixed_type_cols) > 0:
+            alerts.append({
+                "alert_id": "alert_types_mixed_columns",
+                "severity": "high",
+                "category": "type_consistency",
+                "message": f"{len(mixed_type_cols)} column(s) contain mixed data types requiring type coercion",
+                "affected_fields_count": len(mixed_type_cols),
+                "recommendation": "Standardize data types at source or implement strict type validation during data entry."
+            })
+        
+        # Precision loss alert
+        float_to_int_conversions = [log for log in fix_log if 'float' in log.lower() and 'integer' in log.lower()]
+        if len(float_to_int_conversions) > 0:
+            alerts.append({
+                "alert_id": "alert_types_precision_loss",
+                "severity": "medium",
+                "category": "data_integrity",
+                "message": f"{len(float_to_int_conversions)} conversion(s) from float to integer may result in precision loss",
+                "affected_fields_count": len(float_to_int_conversions),
+                "recommendation": "Verify that precision loss is acceptable for these columns or preserve as float."
+            })
+        
+        # No auto-conversion enabled alert
+        if not auto_convert_numeric and not auto_convert_datetime:
+            alerts.append({
+                "alert_id": "alert_types_no_auto_conversion",
+                "severity": "medium",
+                "category": "configuration",
+                "message": "Auto-conversion disabled for numeric and datetime types - manual type fixing required",
+                "affected_fields_count": type_analysis['total_issues'],
+                "recommendation": "Enable auto-conversion settings to automatically fix common type mismatches."
+            })
+        
+        # ==================== GENERATE ISSUES ====================
+        issues = []
+        
+        # Convert type issues to standardized format (column-level type mismatches)
+        for type_issue in type_issues[:100]:
+            issues.append({
+                "issue_id": f"issue_types_{type_issue.get('column', 'unknown')}_type_mismatch",
+                "agent_id": "type-fixer",
+                "field_name": type_issue.get('column', 'N/A'),
+                "issue_type": type_issue.get('issue_type', 'type_mismatch'),
+                "severity": type_issue.get('severity', 'warning'),
+                "message": type_issue.get('description', 'Type mismatch detected')
+            })
+        
+        # Add detailed column-leveldatatype issues
+        for col, type_data in type_analysis.get('type_summary', {}).items():
+            issues.append({
+                "issue_id": f"issue_types_column_{col}_type_issue",
+                "agent_id": "type-fixer",
+                "field_name": str(col),
+                "issue_type": "incorrect_datatype",
+                "severity": "high",
+                "message": f"Column '{col}' has type '{type_data.get('current_type')}' but should be '{type_data.get('suggested_type')}': {'; '.join(type_data.get('issues', []))}"
+            })
+        
+        # Add conversion failure issues
+        failed_conversions = [log for log in fix_log if 'error' in log.lower() or 'failed' in log.lower()]
+        for i, failure in enumerate(failed_conversions[:20]):
+            issues.append({
+                "issue_id": f"issue_types_conversion_failure_{i}",
+                "agent_id": "type-fixer",
+                "field_name": "multiple",
+                "issue_type": "conversion_failure",
+                "severity": "critical",
+                "message": f"Type conversion failed: {failure}"
+            })
+        
+        # Add data integrity issue if conversions caused data loss
+        if fixing_score['metrics']['data_retention_rate'] < 100:
+            issues.append({
+                "issue_id": "issue_types_data_loss",
+                "agent_id": "type-fixer",
+                "field_name": "dataset",
+                "issue_type": "data_retention",
+                "severity": "high",
+                "message": f"Data retention: {fixing_score['metrics']['data_retention_rate']:.1f}% - some rows lost during type conversions"
+            })
+        
+        # ==================== GENERATE RECOMMENDATIONS ====================
+        agent_recommendations = []
+        
+        # Recommendation 1: Schema validation
+        if type_analysis['total_issues'] > 0:
+            agent_recommendations.append({
+                "recommendation_id": "rec_types_schema_validation",
+                "agent_id": "type-fixer",
+                "field_name": "all",
+                "priority": "critical" if type_analysis['total_issues'] > len(df.columns) * 0.5 else "high",
+                "recommendation": f"Implement schema validation at data ingestion to prevent {type_analysis['total_issues']} type mismatches",
+                "timeline": "immediate" if type_analysis['total_issues'] > len(df.columns) * 0.5 else "1 week"
+            })
+        
+        # Recommendation 2: Column-specific fixes
+        for rec in type_analysis.get('recommendations', [])[:3]:
+            agent_recommendations.append({
+                "recommendation_id": f"rec_types_{rec.get('column', 'unknown')}",
+                "agent_id": "type-fixer",
+                "field_name": rec.get('column', 'N/A'),
+                "priority": rec.get('priority', 'medium'),
+                "recommendation": f"{rec.get('action', 'Review')}: {rec.get('reason', 'Fix type mismatch')}",
+                "timeline": "1 week" if rec.get('priority') == 'high' else "2 weeks"
+            })
+        
+        # Recommendation 3: Handle failed conversions
+        if failed_fixes > 0:
+            agent_recommendations.append({
+                "recommendation_id": "rec_types_failed_conversions",
+                "agent_id": "type-fixer",
+                "field_name": "multiple",
+                "priority": "high",
+                "recommendation": f"Review and fix {failed_fixes} failed type conversions with pre-cleaning or custom conversion logic",
+                "timeline": "1-2 weeks"
+            })
+        
+        # Recommendation 4: Auto-conversion settings
+        agent_recommendations.append({
+            "recommendation_id": "rec_types_auto_conversion",
+            "agent_id": "type-fixer",
+            "field_name": "configuration",
+            "priority": "medium",
+            "recommendation": "Enable auto-conversion for numeric and datetime types to streamline type fixing process",
+            "timeline": "2 weeks"
+        })
+        
+        # Recommendation 5: Data validation
+        agent_recommendations.append({
+            "recommendation_id": "rec_types_validation",
+            "agent_id": "type-fixer",
+            "field_name": "all",
+            "priority": "medium",
+            "recommendation": "Add data validation rules to ensure converted values maintain semantic meaning",
+            "timeline": "2 weeks"
+        })
+        
+        # Recommendation 6: Type documentation
+        agent_recommendations.append({
+            "recommendation_id": "rec_types_documentation",
+            "agent_id": "type-fixer",
+            "field_name": "all",
+            "priority": "low",
+            "recommendation": "Document expected data types for each column to prevent future type mismatches",
+            "timeline": "3 weeks"
+        })
+        
+        # Recommendation 7: Mixed type handling
+        if len(mixed_type_cols) > 0:
+            agent_recommendations.append({
+                "recommendation_id": "rec_types_mixed_handling",
+                "agent_id": "type-fixer",
+                "field_name": ", ".join(mixed_type_cols[:3]),
+                "priority": "high",
+                "recommendation": f"Implement data cleaning for {len(mixed_type_cols)} mixed-type column(s) before type conversion",
+                "timeline": "1-2 weeks"
+            })
+        
+        # Recommendation 8: Schema enforcement
+        agent_recommendations.append({
+            "recommendation_id": "rec_types_schema_enforcement",
+            "agent_id": "type-fixer",
+            "field_name": "all",
+            "priority": "high",
+            "recommendation": "Implement database schema enforcement to prevent type mismatches at the storage layer",
+            "timeline": "2-3 weeks"
+        })
+        
+        # Recommendation 9: Monitoring
+        agent_recommendations.append({
+            "recommendation_id": "rec_types_monitoring",
+            "agent_id": "type-fixer",
+            "field_name": "all",
+            "priority": "low",
+            "recommendation": "Set up type consistency monitoring to detect type drift and conversion failures",
+            "timeline": "3 weeks"
+        })
+        
+        # Recommendation 10: Pre-processing pipeline
+        agent_recommendations.append({
+            "recommendation_id": "rec_types_preprocessing",
+            "agent_id": "type-fixer",
+            "field_name": "all",
+            "priority": "medium",
+            "recommendation": "Build pre-processing pipeline to clean and normalize data before type conversion attempts",
+            "timeline": "2-3 weeks"
+        })
 
         # Generate cleaned file (CSV format)
         cleaned_file_bytes = _generate_cleaned_file(df_fixed, filename)
@@ -137,6 +503,13 @@ def execute_type_fixer(
                 "total_issues": len(type_issues)
             },
             "data": type_fixing_data,
+            "alerts": alerts,
+            "issues": issues,
+            "recommendations": agent_recommendations,
+            "executive_summary" : executive_summary,
+            "ai_analysis_text" : ai_analysis_text,
+            "row_level_issues": row_level_issues,
+            "issue_summary": issue_summary,
             "cleaned_file": {
                 "filename": f"cleaned_{filename}",
                 "content": cleaned_file_base64,

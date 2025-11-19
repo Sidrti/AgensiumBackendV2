@@ -125,6 +125,7 @@ class CleanMyDataDownloads:
                     "content_base64": cleaned_file_data.get("content", ""),  # Already base64 encoded from agent
                     "size_bytes": cleaned_file_data.get("size_bytes", 0),
                     "creation_date": datetime.utcnow().isoformat() + "Z",
+                    "type": "cleaned_data",
                     "agent_id": agent_id
                 }
                 
@@ -146,6 +147,7 @@ class CleanMyDataDownloads:
                     "content_base64": quarantine_file.get("content", ""),
                     "size_bytes": quarantine_file.get("size_bytes", 0),
                     "creation_date": datetime.utcnow().isoformat() + "Z",
+                    "type": "cleaned_data",
                     "agent_id": "quarantine-agent",
                     "data_type": "quarantine_zone"
                 }
@@ -253,6 +255,7 @@ class CleanMyDataDownloads:
                 "content_base64": base64.b64encode(file_content).decode('utf-8'),
                 "size_bytes": len(file_content),
                 "creation_date": datetime.utcnow().isoformat() + "Z",
+                "type": "complete_report",
                 "sheets": ["Summary", "Cleanse Preview", "Null Handler", "Outlier Remover", "Type Fixer", "Quarantine", "Duplicates", "Field Standardization", "Cleanse Writeback", "Governance", "Test Coverage", "Alerts", "Issues", "Recommendations"]
             }
         except Exception as e:
@@ -1565,7 +1568,8 @@ class CleanMyDataDownloads:
                 "mimeType": "application/json",
                 "content_base64": base64.b64encode(json_bytes).decode('utf-8'),
                 "size_bytes": len(json_bytes),
-                "creation_date": datetime.utcnow().isoformat() + "Z"
+                "creation_date": datetime.utcnow().isoformat() + "Z",
+                "type": "complete_report"
             }
         except Exception as e:
             print(f"Error generating JSON report: {str(e)}")

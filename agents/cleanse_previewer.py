@@ -201,13 +201,330 @@ def execute_cleanse_previewer(
             "recommendations": recommendations
         }
         
+        # ==================== GENERATE ALERTS ====================
+        alerts = []
+        
+        # High-impact rules alert
+        if overall_impact_assessment["high_impact_rules"] > 0:
+            alerts.append({
+                "alert_id": "alert_preview_high_impact",
+                "severity": "critical" if not overall_impact_assessment["safe_to_execute"] else "high",
+                "category": "cleaning_impact",
+                "message": f"{overall_impact_assessment['high_impact_rules']} high-impact cleaning rule(s) detected. Safety: {preview_analysis['execution_safety']}",
+                "affected_fields_count": overall_impact_assessment["high_impact_rules"],
+                "recommendation": "Review high-impact rules before execution. Consider creating backups."
+            })
+        
+        # Safety alert
+        if not overall_impact_assessment["safe_to_execute"]:
+            alerts.append({
+                "alert_id": "alert_preview_unsafe",
+                "severity": "critical",
+                "category": "execution_safety",
+                "message": f"Execution safety: CAUTION - {len(overall_impact_assessment['warnings'])} warning(s) detected",
+                "affected_fields_count": len(overall_impact_assessment["warnings"]),
+                "recommendation": "Address warnings before executing cleaning operations. Risk of significant data loss or corruption."
+            })
+        
+        # Quality score alert
+        if preview_score["overall_score"] < 75:
+            alerts.append({
+                "alert_id": "alert_preview_quality",
+                "severity": "high" if preview_score["overall_score"] < 60 else "medium",
+                "category": "preview_quality",
+                "message": f"Preview quality score: {preview_score['overall_score']:.1f}/100 ({quality_status})",
+                "affected_fields_count": len(preview_rules),
+                "recommendation": "Review preview analysis results. Consider adjusting cleaning strategy."
+            })
+        
+        # Simulation failures alert
+        failed_simulations = preview_score["metrics"]["total_simulations"] - preview_score["metrics"]["successful_simulations"]
+        if failed_simulations > 0:
+            alerts.append({
+                "alert_id": "alert_preview_simulation_failures",
+                "severity": "high",
+                "category": "simulation_error",
+                "message": f"{failed_simulations} simulation(s) failed out of {preview_score['metrics']['total_simulations']} total",
+                "affected_fields_count": failed_simulations,
+                "recommendation": "Review and fix failed simulation rules before execution."
+            })
+
+        # Large memory change alert
+        memory_change = preview_analysis.get('original_profile', {}).get('memory_usage_mb', 0) - preview_analysis.get('simulated_results', [{}])[0].get('preview_metrics', {}).get('memory_mb', 0) if simulated_results else 0
+        # fallback: compute approximate memory change across first simulation
+        try:
+            memory_change = 0
+            if simulated_results:
+                memory_change = simulated_results[0].get('preview_metrics', {}).get('memory_mb', 0) - original_profile.get('memory_usage_mb', 0)
+        except:
+            memory_change = 0
+
+        if abs(memory_change) > 50:  # MB
+            alerts.append({
+                "alert_id": "alert_preview_memory_change",
+                "severity": "medium",
+                "category": "resource_impact",
+                "message": f"Significant memory change after simulation: {memory_change:.1f} MB (first simulated rule)",
+                "affected_fields_count": 1,
+                "recommendation": "Review transformations that add or remove large columns or expand data (e.g., exploding arrays). Consider sampling for full-run estimation."
+            })
+
+        # Low preview confidence alert
+        if preview_score["metrics"].get("successful_simulations", 0) < max(1, preview_score["metrics"].get("total_simulations", 0)) and preview_score["overall_score"] < 60:
+            alerts.append({
+                "alert_id": "alert_preview_low_confidence",
+                "severity": "high",
+                "category": "preview_confidence",
+                "message": f"Preview confidence low: score {preview_score['overall_score']:.1f}/100 with {preview_score['metrics'].get('successful_simulations',0)}/{preview_score['metrics'].get('total_simulations',0)} successful simulations",
+                "affected_fields_count": preview_score["metrics"].get("total_simulations", 0),
+                "recommendation": "Increase sampling, refine simulation rules, or run a staged test on a representative subset before full execution."
+            })
+        
+        # ==================== GENERATE ISSUES ====================
+        issues = []
+        
+        # Extract impact issues
+        impact_issues = _extract_impact_issues(simulated_results)
+        for impact_issue in impact_issues[:100]:
+            issues.append({
+                "issue_id": f"issue_preview_{impact_issue.get('rule_id', 'unknown')}_{impact_issue.get('issue_type', 'unknown')}",
+                "agent_id": "cleanse-previewer",
+                "field_name": impact_issue.get("rule_id", "N/A"),
+                "issue_type": impact_issue.get("issue_type", "preview_issue"),
+                "severity": impact_issue.get("severity", "medium"),
+                "message": impact_issue.get("description", "Preview issue detected")
+            })
+            
+        # Memory usage issue
+        if abs(memory_change) > 50:
+            issues.append({
+                "issue_id": "issue_preview_memory_spike",
+                "agent_id": "cleanse-previewer",
+                "field_name": "global",
+                "issue_type": "resource_usage",
+                "severity": "medium",
+                "message": f"Projected memory usage change of {memory_change:.1f} MB detected during simulation."
+            })
+
+        # Simulation failure issue
+        if failed_simulations > 0:
+            issues.append({
+                "issue_id": "issue_preview_simulation_failed",
+                "agent_id": "cleanse-previewer",
+                "field_name": "simulation_engine",
+                "issue_type": "execution_error",
+                "severity": "high",
+                "message": f"{failed_simulations} simulation rules failed to execute."
+            })
+        
+        # ==================== GENERATE RECOMMENDATIONS ====================
+        agent_recommendations = []
+        
+        # Top recommendations from preview analysis
+        for rec in recommendations[:7]:
+            rec_id = f"rec_preview_{rec.get('action', 'unknown')}"
+            affected_rules = rec.get("affected_rules", [])
+            field_name = ", ".join(affected_rules[:3]) if affected_rules else "multiple"
+            
+            agent_recommendations.append({
+                "recommendation_id": rec_id,
+                "agent_id": "cleanse-previewer",
+                "field_name": field_name,
+                "priority": rec.get("priority", "medium"),
+                "recommendation": f"{rec.get('action', 'Review')}: {rec.get('reason', 'No reason provided')}",
+                "timeline": "immediate" if rec.get("priority") == "critical" else "1 week" if rec.get("priority") == "high" else "2 weeks"
+            })
+        
+        # Safety-based recommendations
+        if not overall_impact_assessment["safe_to_execute"]:
+            agent_recommendations.append({
+                "recommendation_id": "rec_preview_safety",
+                "agent_id": "cleanse-previewer",
+                "field_name": "all rules",
+                "priority": "critical",
+                "recommendation": "Create data backup before executing cleaning operations. High risk of data loss detected.",
+                "timeline": "immediate"
+            })
+
+        # Memory recommendation
+        if abs(memory_change) > 50:
+            agent_recommendations.append({
+                "recommendation_id": "rec_preview_memory_optimization",
+                "agent_id": "cleanse-previewer",
+                "field_name": "global",
+                "priority": "medium",
+                "recommendation": "Optimize cleaning rules to reduce memory footprint. Consider processing in chunks.",
+                "timeline": "before_execution"
+            })
+            
+        # Low confidence recommendation
+        if preview_score["overall_score"] < 60:
+             agent_recommendations.append({
+                "recommendation_id": "rec_preview_improve_rules",
+                "agent_id": "cleanse-previewer",
+                "field_name": "configuration",
+                "priority": "high",
+                "recommendation": "Refine cleaning rules to improve preview score. Current score indicates potential issues.",
+                "timeline": "immediate"
+            })
+        
+        # ==================== GENERATE EXECUTIVE SUMMARY ====================
+        executive_summary = [{
+            "summary_id": "exec_cleanse_preview",
+            "title": "Cleanse Preview Status",
+            "value": f"{preview_score['overall_score']:.1f}",
+            "status": "excellent" if quality_status == "excellent" else "good" if quality_status == "good" else "needs_review",
+            "description": f"Preview Score: {preview_score['overall_score']:.1f}/100, Safety: {preview_analysis['execution_safety']}, {len(preview_rules)} rules analyzed ({overall_impact_assessment['high_impact_rules']} high-impact)"
+        }]
+        
+        # ==================== GENERATE AI ANALYSIS TEXT ====================
+        ai_analysis_parts = []
+        ai_analysis_parts.append(f"CLEANSE PREVIEWER ANALYSIS:")
+        ai_analysis_parts.append(f"- Preview Score: {preview_score['overall_score']:.1f}/100 (Accuracy: {preview_score['metrics']['accuracy_score']:.1f}, Safety: {preview_score['metrics']['safety_score']:.1f}, Completeness: {preview_score['metrics']['completeness_score']:.1f})")
+        ai_analysis_parts.append(f"- Rules Analyzed: {len(preview_rules)} total ({overall_impact_assessment['high_impact_rules']} high-impact, {overall_impact_assessment['medium_impact_rules']} medium-impact, {overall_impact_assessment['low_impact_rules']} low-impact)")
+        ai_analysis_parts.append(f"- Execution Safety: {preview_analysis['execution_safety']} ({'SAFE' if overall_impact_assessment['safe_to_execute'] else 'CAUTION REQUIRED'})")
+        ai_analysis_parts.append(f"- Warnings: {len(overall_impact_assessment['warnings'])} critical warnings detected")
+        if overall_impact_assessment['warnings']:
+            ai_analysis_parts.append(f"- Top Warnings: {'; '.join(overall_impact_assessment['warnings'][:3])}")
+        ai_analysis_parts.append(f"- Simulations: {preview_score['metrics']['successful_simulations']}/{preview_score['metrics']['total_simulations']} successful")
+        ai_analysis_text = "\n".join(ai_analysis_parts)
+        
+        # ==================== GENERATE ROW-LEVEL-ISSUES ====================
+        row_level_issues = []
+        
+        # Extract row-level issues from simulated results
+        for rule_idx, result in enumerate(simulated_results):
+            if result.get("status") == "error":
+                # Simulation failure - flag all affected rows as problematic
+                try:
+                    target_cols = result.get("target_columns", [])
+                    rule_type = result.get("rule_type", "unknown")
+                    
+                    # Add one issue per affected column
+                    for col_idx, col in enumerate(target_cols[:10]):  # Limit to 10 columns per rule
+                        row_level_issues.append({
+                            "row_index": 0,  # Indicates system-level issue, not specific row
+                            "column": col,
+                            "issue_type": "simulation_failed",
+                            "severity": "critical",
+                            "message": f"Simulation failed for rule on column '{col}': {result.get('error', 'Unknown error')}",
+                            "value": None,
+                            "rule_id": result.get("rule_id"),
+                            "rule_type": rule_type
+                        })
+                except Exception as e:
+                    pass
+            else:
+                # Extract row-level impacts from successful simulations
+                changes = result.get("changes", {})
+                impact_level = result.get("impact_level", "low")
+                risk_assessment = result.get("risk_assessment", {})
+                
+                # High-impact changes - flag affected rows
+                if impact_level == "high" or risk_assessment.get("is_risky"):
+                    row_change = changes.get("row_change", 0)
+                    row_change_pct = changes.get("row_change_percentage", 0)
+                    
+                    # For rows that will be removed (negative row_change)
+                    if row_change < 0:
+                        # Estimate affected rows based on operation type
+                        affected_rows_count = min(abs(row_change), max(1, len(df) // 100))  # Sample up to 1% of rows
+                        
+                        for row_idx in range(affected_rows_count):
+                            row_level_issues.append({
+                                "row_index": row_idx,
+                                "column": "global",
+                                "issue_type": "unsafe_operation",
+                                "severity": "critical" if abs(row_change_pct) > 20 else "warning",
+                                "message": f"Row will be affected by high-impact operation: {result.get('rule_description', 'Unknown rule')}. Total impact: {abs(row_change_pct):.1f}% rows affected",
+                                "value": None,
+                                "rule_id": result.get("rule_id"),
+                                "impact_percentage": round(row_change_pct, 2)
+                            })
+                    
+                    # Column-level changes that affect rows
+                    col_changes = changes.get("column_level_changes", {})
+                    for col_name, col_change_info in col_changes.items():
+                        if isinstance(col_change_info, dict):
+                            # High mean/median changes indicate significant value shifts
+                            mean_change_pct = col_change_info.get("mean_change_pct", 0)
+                            
+                            if abs(mean_change_pct) > 30:
+                                # Find rows with values far from mean (will be significantly affected)
+                                if col_name in df.columns and pd.api.types.is_numeric_dtype(df[col_name]):
+                                    col_data = df[col_name].dropna()
+                                    if len(col_data) > 0:
+                                        col_mean = col_data.mean()
+                                        col_std = col_data.std()
+                                        
+                                        # Find extreme rows
+                                        for idx, val in enumerate(col_data.items()):
+                                            if col_std > 0 and abs(val[1] - col_mean) > 2 * col_std:
+                                                row_level_issues.append({
+                                                    "row_index": idx,
+                                                    "column": col_name,
+                                                    "issue_type": "high_impact_change",
+                                                    "severity": "warning",
+                                                    "message": f"High-impact change on '{col_name}': value will change significantly ({abs(mean_change_pct):.1f}% mean shift)",
+                                                    "value": float(val[1]),
+                                                    "rule_id": result.get("rule_id"),
+                                                    "change_percentage": round(mean_change_pct, 2)
+                                                })
+                                                
+                                                if len(row_level_issues) >= 1000:
+                                                    break
+                            
+                            if len(row_level_issues) >= 1000:
+                                break
+                
+                # Risky operations detected
+                if risk_assessment.get("is_risky"):
+                    for risk_factor in risk_assessment.get("risk_factors", [])[:3]:
+                        row_level_issues.append({
+                            "row_index": 0,  # System-level risk indicator
+                            "column": "global",
+                            "issue_type": "preview_issue",
+                            "severity": "critical",
+                            "message": f"Risk detected: {risk_factor}",
+                            "value": None,
+                            "rule_id": result.get("rule_id")
+                        })
+            
+            if len(row_level_issues) >= 1000:
+                break
+        
+        # Calculate row-level-issues summary
+        issue_summary = {
+            "total_issues": len(row_level_issues),
+            "by_type": {},
+            "by_severity": {
+                "critical": 0,
+                "warning": 0,
+                "info": 0
+            },
+            "affected_rows": len(set(issue["row_index"] for issue in row_level_issues if issue["row_index"] != 0)),
+            "affected_columns": list(set(issue["column"] for issue in row_level_issues))
+        }
+        
+        for issue in row_level_issues:
+            issue_type = issue.get("issue_type", "preview_issue")
+            severity = issue.get("severity", "info")
+            
+            if issue_type not in issue_summary["by_type"]:
+                issue_summary["by_type"][issue_type] = 0
+            issue_summary["by_type"][issue_type] += 1
+            
+            if severity in issue_summary["by_severity"]:
+                issue_summary["by_severity"][severity] += 1
+
         # Build results
         preview_data = {
             "preview_score": preview_score,
             "quality_status": quality_status,
             "preview_analysis": preview_analysis,
             "summary": f"Preview analysis completed. Quality: {quality_status}. Analyzed {len(preview_rules)} cleaning rules across {len(df)} rows. Safety: {preview_analysis['execution_safety']}.",
-            "impact_issues": _extract_impact_issues(simulated_results)[:100]
+            "impact_issues": _extract_impact_issues(simulated_results)[:100],
+            
         }
 
         return {
@@ -224,7 +541,14 @@ def execute_cleanse_previewer(
                 "safe_to_execute": overall_impact_assessment["safe_to_execute"],
                 "total_warnings": len(overall_impact_assessment["warnings"])
             },
-            "data": preview_data
+            "data": preview_data,
+            "alerts": alerts,
+            "issues": issues,
+            "recommendations": agent_recommendations,
+            "executive_summary": executive_summary,
+            "ai_analysis_text": ai_analysis_text,
+            "row_level_issues": row_level_issues[:1000],
+            "issue_summary": issue_summary
         }
 
     except Exception as e:

@@ -166,6 +166,7 @@ class ProfileMyDataDownloads:
                 "content_base64": base64.b64encode(file_content).decode('utf-8'),
                 "size_bytes": len(file_content),
                 "creation_date": datetime.utcnow().isoformat() + "Z",
+                "type": "complete_report",
                 "sheets": ["Summary", "Profiler", "Drift Detection", "Risk Assessment", "Readiness", "Governance", "Test Coverage", "Alerts", "Issues", "Recommendations"]
             }
         except Exception as e:
@@ -865,7 +866,8 @@ class ProfileMyDataDownloads:
                 "mimeType": "application/json",
                 "content_base64": base64.b64encode(json_bytes).decode('utf-8'),
                 "size_bytes": len(json_bytes),
-                "creation_date": datetime.utcnow().isoformat() + "Z"
+                "creation_date": datetime.utcnow().isoformat() + "Z",
+                "type": "complete_report"
             }
         except Exception as e:
             print(f"Error generating JSON report: {str(e)}")

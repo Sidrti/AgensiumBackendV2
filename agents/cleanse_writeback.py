@@ -183,6 +183,441 @@ def execute_cleanse_writeback(
             "summary": f"Cleanse writeback completed. Quality: {quality_status}. Data ready: {integrity_results['all_checks_passed']}. Verified {len(df)} rows across {len(df.columns)} columns.",
             "integrity_issues": _extract_integrity_issues(integrity_results)
         }
+        
+        # ==================== GENERATE EXECUTIVE SUMMARY ====================
+        checks_passed = int(integrity_results["checks_passed"])
+        total_checks = checks_passed + int(integrity_results["checks_failed"])
+        data_ready = bool(integrity_results["all_checks_passed"])
+        executive_summary = [{
+            "summary_id": "exec_cleanse_writeback",
+            "title": "Cleanse Writeback Status",
+            "value": f"{writeback_score['overall_score']:.1f}",
+            "status": "excellent" if quality_status == "excellent" else "good" if quality_status == "good" else "needs_review",
+            "description": f"Quality: {quality_status}, Integrity: {checks_passed}/{total_checks} checks passed, {len(agent_manifests)} agents processed, Data Ready: {'Yes' if data_ready else 'No'}, {comprehensive_manifest.get('total_transformations', 0)} transformations logged"
+        }]
+        
+        # ==================== GENERATE AI ANALYSIS TEXT ====================
+        ai_analysis_parts = []
+        ai_analysis_parts.append(f"CLEANSE WRITEBACK ANALYSIS:")
+        ai_analysis_parts.append(f"- Writeback Score: {writeback_score['overall_score']:.1f}/100 (Integrity: {writeback_score['metrics']['integrity_score']:.1f}, Completeness: {writeback_score['metrics']['completeness_score']:.1f}, Auditability: {writeback_score['metrics']['auditability_score']:.1f})")
+        ai_analysis_parts.append(f"- Integrity Verification: {checks_passed}/{total_checks} checks passed ({(checks_passed/total_checks*100):.1f}% success rate), All Checks Passed: {'Yes' if data_ready else 'No'}")
+        
+        ai_analysis_parts.append(f"- Data Package: {len(df)} rows, {len(df.columns)} columns verified and ready for pipeline")
+        ai_analysis_parts.append(f"- Agent Processing: {len(agent_manifests)} agents processed with complete audit trail")
+        ai_analysis_parts.append(f"- Manifest Completeness: {comprehensive_manifest.get('total_transformations', 0)} transformations logged across all agents")
+        
+        if data_ready:
+            ai_analysis_parts.append(f"- Recommendation: Data package is production-ready. Safe to proceed to 'Master My Data' tool with complete lineage tracking")
+        else:
+            ai_analysis_parts.append(f"- Recommendation: Review {int(integrity_results['checks_failed'])} failed integrity checks before proceeding to next pipeline stage")
+        
+        ai_analysis_text = "\n".join(ai_analysis_parts)
+        
+        
+        
+        # ==================== GENERATE ROW-LEVEL-ISSUES ====================
+        row_level_issues = []
+        
+        # Extract row-level issues from integrity verification
+        for check_name, check_data in integrity_results.get("checks", {}).items():
+            if not check_data.get("passed", False):
+                # Check-specific row-level issue generation
+                if check_name == "numeric_type_integrity":
+                    issues_list = check_data.get("issues", [])
+                    for col_issue in issues_list[:50]:
+                        col = col_issue.get("column", "unknown")
+                        row_level_issues.append({
+                            "row_index": 0,  # System-level issue indicator
+                            "column": col,
+                            "issue_type": "writeback_failed",
+                            "severity": "critical",
+                            "message": f"Type integrity failure in '{col}': {col_issue.get('issue', 'Invalid type detected')}",
+                            "value": None,
+                            "check_name": check_name
+                        })
+                
+                elif check_name == "datetime_type_integrity":
+                    issues_list = check_data.get("issues", [])
+                    for col_issue in issues_list[:50]:
+                        col = col_issue.get("column", "unknown")
+                        invalid_count = col_issue.get("invalid_count", 0)
+                        row_level_issues.append({
+                            "row_index": 0,  # System-level issue indicator
+                            "column": col,
+                            "issue_type": "integrity_violation",
+                            "severity": "critical",
+                            "message": f"Datetime integrity failure in '{col}': {invalid_count} invalid datetime values detected",
+                            "value": None,
+                            "check_name": check_name
+                        })
+                
+                elif check_name == "no_new_nulls":
+                    high_null_cols = check_data.get("columns_with_high_nulls", [])
+                    for col_issue in high_null_cols[:50]:
+                        col = col_issue.get("column", "unknown")
+                        null_pct = col_issue.get("null_percentage", 0)
+                        row_level_issues.append({
+                            "row_index": 0,  # System-level issue indicator
+                            "column": col,
+                            "issue_type": "writeback_failed",
+                            "severity": "critical",
+                            "message": f"Excessive null values in '{col}': {null_pct:.1f}% null ({col_issue.get('null_count', 0)} rows)",
+                            "value": None,
+                            "null_percentage": round(null_pct, 2),
+                            "check_name": check_name
+                        })
+                
+                elif check_name == "no_new_duplicates_introduced":
+                    dup_count = check_data.get("duplicate_count", 0)
+                    dup_pct = check_data.get("duplicate_percentage", 0)
+                    if dup_count > 0:
+                        row_level_issues.append({
+                            "row_index": 0,  # System-level issue indicator
+                            "column": "global",
+                            "issue_type": "integrity_violation",
+                            "severity": "warning",
+                            "message": f"Duplicate rows detected: {dup_count} duplicate records ({dup_pct:.1f}% of data)",
+                            "value": None,
+                            "duplicate_count": dup_count,
+                            "check_name": check_name
+                        })
+                
+                elif check_name == "data_retention":
+                    retention_issues = check_data.get("issues", [])
+                    for ret_issue in retention_issues[:50]:
+                        issue_type = ret_issue.get("type", "data_loss")
+                        if issue_type == "excessive_row_loss":
+                            row_level_issues.append({
+                                "row_index": 0,  # System-level issue indicator
+                                "column": "global",
+                                "issue_type": "rollback_needed",
+                                "severity": "critical",
+                                "message": f"Excessive row loss: {ret_issue.get('loss_count', 0)} rows removed ({100 - ret_issue.get('retention_percentage', 100):.1f}%)",
+                                "value": None,
+                                "original_count": ret_issue.get("original", 0),
+                                "final_count": ret_issue.get("current", 0),
+                                "check_name": check_name
+                            })
+                        elif issue_type == "column_loss":
+                            row_level_issues.append({
+                                "row_index": 0,  # System-level issue indicator
+                                "column": "global",
+                                "issue_type": "integrity_violation",
+                                "severity": "high",
+                                "message": f"Column loss detected: {ret_issue.get('loss_count', 0)} columns removed",
+                                "value": None,
+                                "original_count": ret_issue.get("original", 0),
+                                "final_count": ret_issue.get("current", 0),
+                                "check_name": check_name
+                            })
+        
+        # Extract row-level issues from failed agents
+        failed_agents = [aid for aid, m in agent_manifests.items() if m.get('status') == 'error']
+        for agent_id in failed_agents[:50]:
+            agent_manifest = agent_manifests[agent_id]
+            row_level_issues.append({
+                "row_index": 0,  # System-level issue indicator
+                "column": "global",
+                "issue_type": "writeback_failed",
+                "severity": "critical",
+                "message": f"Upstream agent error: {agent_id} reported failure - {agent_manifest.get('error', 'Unknown error')}",
+                "value": None,
+                "agent_id": agent_id,
+                "upstream_error": True
+            })
+        
+        # Identify rows that may have integrity issues based on checks
+        # For columns with type mismatches, mark rows with problematic values
+        if "numeric_type_integrity" in integrity_results.get("checks", {}):
+            numeric_check = integrity_results["checks"]["numeric_type_integrity"]
+            if not numeric_check.get("passed", False):
+                for col in df.columns:
+                    if pd.api.types.is_numeric_dtype(df[col]):
+                        # Find rows with non-numeric-like values
+                        try:
+                            numeric_rows = pd.to_numeric(df[col], errors='coerce')
+                            problem_rows = df[numeric_rows.isna() & df[col].notna()].index.tolist()
+                            
+                            for idx in problem_rows[:50]:
+                                row_level_issues.append({
+                                    "row_index": int(idx),
+                                    "column": col,
+                                    "issue_type": "integrity_violation",
+                                    "severity": "critical",
+                                    "message": f"Type mismatch in numeric column '{col}' at row {idx}: non-numeric value '{df.loc[idx, col]}'",
+                                    "value": str(df.loc[idx, col]),
+                                    "expected_type": "numeric",
+                                    "check_name": "numeric_type_integrity"
+                                })
+                        except Exception:
+                            pass
+        
+        # For datetime columns with issues, mark specific rows
+        if "datetime_type_integrity" in integrity_results.get("checks", {}):
+            datetime_check = integrity_results["checks"]["datetime_type_integrity"]
+            if not datetime_check.get("passed", False):
+                for col in df.columns:
+                    if pd.api.types.is_datetime64_any_dtype(df[col]):
+                        invalid_rows = df[df[col].isna()].index.tolist()
+                        
+                        for idx in invalid_rows[:50]:
+                            row_level_issues.append({
+                                "row_index": int(idx),
+                                "column": col,
+                                "issue_type": "integrity_violation",
+                                "severity": "critical",
+                                "message": f"Invalid datetime value in column '{col}' at row {idx}",
+                                "value": str(df.loc[idx, col]) if not pd.isna(df.loc[idx, col]) else None,
+                                "expected_type": "datetime",
+                                "check_name": "datetime_type_integrity"
+                            })
+        
+        # Identify duplicate rows if they were introduced
+        if "no_new_duplicates_introduced" in integrity_results.get("checks", {}):
+            dup_check = integrity_results["checks"]["no_new_duplicates_introduced"]
+            if not dup_check.get("passed", False) and dup_check.get("duplicate_count", 0) > 0:
+                duplicate_rows = df[df.duplicated(keep=False)].index.tolist()
+                
+                for idx in duplicate_rows[:50]:
+                    row_level_issues.append({
+                        "row_index": int(idx),
+                        "column": "global",
+                        "issue_type": "integrity_violation",
+                        "severity": "warning",
+                        "message": f"Duplicate row detected at index {idx}",
+                        "value": None,
+                        "check_name": "no_new_duplicates_introduced"
+                    })
+        
+        # Cap at 1000 issues
+        row_level_issues = row_level_issues[:1000]
+        
+        # Calculate row-level-issues summary
+        issue_summary = {
+            "total_issues": len(row_level_issues),
+            "by_type": {},
+            "by_severity": {
+                "critical": 0,
+                "warning": 0,
+                "info": 0
+            },
+            "affected_rows": len(set(issue["row_index"] for issue in row_level_issues if issue["row_index"] != 0)),
+            "affected_columns": list(set(issue["column"] for issue in row_level_issues))
+        }
+        
+        for issue in row_level_issues:
+            issue_type = issue.get("issue_type", "writeback_failed")
+            severity = issue.get("severity", "info")
+            
+            if issue_type not in issue_summary["by_type"]:
+                issue_summary["by_type"][issue_type] = 0
+            issue_summary["by_type"][issue_type] += 1
+            
+            if severity in issue_summary["by_severity"]:
+                issue_summary["by_severity"][severity] += 1
+        
+        # ==================== GENERATE ALERTS ====================
+        alerts = []
+        
+        # Critical integrity failure alert
+        if not data_ready:
+            alerts.append({
+                "alert_id": "alert_writeback_integrity_failure",
+                "severity": "critical",
+                "category": "data_integrity",
+                "message": f"Data integrity verification FAILED: {int(integrity_results['checks_failed'])} critical checks failed",
+                "affected_fields_count": int(integrity_results['checks_failed']),
+                "recommendation": "Data is NOT ready for pipeline. Address all integrity failures immediately before proceeding."
+            })
+
+        # Schema Drift Alert
+        if original_column_count and len(df.columns) != original_column_count:
+             col_diff = len(df.columns) - original_column_count
+             alerts.append({
+                "alert_id": "alert_writeback_schema_drift",
+                "severity": "medium",
+                "category": "schema_change",
+                "message": f"Schema drift detected: Column count changed by {col_diff} (Original: {original_column_count}, Final: {len(df.columns)})",
+                "affected_fields_count": abs(col_diff),
+                "recommendation": "Verify that column additions/removals were intended."
+            })
+
+        # Agent Failure Alert
+        failed_agents = [aid for aid, m in agent_manifests.items() if m.get('status') == 'error']
+        if failed_agents:
+            alerts.append({
+                "alert_id": "alert_writeback_agent_failure",
+                "severity": "high",
+                "category": "pipeline_error",
+                "message": f"Upstream agent failures detected: {', '.join(failed_agents)} reported errors.",
+                "affected_fields_count": len(failed_agents),
+                "recommendation": "Investigate upstream agent logs for errors."
+            })
+        
+        # Manifest completeness alert
+        if comprehensive_manifest.get('total_transformations', 0) == 0:
+            alerts.append({
+                "alert_id": "alert_writeback_manifest_incomplete",
+                "severity": "high",
+                "category": "auditability",
+                "message": "Manifest is incomplete: No transformations logged",
+                "affected_fields_count": len(agent_manifests),
+                "recommendation": "Verify that all cleaning agents executed properly and logged their transformations."
+            })
+        
+        # Data retention alert
+        retention_check = integrity_results.get('checks', {}).get('data_retention', {})
+        if not retention_check.get('passed', True):
+            row_loss = retention_check.get('original_rows', 0) - retention_check.get('current_rows', 0)
+            alerts.append({
+                "alert_id": "alert_writeback_data_loss",
+                "severity": "high",
+                "category": "data_retention",
+                "message": f"Significant data loss: {row_loss} rows lost during cleaning ({100 - retention_check.get('row_retention_percentage', 100):.1f}%)",
+                "affected_fields_count": row_loss,
+                "recommendation": "Review cleaning strategies to minimize data loss. Investigate if loss is acceptable."
+            })
+        
+        # Quality score alert
+        if writeback_score["overall_score"] < good_threshold:
+            alerts.append({
+                "alert_id": "alert_writeback_quality",
+                "severity": "high" if writeback_score["overall_score"] < 70 else "medium",
+                "category": "quality_score",
+                "message": f"Writeback quality score: {writeback_score['overall_score']:.1f}/100 ({quality_status})",
+                "affected_fields_count": total_checks,
+                "recommendation": "Review integrity checks and manifest completeness. Data may not be production-ready."
+            })
+        
+        # Success alert
+        if data_ready and writeback_score["overall_score"] >= excellent_threshold:
+            alerts.append({
+                "alert_id": "alert_writeback_success",
+                "severity": "low",
+                "category": "quality_validation",
+                "message": f"Data package verified: All {checks_passed} integrity checks passed. Ready for pipeline.",
+                "affected_fields_count": checks_passed,
+                "recommendation": "Data is production-ready. Safe to proceed to 'Master My Data' or next pipeline step."
+            })
+        
+        # ==================== GENERATE ISSUES ====================
+        issues = []
+        
+        # Convert integrity issues to standardized format
+        integrity_issues = _extract_integrity_issues(integrity_results)
+        for int_issue in integrity_issues[:100]:
+            issues.append({
+                "issue_id": f"issue_writeback_{int_issue.get('check_name', 'unknown')}",
+                "agent_id": "cleanse-writeback",
+                "field_name": int_issue.get('check_name', 'N/A'),
+                "issue_type": int_issue.get('issue_type', 'integrity_issue'),
+                "severity": int_issue.get('severity', 'high'),
+                "message": int_issue.get('message', 'Integrity verification issue')
+            })
+
+        # Add Manifest Issues
+        for agent_id, manifest in agent_manifests.items():
+            if manifest.get('status') == 'error':
+                issues.append({
+                    "issue_id": f"issue_writeback_agent_error_{agent_id}",
+                    "agent_id": "cleanse-writeback",
+                    "field_name": agent_id,
+                    "issue_type": "upstream_error",
+                    "severity": "high",
+                    "message": f"Agent {agent_id} reported error: {manifest.get('error', 'Unknown error')}"
+                })
+        
+        # ==================== GENERATE RECOMMENDATIONS ====================
+        agent_recommendations = []
+        
+        # Recommendation 1: Address integrity failures (critical)
+        if not data_ready:
+            failed_checks = [check_name for check_name, check_data in integrity_results.get('checks', {}).items()
+                           if not check_data.get('passed', False)]
+            agent_recommendations.append({
+                "recommendation_id": "rec_writeback_integrity_failures",
+                "agent_id": "cleanse-writeback",
+                "field_name": ", ".join(failed_checks[:3]),
+                "priority": "critical",
+                "recommendation": f"CRITICAL: Fix {len(failed_checks)} failed integrity check(s) before proceeding: {', '.join(failed_checks)}",
+                "timeline": "immediate"
+            })
+
+        # Recommendation: Fix upstream agent errors
+        failed_agents_list = [aid for aid, m in agent_manifests.items() if m.get('status') == 'error']
+        if failed_agents_list:
+             agent_recommendations.append({
+                "recommendation_id": "rec_writeback_fix_agents",
+                "agent_id": "cleanse-writeback",
+                "field_name": "pipeline",
+                "priority": "high",
+                "recommendation": f"Fix upstream agent errors ({', '.join(failed_agents_list)}) and re-run pipeline.",
+                "timeline": "immediate"
+            })
+        
+        # Recommendation 2: Review manifest completeness
+        if comprehensive_manifest.get('total_transformations', 0) < len(agent_manifests) * 2:
+            agent_recommendations.append({
+                "recommendation_id": "rec_writeback_manifest",
+                "agent_id": "cleanse-writeback",
+                "field_name": "manifest",
+                "priority": "high",
+                "recommendation": f"Review manifest completeness: Only {comprehensive_manifest.get('total_transformations', 0)} transformations logged from {len(agent_manifests)} agents",
+                "timeline": "1 week"
+            })
+        
+        # Recommendation 3: Data retention review
+        if retention_check and not retention_check.get('passed', True):
+            agent_recommendations.append({
+                "recommendation_id": "rec_writeback_retention",
+                "agent_id": "cleanse-writeback",
+                "field_name": "all",
+                "priority": "high",
+                "recommendation": f"Review data retention: {retention_check.get('row_retention_percentage', 0):.1f}% row retention is below acceptable threshold",
+                "timeline": "1 week"
+            })
+        
+        # Recommendation 4: Specific check failures
+        for check_name, check_data in integrity_results.get('checks', {}).items():
+            if not check_data.get('passed', False) and len(agent_recommendations) < 6:
+                agent_recommendations.append({
+                    "recommendation_id": f"rec_writeback_{check_name}",
+                    "agent_id": "cleanse-writeback",
+                    "field_name": check_name,
+                    "priority": "high",
+                    "recommendation": f"Address {check_name} failure: {check_data.get('message', 'Check failed')}",
+                    "timeline": "1 week"
+                })
+        
+        # Recommendation 5: Pipeline readiness
+        if data_ready:
+            agent_recommendations.append({
+                "recommendation_id": "rec_writeback_proceed",
+                "agent_id": "cleanse-writeback",
+                "field_name": "all",
+                "priority": "low",
+                "recommendation": "Data package is verified and production-ready. Proceed to 'Master My Data' with confidence in data quality and lineage.",
+                "timeline": "immediate"
+            })
+        else:
+            agent_recommendations.append({
+                "recommendation_id": "rec_writeback_review",
+                "agent_id": "cleanse-writeback",
+                "field_name": "all",
+                "priority": "critical",
+                "recommendation": "DO NOT proceed to next pipeline step. Address all integrity failures and re-run writeback verification.",
+                "timeline": "immediate"
+            })
+        
+        # Recommendation 6: Audit trail
+        agent_recommendations.append({
+            "recommendation_id": "rec_writeback_audit",
+            "agent_id": "cleanse-writeback",
+            "field_name": "manifest",
+            "priority": "low",
+            "recommendation": "Archive comprehensive manifest for compliance and auditability requirements",
+            "timeline": "2 weeks"
+        })
 
         return {
             "status": "success",
@@ -198,7 +633,14 @@ def execute_cleanse_writeback(
                 "data_ready_for_pipeline": bool(integrity_results["all_checks_passed"]),
                 "total_transformations_logged": int(comprehensive_manifest.get("total_transformations", 0))
             },
-            "data": writeback_data
+            "data": writeback_data,
+            "alerts": alerts,
+            "issues": issues,
+            "recommendations": agent_recommendations,
+            "executive_summary": executive_summary,
+            "ai_analysis_text" : ai_analysis_text,
+            "row_level_issues": row_level_issues,
+            "issue_summary": issue_summary
         }
 
     except Exception as e:
