@@ -204,7 +204,12 @@ def transform_clean_my_data_response(
         alerts=all_alerts,
         issues=all_issues,
         recommendations=all_recommendations,
-        cleaned_files=cleaned_files
+        cleaned_files=cleaned_files,
+        executive_summary=executive_summary,
+        analysis_summary=analysis_summary,
+        row_level_issues=all_row_level_issues,
+        issue_summary=issue_summary,
+        routing_decisions=routing_decisions
     )
     
     # ==================== BUILD FINAL RESPONSE ====================
