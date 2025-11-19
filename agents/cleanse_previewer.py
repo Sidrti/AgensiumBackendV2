@@ -524,7 +524,20 @@ def execute_cleanse_previewer(
             "preview_analysis": preview_analysis,
             "summary": f"Preview analysis completed. Quality: {quality_status}. Analyzed {len(preview_rules)} cleaning rules across {len(df)} rows. Safety: {preview_analysis['execution_safety']}.",
             "impact_issues": _extract_impact_issues(simulated_results)[:100],
-            
+            "overrides": {
+                "preview_rules": preview_rules,
+                "impact_threshold_high": impact_threshold_high,
+                "impact_threshold_medium": impact_threshold_medium,
+                "confidence_level": confidence_level,
+                "calculate_distributions": calculate_distributions,
+                "compare_statistics": compare_statistics,
+                "analyze_correlations": analyze_correlations,
+                "accuracy_weight": accuracy_weight,
+                "safety_weight": safety_weight,
+                "completeness_weight": completeness_weight,
+                "excellent_threshold": excellent_threshold,
+                "good_threshold": good_threshold
+            }
         }
 
         return {

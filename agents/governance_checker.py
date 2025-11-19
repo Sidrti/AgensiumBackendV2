@@ -212,7 +212,14 @@ def execute_governance(
             "fields_analyzed": list(df.columns),
             "governance_issues": governance_issues,
             "row_level_issues": row_level_issues[:100],
-            "issue_summary": issue_summary
+            "issue_summary": issue_summary,
+            "overrides": {
+                "lineage_weight": lineage_weight,
+                "consent_weight": consent_weight,
+                "classification_weight": classification_weight,
+                "compliance_threshold": compliance_threshold,
+                "needs_review_threshold": needs_review_threshold
+            }
         }
         
         # ==================== GENERATE ALERTS ====================

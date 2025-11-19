@@ -175,7 +175,20 @@ def execute_outlier_remover(
             "outlier_analysis": outlier_analysis,
             "removal_log": removal_log,
             "summary": f"Outlier removal completed. Quality: {quality_status}. Processed {len(original_df)} rows, handled {total_outliers} outliers.",
-            "row_level_issues": outlier_issues[:100]  # Limit to first 100
+            "row_level_issues": outlier_issues[:100],  # Limit to first 100
+            "overrides": {
+                "detection_method": detection_method,
+                "removal_strategy": removal_strategy,
+                "z_threshold": z_threshold,
+                "iqr_multiplier": iqr_multiplier,
+                "lower_percentile": lower_percentile,
+                "upper_percentile": upper_percentile,
+                "outlier_reduction_weight": outlier_reduction_weight,
+                "data_retention_weight": data_retention_weight,
+                "column_retention_weight": column_retention_weight,
+                "excellent_threshold": excellent_threshold,
+                "good_threshold": good_threshold
+            }
         }
         
         # ==================== GENERATE EXECUTIVE SUMMARY ====================

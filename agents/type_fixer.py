@@ -216,7 +216,18 @@ def execute_type_fixer(
             "fix_log": fix_log,
             "summary": f"Type fixing completed. Quality: {quality_status}. Processed {len(original_df)} rows, fixed {len(fix_log)} type issues.",
             "row_level_issues": row_level_issues[:100],  # Limit to first 100
-            "issue_summary": issue_summary
+            "issue_summary": issue_summary,
+            "overrides": {
+                "auto_convert_numeric": auto_convert_numeric,
+                "auto_convert_datetime": auto_convert_datetime,
+                "auto_convert_category": auto_convert_category,
+                "preserve_mixed_types": preserve_mixed_types,
+                "type_reduction_weight": type_reduction_weight,
+                "data_retention_weight": data_retention_weight,
+                "column_retention_weight": column_retention_weight,
+                "excellent_threshold": excellent_threshold,
+                "good_threshold": good_threshold
+            }
         }
         
         # ==================== GENERATE EXECUTIVE SUMMARY ====================

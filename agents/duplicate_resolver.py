@@ -191,7 +191,20 @@ def execute_duplicate_resolver(
             "resolution_log": resolution_log,
             "summary": f"Duplicate resolution completed. Quality: {quality_status}. Processed {len(original_df)} rows, resolved {duplicate_analysis.get('total_duplicates', 0)} duplicate records.",
             "row_level_issues": row_level_issues[:100],  # Limit to first 100
-            "issue_summary": issue_summary
+            "issue_summary": issue_summary,
+            "overrides": {
+                "detection_types": detection_types,
+                "merge_strategy": merge_strategy,
+                "email_columns": email_columns,
+                "key_columns": key_columns,
+                "null_handling": null_handling,
+                "conflict_resolution": conflict_resolution,
+                "dedup_reduction_weight": dedup_reduction_weight,
+                "data_retention_weight": data_retention_weight,
+                "column_retention_weight": column_retention_weight,
+                "excellent_threshold": excellent_threshold,
+                "good_threshold": good_threshold
+            }
         }
         
         # ==================== GENERATE EXECUTIVE SUMMARY ====================

@@ -709,6 +709,11 @@ def detect_drift(
                     "drift_percentage": round(drift_percentage, 2),
                     "fields_with_drift": drift_detected_count,
                     "dataset_stability": dataset_stability
+                },
+                "overrides": {
+                    "statistical_test": statistical_test,
+                    "significance_level": significance_level,
+                    "min_sample_size": min_sample_size
                 }
             },
             "alerts": alerts,

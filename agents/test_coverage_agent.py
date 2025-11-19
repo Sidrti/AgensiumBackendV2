@@ -657,7 +657,14 @@ def execute_test_coverage(
                 "fields_analyzed": list(df.columns),
                 "test_coverage_issues": test_issues,
                 "row_level_issues": row_level_issues[:100],
-                "issue_summary": issue_summary
+                "issue_summary": issue_summary,
+                "overrides": {
+                    "uniqueness_weight": uniqueness_weight,
+                    "range_weight": range_weight,
+                    "format_weight": format_weight,
+                    "excellent_threshold": excellent_threshold,
+                    "good_threshold": good_threshold
+                }
             },
             "alerts": alerts,
             "issues": issues,
