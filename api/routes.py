@@ -12,7 +12,7 @@ from datetime import datetime
 from typing import Dict, Any, Optional, List
 from fastapi import APIRouter, HTTPException, File, UploadFile, Form
 
-from agents import readiness_rater, unified_profiler, drift_detector, score_risk, governance_checker, test_coverage_agent, null_handler, outlier_remover, type_fixer, duplicate_resolver, quarantine_agent, cleanse_writeback
+from agents import readiness_rater, unified_profiler, drift_detector, score_risk, governance_checker, test_coverage_agent, null_handler, outlier_remover, type_fixer, duplicate_resolver, quarantine_agent, cleanse_writeback, field_standardization, cleanse_previewer
 from transformers import profile_my_data_transformer, clean_my_data_transformer
 from ai import ChatAgent
 from .dependencies import decode_base64_file
@@ -544,7 +544,6 @@ def execute_agent_flexible(
         
         primary_bytes, primary_filename = files_map["primary"]
         
-        from agents import field_standardization
         return field_standardization.execute_field_standardization(
             primary_bytes,
             primary_filename,
@@ -561,7 +560,6 @@ def execute_agent_flexible(
         
         primary_bytes, primary_filename = files_map["primary"]
         
-        from agents import cleanse_writeback
         return cleanse_writeback.execute_cleanse_writeback(
             primary_bytes,
             primary_filename,
@@ -578,7 +576,6 @@ def execute_agent_flexible(
         
         primary_bytes, primary_filename = files_map["primary"]
         
-        from agents import cleanse_previewer
         return cleanse_previewer.execute_cleanse_previewer(
             primary_bytes,
             primary_filename,
