@@ -855,7 +855,15 @@ def score_risk(
                 "fields": field_risk_assessments,
                 "risk_summary": risk_summary,
                 "row_level_issues": row_level_issues[:100],
-                "issue_summary": issue_summary
+                "issue_summary": issue_summary,
+                "overrides": {
+                    "pii_sample_size": pii_sample_size,
+                    "high_risk_threshold": high_risk_threshold,
+                    "medium_risk_threshold": medium_risk_threshold,
+                    "pii_detection_enabled": pii_detection_enabled,
+                    "sensitive_field_detection_enabled": sensitive_field_detection_enabled,
+                    "governance_check_enabled": governance_check_enabled
+                }
             },
             "alerts": alerts,
             "issues": issues,

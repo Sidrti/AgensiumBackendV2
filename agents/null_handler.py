@@ -184,7 +184,18 @@ def execute_null_handler(
             "null_analysis": null_analysis,
             "imputation_log": imputation_log,
             "summary": f"Null handling completed. Quality: {quality_status}. Processed {len(original_df)} rows, handled {null_analysis['total_nulls_detected']} null values.",
-            "row_level_issues": null_issues[:100]  # Limit to first 100
+            "row_level_issues": null_issues[:100],  # Limit to first 100
+            "overrides": {
+                "global_strategy": global_strategy,
+                "column_strategies": column_strategies,
+                "fill_values": fill_values,
+                "knn_neighbors": knn_neighbors,
+                "null_reduction_weight": null_reduction_weight,
+                "data_retention_weight": data_retention_weight,
+                "column_retention_weight": column_retention_weight,
+                "excellent_threshold": excellent_threshold,
+                "good_threshold": good_threshold
+            }
         }
         
         # ==================== GENERATE EXECUTIVE SUMMARY ====================

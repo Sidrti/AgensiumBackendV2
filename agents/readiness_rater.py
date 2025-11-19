@@ -821,7 +821,14 @@ def rate_readiness(
                     "recommendation": recommendation
                 },
                 "component_scores": component_scores,
-                "deductions": deductions
+                "deductions": deductions,
+                "overrides": {
+                    "ready_threshold": ready_threshold,
+                    "needs_review_threshold": needs_review_threshold,
+                    "completeness_weight": completeness_weight,
+                    "consistency_weight": consistency_weight,
+                    "schema_health_weight": schema_health_weight
+                }
             },
             "alerts": alerts,
             "issues": issues,
