@@ -230,6 +230,30 @@ def execute_cleanse_writeback(
                 "affected_fields_count": int(integrity_results['checks_failed']),
                 "recommendation": "Data is NOT ready for pipeline. Address all integrity failures immediately before proceeding."
             })
+
+        # Schema Drift Alert
+        if original_column_count and len(df.columns) != original_column_count:
+             col_diff = len(df.columns) - original_column_count
+             alerts.append({
+                "alert_id": "alert_writeback_schema_drift",
+                "severity": "medium",
+                "category": "schema_change",
+                "message": f"Schema drift detected: Column count changed by {col_diff} (Original: {original_column_count}, Final: {len(df.columns)})",
+                "affected_fields_count": abs(col_diff),
+                "recommendation": "Verify that column additions/removals were intended."
+            })
+
+        # Agent Failure Alert
+        failed_agents = [aid for aid, m in agent_manifests.items() if m.get('status') == 'error']
+        if failed_agents:
+            alerts.append({
+                "alert_id": "alert_writeback_agent_failure",
+                "severity": "high",
+                "category": "pipeline_error",
+                "message": f"Upstream agent failures detected: {', '.join(failed_agents)} reported errors.",
+                "affected_fields_count": len(failed_agents),
+                "recommendation": "Investigate upstream agent logs for errors."
+            })
         
         # Manifest completeness alert
         if comprehensive_manifest.get('total_transformations', 0) == 0:
@@ -291,6 +315,18 @@ def execute_cleanse_writeback(
                 "severity": int_issue.get('severity', 'high'),
                 "message": int_issue.get('message', 'Integrity verification issue')
             })
+
+        # Add Manifest Issues
+        for agent_id, manifest in agent_manifests.items():
+            if manifest.get('status') == 'error':
+                issues.append({
+                    "issue_id": f"issue_writeback_agent_error_{agent_id}",
+                    "agent_id": "cleanse-writeback",
+                    "field_name": agent_id,
+                    "issue_type": "upstream_error",
+                    "severity": "high",
+                    "message": f"Agent {agent_id} reported error: {manifest.get('error', 'Unknown error')}"
+                })
         
         # ==================== GENERATE RECOMMENDATIONS ====================
         agent_recommendations = []
@@ -305,6 +341,18 @@ def execute_cleanse_writeback(
                 "field_name": ", ".join(failed_checks[:3]),
                 "priority": "critical",
                 "recommendation": f"CRITICAL: Fix {len(failed_checks)} failed integrity check(s) before proceeding: {', '.join(failed_checks)}",
+                "timeline": "immediate"
+            })
+
+        # Recommendation: Fix upstream agent errors
+        failed_agents_list = [aid for aid, m in agent_manifests.items() if m.get('status') == 'error']
+        if failed_agents_list:
+             agent_recommendations.append({
+                "recommendation_id": "rec_writeback_fix_agents",
+                "agent_id": "cleanse-writeback",
+                "field_name": "pipeline",
+                "priority": "high",
+                "recommendation": f"Fix upstream agent errors ({', '.join(failed_agents_list)}) and re-run pipeline.",
                 "timeline": "immediate"
             })
         

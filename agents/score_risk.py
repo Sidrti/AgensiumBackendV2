@@ -238,39 +238,80 @@ def score_risk(
         
         # ==================== GENERATE ALERTS ====================
         alerts = []
+        sensitive_non_pii = sensitive_fields_detected - pii_fields_detected
+        impacted_frameworks = risk_summary["compliance_frameworks_impacted"]
         
-        # Overall risk alert
-        if overall_risk_level in ["high", "medium"]:
+        # Overall risk alert - Primary
+        if overall_risk_level == "high":
             alerts.append({
-                "alert_id": "alert_risk_001",
-                "severity": "critical" if overall_risk_level == "high" else "high",
+                "alert_id": "alert_risk_001_overall_critical",
+                "severity": "critical",
                 "category": "risk_compliance",
-                "message": f"Overall risk level: {overall_risk_level.upper()} ({overall_risk_score:.1f}/100)",
+                "message": f"CRITICAL RISK: Overall risk score {overall_risk_score:.1f}/100 - Dataset contains high-risk data",
                 "affected_fields_count": total_high_risk,
-                "recommendation": f"Address {total_high_risk} high-risk field(s). Implement encryption, access controls, audit logging."
+                "recommendation": f"IMMEDIATE ACTION: Secure {total_high_risk} high-risk field(s). Implement encryption, access controls, audit logging, and monitoring."
+            })
+        elif overall_risk_level == "medium":
+            alerts.append({
+                "alert_id": "alert_risk_002_overall_high",
+                "severity": "high",
+                "category": "risk_compliance",
+                "message": f"MEDIUM RISK: Overall risk score {overall_risk_score:.1f}/100 - Dataset contains sensitive data",
+                "affected_fields_count": total_high_risk + total_medium_risk,
+                "recommendation": f"Address {total_high_risk + total_medium_risk} at-risk field(s). Review security controls and compliance requirements."
+            })
+        else:
+            alerts.append({
+                "alert_id": "alert_risk_003_overall_low",
+                "severity": "low",
+                "category": "risk_compliance",
+                "message": f"LOW RISK: Overall risk score {overall_risk_score:.1f}/100 - Dataset risk is acceptable",
+                "affected_fields_count": total_low_risk,
+                "recommendation": "Continue monitoring data security and compliance posture regularly."
             })
         
         # PII detection alerts
         if pii_fields_detected > 0:
             alerts.append({
-                "alert_id": "alert_pii_001",
+                "alert_id": "alert_pii_001_detected_critical",
                 "severity": "critical",
                 "category": "pii_detected",
-                "message": f"{pii_fields_detected} PII field(s) detected",
+                "message": f"PII DETECTED: {pii_fields_detected} field(s) contain personally identifiable information",
                 "affected_fields_count": pii_fields_detected,
-                "recommendation": f"Implement encryption at rest/transit, restrict access, audit logging, data retention policies."
+                "recommendation": "CRITICAL: Implement end-to-end encryption (AES-256), restrict access to PII, enable audit logging, establish retention policies, and enforce data minimization."
+            })
+        
+        # High-risk field count alert
+        if total_high_risk > 0:
+            alerts.append({
+                "alert_id": "alert_risk_high_volume",
+                "severity": "critical" if total_high_risk > 5 else "high",
+                "category": "high_risk_fields",
+                "message": f"HIGH-RISK FIELDS: {total_high_risk} field(s) scored as high-risk (>={high_risk_threshold})",
+                "affected_fields_count": total_high_risk,
+                "recommendation": f"Implement security measures immediately for all {total_high_risk} high-risk field(s): encryption, role-based access, audit trails."
+            })
+        
+        # Medium-risk fields alert
+        if total_medium_risk > 0:
+            alerts.append({
+                "alert_id": "alert_risk_medium_volume",
+                "severity": "high",
+                "category": "medium_risk_fields",
+                "message": f"MEDIUM-RISK FIELDS: {total_medium_risk} field(s) scored as medium-risk",
+                "affected_fields_count": total_medium_risk,
+                "recommendation": f"Review and improve security controls for {total_medium_risk} medium-risk field(s). Consider data masking or tokenization."
             })
         
         # Sensitive fields alert (separate from PII)
-        sensitive_non_pii = sensitive_fields_detected - pii_fields_detected
         if sensitive_non_pii > 0:
             alerts.append({
-                "alert_id": "alert_sensitive_001",
+                "alert_id": "alert_sensitive_001_high",
                 "severity": "high",
                 "category": "sensitive_data",
-                "message": f"{sensitive_non_pii} sensitive field(s) detected",
+                "message": f"SENSITIVE DATA: {sensitive_non_pii} field(s) detected as sensitive but not categorized as PII",
                 "affected_fields_count": sensitive_non_pii,
-                "recommendation": f"Review and secure {sensitive_non_pii} sensitive field(s). Consider access controls and monitoring."
+                "recommendation": f"Implement controls for {sensitive_non_pii} sensitive field(s): access restrictions, monitoring, classification tagging."
             })
         
         # Governance gaps alert
@@ -279,28 +320,74 @@ def score_risk(
                 "alert_id": "alert_governance_gaps_001",
                 "severity": "high",
                 "category": "governance_gaps",
-                "message": f"{governance_gaps} governance gap(s) detected",
+                "message": f"GOVERNANCE GAPS: {governance_gaps} sensitive field(s) lack encryption or security controls",
                 "affected_fields_count": governance_gaps,
-                "recommendation": f"Address {governance_gaps} governance gap(s) to ensure compliance and data quality."
+                "recommendation": f"Address governance gaps: encrypt {governance_gaps} field(s), implement access controls, audit logging, and data retention policies."
             })
         
-        # Compliance framework alerts
-        impacted_frameworks = risk_summary["compliance_frameworks_impacted"]
-        if impacted_frameworks:
-            for framework in impacted_frameworks:
-                alerts.append({
-                    "alert_id": f"alert_compliance_{framework.lower()}",
-                    "severity": "critical" if framework == "HIPAA" else "high",
-                    "category": "compliance",
-                    "message": f"{framework} compliance requirements detected",
-                    "affected_fields_count": len([f for f in field_risk_assessments if framework in str(f.get("compliance_issues", []))]),
-                    "recommendation": f"Ensure {framework} compliance: encryption, access controls, consent management, audit trails"
-                })
+        # Compliance framework alerts - GDPR
+        if "GDPR" in impacted_frameworks:
+            gdpr_fields = len([f for f in field_risk_assessments if "GDPR" in str(f.get("compliance_issues", []))])
+            alerts.append({
+                "alert_id": "alert_compliance_gdpr_critical",
+                "severity": "critical",
+                "category": "compliance_gdpr",
+                "message": f"GDPR COMPLIANCE: {gdpr_fields} field(s) contain personal data covered by GDPR",
+                "affected_fields_count": gdpr_fields,
+                "recommendation": "Implement GDPR compliance: explicit consent mechanisms, data subject rights (access, erasure, portability), DPA records, breach notification procedures (72 hours)."
+            })
+        
+        # Compliance framework alerts - HIPAA
+        if "HIPAA" in impacted_frameworks:
+            hipaa_fields = len([f for f in field_risk_assessments if "HIPAA" in str(f.get("compliance_issues", []))])
+            alerts.append({
+                "alert_id": "alert_compliance_hipaa_critical",
+                "severity": "critical",
+                "category": "compliance_hipaa",
+                "message": f"HIPAA COMPLIANCE REQUIRED: {hipaa_fields} field(s) contain protected health information (PHI)",
+                "affected_fields_count": hipaa_fields,
+                "recommendation": "IMMEDIATE: Implement end-to-end encryption, role-based access control, Business Associate Agreements (BAAs), audit controls, 6-year retention requirements."
+            })
+        
+        # Compliance framework alerts - CCPA
+        if "CCPA" in impacted_frameworks:
+            ccpa_fields = len([f for f in field_risk_assessments if "CCPA" in str(f.get("compliance_issues", []))])
+            alerts.append({
+                "alert_id": "alert_compliance_ccpa_high",
+                "severity": "high",
+                "category": "compliance_ccpa",
+                "message": f"CCPA COMPLIANCE: {ccpa_fields} field(s) contain consumer personal information",
+                "affected_fields_count": ccpa_fields,
+                "recommendation": "Implement CCPA compliance: consumer rights mechanisms (access, delete, opt-out), privacy notices, opt-out mechanisms, data inventory, verification procedures."
+            })
+        
+        # Encryption not implemented alert
+        unencrypted_pii = total_high_risk
+        if unencrypted_pii > 0:
+            alerts.append({
+                "alert_id": "alert_encryption_missing",
+                "severity": "critical",
+                "category": "encryption_gap",
+                "message": f"ENCRYPTION MISSING: {unencrypted_pii} high-risk field(s) may lack encryption",
+                "affected_fields_count": unencrypted_pii,
+                "recommendation": "Implement encryption immediately: AES-256 at rest, TLS 1.2+ in transit, key management system with HSM, field-level encryption for PII."
+            })
+        
+        # Multiple compliance frameworks alert
+        if len(impacted_frameworks) > 1:
+            alerts.append({
+                "alert_id": "alert_multiple_compliance_critical",
+                "severity": "critical",
+                "category": "multi_compliance",
+                "message": f"MULTIPLE COMPLIANCE FRAMEWORKS TRIGGERED: {', '.join(impacted_frameworks)}",
+                "affected_fields_count": len(field_risk_assessments),
+                "recommendation": f"CRITICAL: Address compliance requirements for all {len(impacted_frameworks)} frameworks. This increases implementation complexity and audit requirements significantly."
+            })
         
         # ==================== GENERATE ISSUES ====================
         issues = []
         
-        # Add field risk issues
+        # Add field risk issues with comprehensive issue types
         for field in field_risk_assessments:
             if field.get("risk_level") in ["high", "medium"]:
                 risk_score = field.get("risk_score", 0)
@@ -315,25 +402,83 @@ def score_risk(
                     "agent_id": "score-risk",
                     "field_name": field_name,
                     "issue_type": "pii_or_sensitive_data",
-                    "severity": "critical" if risk_level == "high" else "warning",
-                    "message": f"{field_name} - Risk {risk_score}/100 ({risk_level.upper()})"
+                    "severity": "critical" if risk_level == "high" else "high",
+                    "message": f"{field_name} - Risk {risk_score}/100 ({risk_level.upper()})",
+                    "remediation_time_hours": 4 if risk_level == "high" else 2
                 })
                 
-                # Add specific risk factor issues
+                # Add comprehensive PII detection issues
                 for risk_factor in risk_factors:
                     factor_type = risk_factor.get("factor", "unknown")
                     pii_type = risk_factor.get("pii_type")
                     confidence = risk_factor.get("confidence", 0)
                     
                     if factor_type == "pii_detected" and pii_type:
+                        pii_type_display = pii_type.replace("_", " ").title()
                         issues.append({
                             "issue_id": f"issue_pii_{field_id}_{pii_type}",
                             "agent_id": "score-risk",
                             "field_name": field_name,
                             "issue_type": f"pii_{pii_type}",
                             "severity": "critical",
-                            "message": f"PII detected: {pii_type.replace('_', ' ').title()} (confidence: {confidence:.0%})"
+                            "message": f"PII detected: {pii_type_display} (confidence: {confidence:.0%})",
+                            "pii_category": pii_type,
+                            "confidence_score": confidence,
+                            "remediation_time_hours": 8
                         })
+                        
+                        # Add specific PII subtype issues
+                        if pii_type == "email":
+                            issues.append({
+                                "issue_id": f"issue_pii_email_{field_id}",
+                                "agent_id": "score-risk",
+                                "field_name": field_name,
+                                "issue_type": "email_exposure",
+                                "severity": "high",
+                                "message": f"Email address exposure risk in {field_name}",
+                                "remediation_time_hours": 6
+                            })
+                        elif pii_type == "phone":
+                            issues.append({
+                                "issue_id": f"issue_pii_phone_{field_id}",
+                                "agent_id": "score-risk",
+                                "field_name": field_name,
+                                "issue_type": "phone_exposure",
+                                "severity": "high",
+                                "message": f"Phone number exposure risk in {field_name}",
+                                "remediation_time_hours": 6
+                            })
+                        elif pii_type == "ssn":
+                            issues.append({
+                                "issue_id": f"issue_pii_ssn_{field_id}",
+                                "agent_id": "score-risk",
+                                "field_name": field_name,
+                                "issue_type": "ssn_exposure",
+                                "severity": "critical",
+                                "message": f"Social Security Number exposure risk in {field_name}",
+                                "remediation_time_hours": 12
+                            })
+                        elif pii_type == "credit_card":
+                            issues.append({
+                                "issue_id": f"issue_pii_credit_card_{field_id}",
+                                "agent_id": "score-risk",
+                                "field_name": field_name,
+                                "issue_type": "credit_card_exposure",
+                                "severity": "critical",
+                                "message": f"Credit card number exposure risk in {field_name}",
+                                "remediation_time_hours": 12
+                            })
+                        elif pii_type == "zipcode":
+                            issues.append({
+                                "issue_id": f"issue_pii_zipcode_{field_id}",
+                                "agent_id": "score-risk",
+                                "field_name": field_name,
+                                "issue_type": "zipcode_exposure",
+                                "severity": "medium",
+                                "message": f"Zipcode exposure risk in {field_name}",
+                                "remediation_time_hours": 4
+                            })
+                    
                     elif factor_type == "contains_personal_identifier":
                         issues.append({
                             "issue_id": f"issue_sensitive_{field_id}",
@@ -341,38 +486,71 @@ def score_risk(
                             "field_name": field_name,
                             "issue_type": "sensitive_personal_data",
                             "severity": "high",
-                            "message": f"Contains personal identifier or sensitive information"
+                            "message": f"Contains personal identifier or sensitive information",
+                            "remediation_time_hours": 6
                         })
                 
-                # Add compliance issues
+                # Add governance and access control issues
+                if "governance" in str(risk_factors).lower():
+                    issues.append({
+                        "issue_id": f"issue_governance_{field_id}",
+                        "agent_id": "score-risk",
+                        "field_name": field_name,
+                        "issue_type": "governance_gap",
+                        "severity": "high",
+                        "message": f"Governance gap detected for {field_name}: No access control policy defined",
+                        "remediation_time_hours": 8
+                    })
+                
+                # Add data classification issues
+                issues.append({
+                    "issue_id": f"issue_classification_{field_id}",
+                    "agent_id": "score-risk",
+                    "field_name": field_name,
+                    "issue_type": "data_classification",
+                    "severity": "high",
+                    "message": f"{field_name} requires explicit classification: Personal/Sensitive/Confidential",
+                    "remediation_time_hours": 2
+                })
+                
+                # Add compliance issues with detailed framework tracking
                 compliance_issues = field.get("compliance_issues", [])
                 for idx, compliance_issue in enumerate(compliance_issues):
+                    framework = "GDPR"
+                    if "HIPAA" in compliance_issue:
+                        framework = "HIPAA"
+                    elif "CCPA" in compliance_issue:
+                        framework = "CCPA"
+                    
                     issues.append({
                         "issue_id": f"issue_compliance_{field_id}_{idx}",
                         "agent_id": "score-risk",
                         "field_name": field_name,
                         "issue_type": "compliance_violation",
-                        "severity": "critical" if "HIPAA" in compliance_issue else "high",
-                        "message": compliance_issue
+                        "severity": "critical" if framework in ["HIPAA", "GDPR"] else "high",
+                        "message": f"{framework} violation: {compliance_issue}",
+                        "framework": framework,
+                        "remediation_time_hours": 12 if framework == "HIPAA" else 8
                     })
         
         # ==================== GENERATE RECOMMENDATIONS ====================
         recommendations = []
         
-        # Risk recommendations for high-risk fields
+        # Critical priority: High-risk field encryption recommendations
         high_risk_fields = [f for f in field_risk_assessments if f.get("risk_level") == "high"][:3]
         for field in high_risk_fields:
             field_name = field.get("field_name")
             field_id = field.get("field_id")
             risk_factors = field.get("risk_factors", [])
+            risk_score = field.get("risk_score", 0)
             
             # Determine specific recommendation based on risk factors
             pii_detected = any(rf.get("factor") == "pii_detected" for rf in risk_factors)
             
             if pii_detected:
-                recommendation_text = f"Implement security measures for {field_name}: encryption (AES-256), role-based access control, audit logging"
+                recommendation_text = f"CRITICAL: Encrypt {field_name} using AES-256 (NIST approved). Implement role-based access control (RBAC) with principle of least privilege, comprehensive audit logging, and data access monitoring"
             else:
-                recommendation_text = f"Implement security measures for {field_name} - High risk detected"
+                recommendation_text = f"CRITICAL: Implement multi-layered security for {field_name} - Risk score {risk_score}/100. Requires encryption, access controls, and audit trails"
             
             recommendations.append({
                 "recommendation_id": f"rec_risk_{field_id}",
@@ -380,12 +558,15 @@ def score_risk(
                 "field_name": field_name,
                 "priority": "critical",
                 "recommendation": recommendation_text,
-                "timeline": "immediate"
+                "timeline": "immediate",
+                "estimated_effort_hours": 8,
+                "owner": "Data Security Team",
+                "depends_on": []
             })
         
-        # Medium risk fields
+        # High priority: Medium-risk field data masking/tokenization
         medium_risk_fields = [f for f in field_risk_assessments if f.get("risk_level") == "medium"][:3]
-        for field in medium_risk_fields:
+        for idx, field in enumerate(medium_risk_fields):
             field_name = field.get("field_name")
             field_id = field.get("field_id")
             
@@ -394,61 +575,100 @@ def score_risk(
                 "agent_id": "score-risk",
                 "field_name": field_name,
                 "priority": "high",
-                "recommendation": f"Review and secure {field_name} - Medium risk level. Consider data masking or tokenization",
-                "timeline": "1 week"
+                "recommendation": f"Implement data masking or tokenization for {field_name} - Medium risk level. Consider Format-Preserving Encryption (FPE) for operational requirements",
+                "timeline": "1 week",
+                "estimated_effort_hours": 4,
+                "owner": "Data Engineering Team",
+                "depends_on": ["rec_risk_*"] if idx == 0 else []
             })
         
-        # PII handling recommendation
+        # Critical priority: PII protection strategy
         if pii_fields_detected > 0:
+            pii_details = []
+            for pii_type in ["email", "phone", "ssn", "credit_card", "zipcode"]:
+                pii_type_display = pii_type.replace("_", " ").title()
+                pii_details.append(f"{pii_type_display}: implement encryption and access logs")
+            
             recommendations.append({
                 "recommendation_id": "rec_pii_handling",
                 "agent_id": "score-risk",
-                "field_name": f"{pii_fields_detected} fields",
+                "field_name": f"{pii_fields_detected} fields with PII",
                 "priority": "critical",
-                "recommendation": f"Implement PII protection strategy for {pii_fields_detected} field(s): anonymization, pseudonymization, or encryption",
-                "timeline": "immediate"
+                "recommendation": f"Implement comprehensive PII protection strategy for {pii_fields_detected} field(s): 1) Encryption (AES-256), 2) Anonymization/Pseudonymization for non-prod, 3) Tokenization for APIs, 4) Access controls with audit trails. Specific PII types: {'; '.join(pii_details[:3])}",
+                "timeline": "immediate",
+                "estimated_effort_hours": 16,
+                "owner": "Privacy & Security Officer",
+                "depends_on": []
             })
         
-        # Governance gaps recommendation
+        # High priority: Governance and access control implementation
         if governance_gaps > 0:
             recommendations.append({
                 "recommendation_id": "rec_governance_gaps",
                 "agent_id": "score-risk",
-                "field_name": f"{governance_gaps} fields",
+                "field_name": f"{governance_gaps} fields without governance",
                 "priority": "high",
-                "recommendation": f"Address {governance_gaps} governance gap(s): implement data classification, lineage tracking, and access policies",
-                "timeline": "1-2 weeks"
+                "recommendation": f"Address {governance_gaps} governance gap(s): 1) Implement data classification (Public/Internal/Confidential/Restricted), 2) Define data lineage tracking, 3) Establish role-based access policies, 4) Create data ownership assignments, 5) Implement data quality standards",
+                "timeline": "1-2 weeks",
+                "estimated_effort_hours": 12,
+                "owner": "Data Governance Team",
+                "depends_on": []
             })
         
-        # Compliance framework recommendations
-        for framework in impacted_frameworks:
-            if framework == "GDPR":
-                recommendations.append({
-                    "recommendation_id": "rec_gdpr_compliance",
-                    "agent_id": "score-risk",
-                    "field_name": "all PII fields",
-                    "priority": "critical",
-                    "recommendation": "GDPR compliance: implement consent management, data portability, right to erasure, and breach notification procedures",
-                    "timeline": "2-4 weeks"
-                })
-            elif framework == "HIPAA":
-                recommendations.append({
-                    "recommendation_id": "rec_hipaa_compliance",
-                    "agent_id": "score-risk",
-                    "field_name": "all PHI fields",
-                    "priority": "critical",
-                    "recommendation": "HIPAA compliance: implement end-to-end encryption, access controls, audit trails, and Business Associate Agreements (BAAs)",
-                    "timeline": "immediate"
-                })
-            elif framework == "CCPA":
-                recommendations.append({
-                    "recommendation_id": "rec_ccpa_compliance",
-                    "agent_id": "score-risk",
-                    "field_name": "all personal information",
-                    "priority": "high",
-                    "recommendation": "CCPA compliance: implement consumer rights mechanisms (access, delete, opt-out), privacy notices, and data inventory",
-                    "timeline": "2-3 weeks"
-                })
+        # Critical priority: GDPR compliance recommendation
+        if "GDPR" in impacted_frameworks:
+            recommendations.append({
+                "recommendation_id": "rec_gdpr_compliance",
+                "agent_id": "score-risk",
+                "field_name": "all PII fields (GDPR scope)",
+                "priority": "critical",
+                "recommendation": "GDPR compliance: 1) Implement consent management system with explicit opt-in, 2) Enable data portability (export in standard formats), 3) Implement right to erasure (complete PII removal), 4) Establish breach notification procedures (72-hour notification), 5) Conduct Data Protection Impact Assessments (DPIA), 6) Update privacy policies and data processing agreements",
+                "timeline": "immediate",
+                "estimated_effort_hours": 24,
+                "owner": "Legal & Compliance Team",
+                "depends_on": ["rec_pii_handling"]
+            })
+        
+        # Critical priority: HIPAA compliance recommendation
+        if "HIPAA" in impacted_frameworks:
+            recommendations.append({
+                "recommendation_id": "rec_hipaa_compliance",
+                "agent_id": "score-risk",
+                "field_name": "all PHI fields (HIPAA scope)",
+                "priority": "critical",
+                "recommendation": "HIPAA compliance: 1) Implement end-to-end encryption (minimum AES-256), 2) Deploy granular access controls with role separation, 3) Maintain comprehensive audit trails (minimum 6 years), 4) Execute Business Associate Agreements (BAAs) with all vendors, 5) Implement HIPAA-compliant backup and disaster recovery, 6) Conduct Security Risk Analysis (SRA) annually",
+                "timeline": "immediate",
+                "estimated_effort_hours": 32,
+                "owner": "HIPAA Compliance Officer",
+                "depends_on": ["rec_pii_handling"]
+            })
+        
+        # High priority: CCPA compliance recommendation
+        if "CCPA" in impacted_frameworks:
+            recommendations.append({
+                "recommendation_id": "rec_ccpa_compliance",
+                "agent_id": "score-risk",
+                "field_name": "all personal information (CCPA scope)",
+                "priority": "high",
+                "recommendation": "CCPA compliance: 1) Implement consumer rights mechanisms (access, delete, do-not-sell), 2) Create opt-out mechanisms for data sales, 3) Update privacy notices with California-specific disclosures, 4) Maintain data inventory (sources, uses, retention), 5) Establish vendor management procedures, 6) Implement data minimization practices",
+                "timeline": "2-3 weeks",
+                "estimated_effort_hours": 20,
+                "owner": "Privacy Counsel",
+                "depends_on": []
+            })
+        
+        # High priority: Audit logging and monitoring
+        recommendations.append({
+            "recommendation_id": "rec_audit_logging",
+            "agent_id": "score-risk",
+            "field_name": "all sensitive fields",
+            "priority": "high",
+            "recommendation": "Implement comprehensive audit logging for all sensitive fields: 1) Log all access events (user, timestamp, action), 2) Implement real-time alerting for suspicious access patterns, 3) Maintain audit logs for minimum 1 year (encrypted), 4) Setup SIEM (Security Information & Event Management) integration, 5) Regular audit log reviews and anomaly detection",
+            "timeline": "1-2 weeks",
+            "estimated_effort_hours": 10,
+            "owner": "Security Operations Center",
+            "depends_on": []
+        })
         
         # ==================== GENERATE EXECUTIVE SUMMARY ====================
         executive_summary = []

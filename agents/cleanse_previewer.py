@@ -248,6 +248,37 @@ def execute_cleanse_previewer(
                 "affected_fields_count": failed_simulations,
                 "recommendation": "Review and fix failed simulation rules before execution."
             })
+
+        # Large memory change alert
+        memory_change = preview_analysis.get('original_profile', {}).get('memory_usage_mb', 0) - preview_analysis.get('simulated_results', [{}])[0].get('preview_metrics', {}).get('memory_mb', 0) if simulated_results else 0
+        # fallback: compute approximate memory change across first simulation
+        try:
+            memory_change = 0
+            if simulated_results:
+                memory_change = simulated_results[0].get('preview_metrics', {}).get('memory_mb', 0) - original_profile.get('memory_usage_mb', 0)
+        except:
+            memory_change = 0
+
+        if abs(memory_change) > 50:  # MB
+            alerts.append({
+                "alert_id": "alert_preview_memory_change",
+                "severity": "medium",
+                "category": "resource_impact",
+                "message": f"Significant memory change after simulation: {memory_change:.1f} MB (first simulated rule)",
+                "affected_fields_count": 1,
+                "recommendation": "Review transformations that add or remove large columns or expand data (e.g., exploding arrays). Consider sampling for full-run estimation."
+            })
+
+        # Low preview confidence alert
+        if preview_score["metrics"].get("successful_simulations", 0) < max(1, preview_score["metrics"].get("total_simulations", 0)) and preview_score["overall_score"] < 60:
+            alerts.append({
+                "alert_id": "alert_preview_low_confidence",
+                "severity": "high",
+                "category": "preview_confidence",
+                "message": f"Preview confidence low: score {preview_score['overall_score']:.1f}/100 with {preview_score['metrics'].get('successful_simulations',0)}/{preview_score['metrics'].get('total_simulations',0)} successful simulations",
+                "affected_fields_count": preview_score["metrics"].get("total_simulations", 0),
+                "recommendation": "Increase sampling, refine simulation rules, or run a staged test on a representative subset before full execution."
+            })
         
         # ==================== GENERATE ISSUES ====================
         issues = []
@@ -262,6 +293,28 @@ def execute_cleanse_previewer(
                 "issue_type": impact_issue.get("issue_type", "preview_issue"),
                 "severity": impact_issue.get("severity", "medium"),
                 "message": impact_issue.get("description", "Preview issue detected")
+            })
+            
+        # Memory usage issue
+        if abs(memory_change) > 50:
+            issues.append({
+                "issue_id": "issue_preview_memory_spike",
+                "agent_id": "cleanse-previewer",
+                "field_name": "global",
+                "issue_type": "resource_usage",
+                "severity": "medium",
+                "message": f"Projected memory usage change of {memory_change:.1f} MB detected during simulation."
+            })
+
+        # Simulation failure issue
+        if failed_simulations > 0:
+            issues.append({
+                "issue_id": "issue_preview_simulation_failed",
+                "agent_id": "cleanse-previewer",
+                "field_name": "simulation_engine",
+                "issue_type": "execution_error",
+                "severity": "high",
+                "message": f"{failed_simulations} simulation rules failed to execute."
             })
         
         # ==================== GENERATE RECOMMENDATIONS ====================
@@ -290,6 +343,28 @@ def execute_cleanse_previewer(
                 "field_name": "all rules",
                 "priority": "critical",
                 "recommendation": "Create data backup before executing cleaning operations. High risk of data loss detected.",
+                "timeline": "immediate"
+            })
+
+        # Memory recommendation
+        if abs(memory_change) > 50:
+            agent_recommendations.append({
+                "recommendation_id": "rec_preview_memory_optimization",
+                "agent_id": "cleanse-previewer",
+                "field_name": "global",
+                "priority": "medium",
+                "recommendation": "Optimize cleaning rules to reduce memory footprint. Consider processing in chunks.",
+                "timeline": "before_execution"
+            })
+            
+        # Low confidence recommendation
+        if preview_score["overall_score"] < 60:
+             agent_recommendations.append({
+                "recommendation_id": "rec_preview_improve_rules",
+                "agent_id": "cleanse-previewer",
+                "field_name": "configuration",
+                "priority": "high",
+                "recommendation": "Refine cleaning rules to improve preview score. Current score indicates potential issues.",
                 "timeline": "immediate"
             })
         

@@ -201,73 +201,158 @@ def execute_quarantine_agent(
         # ==================== GENERATE ALERTS ====================
         alerts = []
         
-        # Critical quarantine alert
-        if len(quarantined_data) > len(original_df) * 0.3:
+        quarantine_pct = round((len(quarantined_data) / len(original_df) * 100) if len(original_df) > 0 else 0, 2)
+        severity_breakdown = quarantine_analysis.get('severity_breakdown', {})
+        critical_issues = severity_breakdown.get('critical', 0)
+        high_issues = severity_breakdown.get('high', 0)
+        issue_types = quarantine_analysis.get('issue_types', {})
+        missing_field_count = issue_types.get('missing_required_field', 0)
+        type_mismatch_count = issue_types.get('type_mismatch', 0)
+        schema_mismatch_count = issue_types.get('schema_mismatch', 0)
+        
+        # Alert 1: High quarantine volume (critical threshold)
+        if quarantine_pct > 30:
             alerts.append({
-                "alert_id": "alert_quarantine_high_volume",
+                "alert_id": "alert_quarantine_001_volume_critical",
                 "severity": "critical",
+                "category": "data_quality",
+                "message": f"CRITICAL: {len(quarantined_data)} records ({quarantine_pct:.1f}%) quarantined - exceeds 30% threshold",
+                "affected_fields_count": len(issue_types),
+                "recommendation": "URGENT: Data quality degradation detected. Review source data immediately and implement stricter validation at ingestion."
+            })
+        elif quarantine_pct > 15:
+            alerts.append({
+                "alert_id": "alert_quarantine_001_volume_high",
+                "severity": "high",
                 "category": "data_quality",
                 "message": f"High quarantine volume: {len(quarantined_data)} records ({quarantine_pct:.1f}%) quarantined",
-                "affected_fields_count": len(quarantine_analysis.get('issue_types', {})),
-                "recommendation": "Review data source quality. High quarantine rate indicates systemic data quality issues."
+                "affected_fields_count": len(issue_types),
+                "recommendation": "Investigate quarantine patterns. Data source quality may need improvement."
             })
-        elif len(quarantined_data) > len(original_df) * 0.1:
+        elif quarantine_pct > 5:
             alerts.append({
-                "alert_id": "alert_quarantine_medium_volume",
-                "severity": "high",
+                "alert_id": "alert_quarantine_001_volume_medium",
+                "severity": "medium",
                 "category": "data_quality",
                 "message": f"Moderate quarantine volume: {len(quarantined_data)} records ({quarantine_pct:.1f}%) quarantined",
-                "affected_fields_count": len(quarantine_analysis.get('issue_types', {})),
-                "recommendation": "Investigate quarantine patterns to identify root causes."
+                "affected_fields_count": len(issue_types),
+                "recommendation": "Monitor quarantine trends for patterns indicating systemic issues."
             })
         
-        # Severity breakdown alert
-        critical_issues = severity_breakdown.get('critical', 0)
+        # Alert 2: Critical severity issues
         if critical_issues > 0:
             alerts.append({
-                "alert_id": "alert_quarantine_critical_issues",
+                "alert_id": "alert_quarantine_002_critical_severity",
                 "severity": "critical",
                 "category": "data_integrity",
-                "message": f"{critical_issues} critical data integrity issues detected",
+                "message": f"Critical data integrity issues: {critical_issues} record(s) with critical-severity problems",
                 "affected_fields_count": critical_issues,
-                "recommendation": "Address critical issues immediately. These indicate severe data quality problems."
+                "recommendation": "Address all critical issues immediately. These indicate severe data quality violations requiring urgent remediation."
             })
         
-        # Data integrity alert
+        # Alert 3: High severity issues
+        if high_issues > len(original_df) * 0.05:
+            alerts.append({
+                "alert_id": "alert_quarantine_003_high_severity",
+                "severity": "high",
+                "category": "data_quality",
+                "message": f"High-severity issues detected: {high_issues} records with high-severity violations",
+                "affected_fields_count": high_issues,
+                "recommendation": "Prioritize fixing high-severity violations to improve dataset quality."
+            })
+        
+        # Alert 4: Data integrity score
         if quality_score['metrics']['data_integrity_rate'] < 80:
             alerts.append({
-                "alert_id": "alert_quarantine_integrity",
-                "severity": "high",
+                "alert_id": "alert_quarantine_004_integrity_score",
+                "severity": "high" if quality_score['metrics']['data_integrity_rate'] < 70 else "medium",
                 "category": "data_integrity",
                 "message": f"Data integrity rate: {quality_score['metrics']['data_integrity_rate']:.1f}% (below 80% threshold)",
                 "affected_fields_count": len(quarantined_data),
-                "recommendation": "Improve data validation at source to reduce quarantine requirements."
+                "recommendation": "Improve data validation processes at source. Low integrity rate indicates missing or insufficient validation rules."
             })
         
-        # Quality score alert
-        if quality_score["overall_score"] < good_threshold:
+        # Alert 5: Missing required fields violations
+        if missing_field_count > 0:
             alerts.append({
-                "alert_id": "alert_quarantine_quality",
-                "severity": "medium",
-                "category": "quality_score",
-                "message": f"Quarantine quality score: {quality_score['overall_score']:.1f}/100 ({quality_status})",
+                "alert_id": "alert_quarantine_005_missing_fields",
+                "severity": "critical" if missing_field_count > len(original_df) * 0.1 else "high",
+                "category": "data_integrity",
+                "message": f"Missing required fields: {missing_field_count} records missing mandatory fields",
+                "affected_fields_count": missing_field_count,
+                "recommendation": "Enforce required field validation at data ingestion. Missing mandatory fields indicate incomplete data capture."
+            })
+        
+        # Alert 6: Type mismatches
+        if type_mismatch_count > 0:
+            alerts.append({
+                "alert_id": "alert_quarantine_006_type_mismatches",
+                "severity": "high" if type_mismatch_count > len(original_df) * 0.05 else "medium",
+                "category": "data_quality",
+                "message": f"Type mismatches detected: {type_mismatch_count} records with incorrect data types",
+                "affected_fields_count": type_mismatch_count,
+                "recommendation": "Implement type validation and conversion rules. Type mismatches cause processing failures and data integrity issues."
+            })
+        
+        # Alert 7: Schema mismatches
+        if schema_mismatch_count > 0:
+            alerts.append({
+                "alert_id": "alert_quarantine_007_schema_mismatch",
+                "severity": "critical",
+                "category": "data_integrity",
+                "message": f"Schema mismatches: {len(quarantined_data)} records fail schema validation",
                 "affected_fields_count": len(quarantined_data),
-                "recommendation": "Review quarantine strategy and thresholds for optimization."
+                "recommendation": "Validate and align data source schema. Schema mismatches prevent all record processing."
+            })
+        
+        # Alert 8: Corrupted/invalid records
+        corrupted_count = issue_types.get('corrupted_record', 0) + issue_types.get('invalid_format', 0) + issue_types.get('out_of_range', 0)
+        if corrupted_count > 0:
+            alerts.append({
+                "alert_id": "alert_quarantine_008_corrupted_invalid",
+                "severity": "high" if corrupted_count > len(original_df) * 0.1 else "medium",
+                "category": "data_quality",
+                "message": f"Corrupted/invalid records: {corrupted_count} records with format violations or out-of-range values",
+                "affected_fields_count": corrupted_count,
+                "recommendation": "Review validation rules and data source quality. Invalid formats and corrupted records impact pipeline reliability."
             })
         
         # ==================== GENERATE ISSUES ====================
         issues = []
         
-        # Convert quarantine issues to standardized format
-        for q_issue in quarantine_analysis.get('quarantine_issues', [])[:100]:
+        # Convert quarantine issues to standardized format with enhanced severity mapping
+        for idx, q_issue in enumerate(quarantine_analysis.get('quarantine_issues', [])[:100]):
+            issue_type = q_issue.get('issue_type', 'unknown')
+            severity = q_issue.get('severity', 'medium')
+            
+            # Map severity more precisely based on issue type
+            if issue_type in ['missing_required_field', 'schema_mismatch', 'corrupted_record']:
+                severity = 'critical'
+            elif issue_type in ['type_mismatch', 'out_of_range']:
+                severity = 'high'
+            elif issue_type == 'invalid_format':
+                severity = 'medium'
+            
             issues.append({
-                "issue_id": f"issue_quarantine_{q_issue.get('row_index', 0)}_{q_issue.get('issue_type', 'unknown')}",
+                "issue_id": f"issue_quarantine_{issue_type}_{idx}_{q_issue.get('row_index', 0)}",
                 "agent_id": "quarantine-agent",
                 "field_name": q_issue.get('column', 'N/A'),
-                "issue_type": q_issue.get('issue_type', 'quarantine_issue'),
-                "severity": q_issue.get('severity', 'medium'),
+                "issue_type": issue_type,
+                "severity": severity,
                 "message": q_issue.get('description', 'Data quarantine issue detected')
             })
+        
+        # Add aggregated issue summaries for issue type patterns
+        for issue_type, count in issue_types.items():
+            if count > 0 and len(issues) < 100:
+                issues.append({
+                    "issue_id": f"issue_quarantine_aggregate_{issue_type}",
+                    "agent_id": "quarantine-agent",
+                    "field_name": "all",
+                    "issue_type": f"{issue_type}_pattern",
+                    "severity": "critical" if issue_type in ['missing_required_field', 'schema_mismatch'] else "high" if issue_type == 'type_mismatch' else "medium",
+                    "message": f"{count} record(s) identified with {issue_type} - indicating systemic {issue_type.replace('_', ' ')} issue"
+                })
         
         # ==================== GENERATE RECOMMENDATIONS ====================
         agent_recommendations = []
