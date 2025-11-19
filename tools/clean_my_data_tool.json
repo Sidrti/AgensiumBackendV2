@@ -279,12 +279,6 @@
           "content": "string (base64)",
           "size_bytes": "integer",
           "format": "string"
-        },
-        "quarantine_file": {
-          "filename": "string",
-          "content": "string (base64)",
-          "size_bytes": "integer",
-          "format": "string"
         }
       }
     },

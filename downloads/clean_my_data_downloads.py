@@ -129,13 +129,15 @@ class CleanMyDataDownloads:
         # Add cleaned CSV files from individual agents
         agent_names = {
             "cleanse-previewer": "Cleanse Previewer",
+            "quarantine-agent": "Quarantine Agent",
+            "type-fixer": "Type Fixer",
+            "field-standardization": "Field Standardization",
+            "duplicate-resolver": "Duplicate Resolver",
             "null-handler": "Null Handler",
             "outlier-remover": "Outlier Remover",
-            "type-fixer": "Type Fixer",
-            "duplicate-resolver": "Duplicate Resolver",
-            "field-standardization": "Field Standardization",
-            "cleanse-writeback": "Cleanse Writeback",
-            "quarantine-agent": "Quarantine Agent"
+            "governance-checker": "Governance Checker",
+            "test-coverage-agent": "Test Coverage Agent",
+            "cleanse-writeback": "Cleanse Writeback"
         }
         
         for agent_id, agent_name in agent_names.items():
@@ -143,12 +145,27 @@ class CleanMyDataDownloads:
                 cleaned_file_data = cleaned_files[agent_id]
                 
                 # Create download entry for cleaned file following the standard pattern
+                # download_entry = {
+                #     "download_id": f"{analysis_id}_cleaned_{agent_id}",
+                #     "name": f"Clean My Data - {agent_name} Cleaned Data",
+                #     "format": "csv",
+                #     "file_name": cleaned_file_data.get("filename", f"cleaned_{agent_id}.csv"),
+                #     "description": f"Cleaned data file produced by {agent_name} agent with all cleaning operations applied",
+                #     "mimeType": "text/csv",
+                #     "content_base64": cleaned_file_data.get("content", ""),  # Already base64 encoded from agent
+                #     "size_bytes": cleaned_file_data.get("size_bytes", 0),
+                #     "creation_date": datetime.utcnow().isoformat() + "Z",
+                #     "type": "cleaned_data",
+                #     "agent_id": agent_id
+                # }
+
+               # Create download entry for final cleaned data (most processed version)
                 download_entry = {
-                    "download_id": f"{analysis_id}_cleaned_{agent_id}",
-                    "name": f"Clean My Data - {agent_name} Cleaned Data",
+                    "download_id": f"{analysis_id}_final_cleaned_data",
+                    "name": "Clean My Data - Final Cleaned Data",
                     "format": "csv",
-                    "file_name": cleaned_file_data.get("filename", f"cleaned_{agent_id}.csv"),
-                    "description": f"Cleaned data file produced by {agent_name} agent with all cleaning operations applied",
+                    "file_name": cleaned_file_data.get("filename", "final_cleaned_data.csv"),
+                    "description": "Final cleaned data file with all cleaning operations applied across the entire pipeline",
                     "mimeType": "text/csv",
                     "content_base64": cleaned_file_data.get("content", ""),  # Already base64 encoded from agent
                     "size_bytes": cleaned_file_data.get("size_bytes", 0),
@@ -158,29 +175,6 @@ class CleanMyDataDownloads:
                 }
                 
                 downloads.append(download_entry)
-        
-        # ==================== ADD QUARANTINED DATA FILES ====================
-        # Add quarantined records file from quarantine agent
-        if "quarantine-agent" in cleaned_files:
-            quarantine_file = cleaned_files.get("quarantine-agent", {}).get("quarantine_file", {})
-            
-            if quarantine_file:
-                quarantine_entry = {
-                    "download_id": f"{analysis_id}_quarantined_records",
-                    "name": "Clean My Data - Quarantined Records",
-                    "format": "csv",
-                    "file_name": quarantine_file.get("filename", "quarantined_records.csv"),
-                    "description": "Records identified and isolated by Quarantine Agent as invalid or suspicious. Contains problematic data with quarantine timestamps and reasons.",
-                    "mimeType": "text/csv",
-                    "content_base64": quarantine_file.get("content", ""),
-                    "size_bytes": quarantine_file.get("size_bytes", 0),
-                    "creation_date": datetime.utcnow().isoformat() + "Z",
-                    "type": "cleaned_data",
-                    "agent_id": "quarantine-agent",
-                    "data_type": "quarantine_zone"
-                }
-                
-                downloads.append(quarantine_entry)
         
         return downloads
     
