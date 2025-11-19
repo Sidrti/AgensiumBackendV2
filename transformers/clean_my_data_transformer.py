@@ -99,7 +99,7 @@ def transform_clean_my_data_response(
     # ==================== GENERATE AI SUMMARY ====================
     analysis_text_parts = ["EXECUTIVE SUMMARY:"]
     
-    for item in executive_summary[:6]:
+    for item in executive_summary:
         analysis_text_parts.append(f"- {item.get('title', '')}: {item.get('description', '')}")
     
     analysis_text_parts.append("")
@@ -209,6 +209,12 @@ def transform_clean_my_data_response(
     
     # ==================== BUILD FINAL RESPONSE ====================
     
+    # Include all agent results (both success and error) in the report
+    # This provides complete visibility into agent execution
+    agent_outputs = {}
+    for agent_id, output in agent_results.items():
+        agent_outputs[agent_id] = output
+    
     return {
         "analysis_id": analysis_id,
         "tool": "clean-my-data",
@@ -223,9 +229,8 @@ def transform_clean_my_data_response(
             "analysisSummary": analysis_summary,
             "rowLevelIssues": all_row_level_issues,
             "issueSummary": issue_summary,
-            "visualizations": [],
             "routing_decisions": routing_decisions,
-            **{agent_id: output for agent_id, output in agent_results.items() if output.get("status") == "success"},
-            "downloads": downloads
+            "downloads": downloads,
+            **agent_outputs,
         }
     }

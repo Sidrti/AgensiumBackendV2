@@ -199,7 +199,7 @@ def execute_cleanse_writeback(
         # ==================== GENERATE AI ANALYSIS TEXT ====================
         ai_analysis_parts = []
         ai_analysis_parts.append(f"CLEANSE WRITEBACK ANALYSIS:")
-        ai_analysis_parts.append(f"- Writeback Score: {writeback_score['overall_score']:.1f}/100 (Integrity: {writeback_score['metrics']['integrity_score']:.1f}, Completeness: {writeback_score['metrics']['completeness_score']:.1f}, Readiness: {writeback_score['metrics']['readiness_score']:.1f})")
+        ai_analysis_parts.append(f"- Writeback Score: {writeback_score['overall_score']:.1f}/100 (Integrity: {writeback_score['metrics']['integrity_score']:.1f}, Completeness: {writeback_score['metrics']['completeness_score']:.1f}, Auditability: {writeback_score['metrics']['auditability_score']:.1f})")
         ai_analysis_parts.append(f"- Integrity Verification: {checks_passed}/{total_checks} checks passed ({(checks_passed/total_checks*100):.1f}% success rate), All Checks Passed: {'Yes' if data_ready else 'No'}")
         
         ai_analysis_parts.append(f"- Data Package: {len(df)} rows, {len(df.columns)} columns verified and ready for pipeline")
@@ -213,9 +213,7 @@ def execute_cleanse_writeback(
         
         ai_analysis_text = "\n".join(ai_analysis_parts)
         
-        # Add to writeback_data
-        writeback_data["executive_summary"] = executive_summary
-        writeback_data["ai_analysis_text"] = ai_analysis_text
+        
         
         # ==================== GENERATE ROW-LEVEL-ISSUES ====================
         row_level_issues = []
@@ -639,6 +637,8 @@ def execute_cleanse_writeback(
             "alerts": alerts,
             "issues": issues,
             "recommendations": agent_recommendations,
+            "executive_summary": executive_summary,
+            "ai_analysis_text" : ai_analysis_text,
             "row_level_issues": row_level_issues,
             "issue_summary": issue_summary
         }

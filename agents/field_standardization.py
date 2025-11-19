@@ -279,17 +279,17 @@ def execute_field_standardization(
             "title": "Field Standardization Status",
             "value": f"{standardization_score['overall_score']:.1f}",
             "status": "excellent" if quality_status == "excellent" else "good" if quality_status == "good" else "needs_improvement",
-            "description": f"Quality: {quality_status}, Values Changed: {values_changed}, {len(columns_to_process)} columns standardized, {variations_reduced} variations reduced, {standardization_score['metrics']['improvement_percentage']:.1f}% improvement"
+            "description": f"Quality: {quality_status}, Values Changed: {values_changed}, {len(columns_to_process)} columns standardized, {variations_reduced} variations reduced, {standardization_score['metrics']['standardization_effectiveness']:.1f}% improvement"
         }]
         
         # ==================== GENERATE AI ANALYSIS TEXT ====================
         ai_analysis_parts = []
         ai_analysis_parts.append(f"FIELD STANDARDIZATION ANALYSIS:")
-        ai_analysis_parts.append(f"- Standardization Score: {standardization_score['overall_score']:.1f}/100 (Consistency: {standardization_score['metrics']['consistency_score']:.1f}, Coverage: {standardization_score['metrics']['coverage_score']:.1f}, Effectiveness: {standardization_score['metrics']['effectiveness_score']:.1f})")
-        ai_analysis_parts.append(f"- Standardization Applied: {values_changed} values standardized, {variations_reduced} variations reduced, {standardization_score['metrics']['improvement_percentage']:.1f}% improvement")
+        ai_analysis_parts.append(f"- Standardization Score: {standardization_score['overall_score']:.1f}/100 (Effectiveness: {standardization_score['metrics']['standardization_effectiveness']:.1f}, Data Retention: {standardization_score['metrics']['data_retention_rate']:.1f}, Column Retention: {standardization_score['metrics']['column_retention_rate']:.1f})")
+        ai_analysis_parts.append(f"- Standardization Applied: {values_changed} values standardized, {variations_reduced} variations reduced, {standardization_score['metrics']['standardization_effectiveness']:.1f}% improvement")
         
         ai_analysis_parts.append(f"- Columns Processed: {len(columns_to_process)} columns standardized ({', '.join(list(columns_to_process)[:5])}{'...' if len(columns_to_process) > 5 else ''})")
-        ai_analysis_parts.append(f"- Data Quality: {standardization_score['metrics']['data_quality_percentage']:.1f}% data quality after standardization")
+        ai_analysis_parts.append(f"- Data Quality: {standardization_score['metrics']['data_retention_rate']:.1f}% data quality after standardization")
         
         col_improvements = standardization_analysis["improvements"].get("column_improvements", {})
         if len(col_improvements) > 0:
@@ -301,9 +301,7 @@ def execute_field_standardization(
         
         ai_analysis_text = "\n".join(ai_analysis_parts)
         
-        # Add to standardization_data
-        standardization_data["executive_summary"] = executive_summary
-        standardization_data["ai_analysis_text"] = ai_analysis_text
+        
         
         # ==================== GENERATE ALERTS ====================
         alerts = []
@@ -333,7 +331,7 @@ def execute_field_standardization(
             })
         
         # Low improvement alert
-        improvement_pct = standardization_score['metrics'].get('improvement_percentage', 0)
+        improvement_pct = standardization_score['metrics'].get('standardization_effectiveness', 0)
         if improvement_pct < 10 and total_variations > 0:
             alerts.append({
                 "alert_id": "alert_standardization_low_improvement",
@@ -582,6 +580,8 @@ def execute_field_standardization(
             "alerts": alerts,
             "issues": issues,
             "recommendations": agent_recommendations,
+            "executive_summary" : executive_summary,
+            "ai_analysis_text" : ai_analysis_text,
             "row_level_issues": row_level_issues,
             "issue_summary": issue_summary,
             "cleaned_file": {

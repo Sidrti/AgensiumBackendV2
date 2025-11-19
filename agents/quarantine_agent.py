@@ -175,7 +175,7 @@ def execute_quarantine_agent(
         # ==================== GENERATE AI ANALYSIS TEXT ====================
         ai_analysis_parts = []
         ai_analysis_parts.append(f"QUARANTINE AGENT ANALYSIS:")
-        ai_analysis_parts.append(f"- Quality Score: {quality_score['overall_score']:.1f}/100 (Quarantine Reduction: {quality_score['metrics']['quarantine_reduction_score']:.1f}, Data Integrity: {quality_score['metrics']['data_integrity_score']:.1f}, Processing Efficiency: {quality_score['metrics']['processing_efficiency_score']:.1f})")
+        ai_analysis_parts.append(f"- Quality Score: {quality_score['overall_score']:.1f}/100 (Quarantine Reduction: {quality_score['metrics']['quarantine_reduction_rate']:.1f}, Data Integrity: {quality_score['metrics']['data_integrity_rate']:.1f}, Processing Efficiency: {quality_score['metrics']['processing_efficiency_rate']:.1f})")
         
         quarantine_pct = round((len(quarantined_data) / len(original_df) * 100) if len(original_df) > 0 else 0, 2)
         ai_analysis_parts.append(f"- Quarantine Stats: {len(quarantined_data)} records quarantined ({quarantine_pct:.1f}%), {len(df_clean)} clean records ({100 - quarantine_pct:.1f}%)")
@@ -194,9 +194,7 @@ def execute_quarantine_agent(
         
         ai_analysis_text = "\n".join(ai_analysis_parts)
         
-        # Add to quarantine_data
-        quarantine_data["executive_summary"] = executive_summary
-        quarantine_data["ai_analysis_text"] = ai_analysis_text
+        
         
         # ==================== GENERATE ROW-LEVEL-ISSUES ====================
         row_level_issues = []
@@ -537,6 +535,8 @@ def execute_quarantine_agent(
             "alerts": alerts,
             "issues": issues,
             "recommendations": agent_recommendations,
+            "executive_summary" : executive_summary,
+            "ai_analysis_text" : ai_analysis_text,
             "cleaned_file": {
                 "filename": f"cleaned_{filename}",
                 "content": cleaned_file_base64,

@@ -184,28 +184,26 @@ def execute_outlier_remover(
             "title": "Outlier Removal Status",
             "value": f"{cleaning_score['overall_score']:.1f}",
             "status": "excellent" if quality_status == "excellent" else "good" if quality_status == "good" else "needs_improvement",
-            "description": f"Quality: {quality_status}, Outliers Handled: {total_outliers}, {len(outlier_analysis['numeric_columns'])} numeric columns analyzed, {cleaning_score['metrics']['outlier_reduction_percentage']:.1f}% reduction"
+            "description": f"Quality: {quality_status}, Outliers Handled: {total_outliers}, {len(outlier_analysis['numeric_columns'])} numeric columns analyzed, {cleaning_score['metrics']['outlier_reduction_rate']:.1f}% reduction"
         }]
         
         # ==================== GENERATE AI ANALYSIS TEXT ====================
         ai_analysis_parts = []
         ai_analysis_parts.append(f"OUTLIER REMOVER ANALYSIS:")
-        ai_analysis_parts.append(f"- Cleaning Score: {cleaning_score['overall_score']:.1f}/100 (Outlier Reduction: {cleaning_score['metrics']['outlier_reduction_score']:.1f}, Data Retention: {cleaning_score['metrics']['data_retention_score']:.1f}, Detection Accuracy: {cleaning_score['metrics']['detection_accuracy_score']:.1f})")
-        ai_analysis_parts.append(f"- Outliers Handled: {total_outliers} outliers detected and removed, {cleaning_score['metrics']['outlier_reduction_percentage']:.1f}% reduction achieved")
+        ai_analysis_parts.append(f"- Cleaning Score: {cleaning_score['overall_score']:.1f}/100 (Outlier Reduction: {cleaning_score['metrics']['outlier_reduction_rate']:.1f}, Data Retention: {cleaning_score['metrics']['data_retention_rate']:.1f}, Column Retention: {cleaning_score['metrics']['column_retention_rate']:.1f})")
+        ai_analysis_parts.append(f"- Outliers Handled: {total_outliers} outliers detected and removed, {cleaning_score['metrics']['outlier_reduction_rate']:.1f}% reduction achieved")
         
         numeric_cols = outlier_analysis['numeric_columns']
         ai_analysis_parts.append(f"- Columns Analyzed: {len(numeric_cols)} numeric columns ({', '.join(list(numeric_cols)[:5])}{'...' if len(numeric_cols) > 5 else ''})")
-        ai_analysis_parts.append(f"- Data Retention: {cleaning_score['metrics']['row_retention_percentage']:.1f}% rows retained after outlier removal")
-        ai_analysis_parts.append(f"- Methods Used: {', '.join(set([log.get('method', 'unknown') for log in removal_log]))}")
+        ai_analysis_parts.append(f"- Data Retention: {cleaning_score['metrics']['data_retention_rate']:.1f}% rows retained after outlier removal")
+        ai_analysis_parts.append(f"- Removal Operations: {len(removal_log)} operations performed")
         
         if len(outlier_analysis.get('recommendations', [])) > 0:
             ai_analysis_parts.append(f"- Top Recommendation: {outlier_analysis['recommendations'][0].get('recommendation', 'Review outlier handling strategy')}")
         
         ai_analysis_text = "\n".join(ai_analysis_parts)
         
-        # Add to outlier_handling_data
-        outlier_handling_data["executive_summary"] = executive_summary
-        outlier_handling_data["ai_analysis_text"] = ai_analysis_text
+        
         
         # ==================== GENERATE ALERTS ====================
         alerts = []
@@ -245,12 +243,12 @@ def execute_outlier_remover(
             })
         
         # Data retention alert
-        if cleaning_score['metrics']['row_retention_percentage'] < 90:
+        if cleaning_score['metrics']['data_retention_rate'] < 90:
             alerts.append({
                 "alert_id": "alert_outliers_data_loss",
                 "severity": "high",
                 "category": "data_retention",
-                "message": f"Data retention: {cleaning_score['metrics']['row_retention_percentage']:.1f}% rows retained (below 90% threshold)",
+                "message": f"Data retention: {cleaning_score['metrics']['data_retention_rate']:.1f}% rows retained (below 90% threshold)",
                 "affected_fields_count": len(original_df) - len(df_cleaned),
                 "recommendation": "Review outlier removal strategy to minimize data loss. Consider outlier imputation instead of removal."
             })
@@ -293,12 +291,12 @@ def execute_outlier_remover(
             })
         
         # Removal strategy effectiveness
-        if removal_strategy == 'remove' and cleaning_score['metrics']['row_retention_percentage'] < 85:
+        if removal_strategy == 'remove' and cleaning_score['metrics']['data_retention_rate'] < 85:
             alerts.append({
                 "alert_id": "alert_outliers_excessive_removal",
                 "severity": "high",
                 "category": "data_retention",
-                "message": f"Excessive data removal: {100 - cleaning_score['metrics']['row_retention_percentage']:.1f}% of data lost",
+                "message": f"Excessive data removal: {100 - cleaning_score['metrics']['data_retention_rate']:.1f}% of data lost",
                 "affected_fields_count": len(original_df) - len(df_cleaned),
                 "recommendation": "Switch to imputation strategy to preserve more data while handling outliers."
             })
@@ -478,6 +476,8 @@ def execute_outlier_remover(
             "alerts": alerts,
             "issues": issues,
             "recommendations": agent_recommendations,
+            "executive_summary" : executive_summary,
+            "ai_analysis_text" : ai_analysis_text,
             "cleaned_file": {
                 "filename": f"cleaned_{filename}",
                 "content": base64.b64encode(_generate_cleaned_file(df_cleaned, filename)).decode('utf-8'),

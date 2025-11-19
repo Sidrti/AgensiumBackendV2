@@ -118,9 +118,6 @@ def execute_duplicate_resolver(
         else:
             quality_status = "needs_improvement"
         
-        # Identify type fixing issues
-        type_issues = _identify_type_issues(original_df, df_fixed, type_analysis)
-        
         # Generate ROW-LEVEL-ISSUES
         row_level_issues = []
         
@@ -204,28 +201,26 @@ def execute_duplicate_resolver(
             "title": "Duplicate Resolution Status",
             "value": f"{dedup_score['overall_score']:.1f}",
             "status": "excellent" if quality_status == "excellent" else "good" if quality_status == "good" else "needs_improvement",
-            "description": f"Quality: {quality_status}, Duplicates Resolved: {total_dups}, {len(original_df) - len(df_deduplicated)} rows removed, {dedup_score['metrics']['dedup_effectiveness_percentage']:.1f}% effectiveness"
+            "description": f"Quality: {quality_status}, Duplicates Resolved: {total_dups}, {len(original_df) - len(df_deduplicated)} rows removed, {dedup_score['metrics']['dedup_reduction_rate']:.1f}% effectiveness"
         }]
         
         # ==================== GENERATE AI ANALYSIS TEXT ====================
         ai_analysis_parts = []
         ai_analysis_parts.append(f"DUPLICATE RESOLVER ANALYSIS:")
-        ai_analysis_parts.append(f"- Deduplication Score: {dedup_score['overall_score']:.1f}/100 (Effectiveness: {dedup_score['metrics']['dedup_effectiveness_score']:.1f}, Data Integrity: {dedup_score['metrics']['data_integrity_score']:.1f}, Detection Accuracy: {dedup_score['metrics']['detection_accuracy_score']:.1f})")
-        ai_analysis_parts.append(f"- Duplicates Resolved: {total_dups} duplicate records detected, {len(original_df) - len(df_deduplicated)} rows removed, {dedup_score['metrics']['dedup_effectiveness_percentage']:.1f}% effectiveness")
+        ai_analysis_parts.append(f"- Deduplication Score: {dedup_score['overall_score']:.1f}/100 (Dedup Reduction: {dedup_score['metrics']['dedup_reduction_rate']:.1f}, Data Retention: {dedup_score['metrics']['data_retention_rate']:.1f}, Column Retention: {dedup_score['metrics']['column_retention_rate']:.1f})")
+        ai_analysis_parts.append(f"- Duplicates Resolved: {total_dups} duplicate records detected, {len(original_df) - len(df_deduplicated)} rows removed, {dedup_score['metrics']['dedup_reduction_rate']:.1f}% effectiveness")
         
         dup_methods = duplicate_analysis.get('duplicate_summary', {})
         ai_analysis_parts.append(f"- Detection Methods: {len(dup_methods)} methods used - {', '.join(dup_methods.keys())}")
         ai_analysis_parts.append(f"- Data Retention: {len(df_deduplicated)} rows retained ({(len(df_deduplicated) / len(original_df) * 100):.1f}% of original)")
-        ai_analysis_parts.append(f"- Resolution Strategy: {resolution_log[0].get('strategy', 'unknown') if len(resolution_log) > 0 else 'N/A'}")
+        ai_analysis_parts.append(f"- Resolution Strategy: {resolution_log[0] if len(resolution_log) > 0 else 'N/A'}")
         
         if len(duplicate_analysis.get('recommendations', [])) > 0:
             ai_analysis_parts.append(f"- Top Recommendation: {duplicate_analysis['recommendations'][0].get('recommendation', 'Review duplicate resolution strategy')}")
         
         ai_analysis_text = "\n".join(ai_analysis_parts)
         
-        # Add to dedup_data
-        dedup_data["executive_summary"] = executive_summary
-        dedup_data["ai_analysis_text"] = ai_analysis_text
+       
         
         # ==================== GENERATE ALERTS ====================
         alerts = []
@@ -505,6 +500,8 @@ def execute_duplicate_resolver(
             "alerts": alerts,
             "issues": issues,
             "recommendations": agent_recommendations,
+            "executive_summary" : executive_summary,
+            "ai_analysis_text" : ai_analysis_text,
             "row_level_issues": row_level_issues,
             "issue_summary": issue_summary,
             "cleaned_file": {
