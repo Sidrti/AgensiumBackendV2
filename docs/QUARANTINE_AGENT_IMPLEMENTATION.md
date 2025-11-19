@@ -24,7 +24,6 @@ The **QuarantineAgent** is a new, comprehensive component for the Clean My Data 
 - `_count_severity_breakdown()` - Counts issues by severity
 - `_calculate_quarantine_score()` - Calculates quarantine effectiveness score
 - `_extract_row_level_issues()` - Extracts row-level issue details
-- `_generate_quarantine_file()` - Generates quarantine zone file (CSV)
 - `_generate_cleaned_file()` - Generates cleaned data file
 
 **Detection Capabilities:**
@@ -113,12 +112,6 @@ The **QuarantineAgent** is a new, comprehensive component for the Clean My Data 
         "content": string (base64),
         "size_bytes": integer,
         "format": string
-    },
-    "quarantine_file": {
-        "filename": string,
-        "content": string (base64),
-        "size_bytes": integer,
-        "format": string
     }
 }
 ```
@@ -133,8 +126,7 @@ The **QuarantineAgent** is a new, comprehensive component for the Clean My Data 
 
 1. Added quarantine agent support to cleaned files mapping
 2. Created `_create_quarantine_sheet()` method for Excel reports
-3. Added quarantine file exports (separate quarantine zone CSV)
-4. Updated agent names mapping to include "quarantine-agent"
+3. Updated agent names mapping to include "quarantine-agent"
 
 **New Method: `_create_quarantine_sheet()`**
 
@@ -142,31 +134,6 @@ The **QuarantineAgent** is a new, comprehensive component for the Clean My Data 
 - Shows quarantine metrics and quality scores
 - Displays issues by type and severity
 - Includes quarantine analysis breakdown
-
-**Quarantine File Export Features:**
-
-- Exports all quarantined records to separate CSV
-- Includes quarantine timestamp and reason
-- Labeled as "Quarantine Zone" in download metadata
-- Separate from cleaned data for easy reference
-
-**Download Metadata Example:**
-
-```python
-{
-    "download_id": f"{analysis_id}_quarantined_records",
-    "name": "Clean My Data - Quarantined Records",
-    "format": "csv",
-    "file_name": "quarantined_records.csv",
-    "description": "Records identified and isolated by Quarantine Agent...",
-    "mimeType": "text/csv",
-    "content_base64": "...",
-    "size_bytes": integer,
-    "creation_date": string,
-    "agent_id": "quarantine-agent",
-    "data_type": "quarantine_zone"
-}
-```
 
 ---
 
@@ -181,7 +148,6 @@ The **QuarantineAgent** is a new, comprehensive component for the Clean My Data 
 3. Added quarantine issues aggregation
 4. Created quarantine-specific recommendations
 5. Updated analysis summary text with quarantine metrics
-6. Modified cleaned files collection to include quarantine files
 
 **Alerts Generated:**
 
@@ -323,7 +289,6 @@ elif agent_id == "quarantine-agent":
 ### 2. Intelligent Quarantine Isolation
 
 - Automatically separates problematic records
-- Creates "quarantine zone" for review
 - Maintains clean pipeline integrity
 - Preserves problematic data for investigation
 
@@ -353,7 +318,6 @@ elif agent_id == "quarantine-agent":
 ### 6. Multiple Export Formats
 
 - Cleaned data CSV (without quarantined records)
-- Quarantined records CSV (for investigation)
 - Excel report with dedicated sheet
 - JSON report with complete details
 
@@ -367,7 +331,7 @@ elif agent_id == "quarantine-agent":
 2. **Analysis** - Applies all enabled detection methods
 3. **Quarantine** - Separates problematic records
 4. **Scoring** - Calculates quality metrics
-5. **Export** - Generates cleaned and quarantine files
+5. **Export** - Generates cleaned files
 6. **Reporting** - Creates comprehensive reports
 
 ### Integration Flow
@@ -424,7 +388,6 @@ result = quarantine_agent.execute_quarantine_agent(
 ### Results
 
 - Clean data (minus quarantined records)
-- Quarantine zone (problematic records)
 - Quality scores and metrics
 - Detailed issue reports
 - Export files (CSV, Excel, JSON)

@@ -182,19 +182,48 @@ def transform_clean_my_data_response(
     
     # ==================== DOWNLOADS ====================
     # Collect cleaned files from agents
-    cleaned_files = {}
+    cleaned_files_list = []
     for agent_id in ["null-handler", "outlier-remover", "type-fixer", "duplicate-resolver", "field-standardization", "quarantine-agent"]:
         agent_output = agent_results.get(agent_id, {})
         if agent_output.get("status") == "success":
-            if agent_id == "quarantine-agent":
-                if "cleaned_file" in agent_output:
-                    cleaned_files[agent_id] = agent_output["cleaned_file"]
-                if "quarantine_file" in agent_output:
-                    if agent_id not in cleaned_files:
-                        cleaned_files[agent_id] = {}
-                    cleaned_files[agent_id]["quarantine_file"] = agent_output["quarantine_file"]
-            elif "cleaned_file" in agent_output:
-                cleaned_files[agent_id] = agent_output["cleaned_file"]
+            if "cleaned_file" in agent_output:
+                cleaned_file = agent_output["cleaned_file"]
+                filename = cleaned_file.get("filename", "unknown.csv")
+                
+                # Count number of "cleaned_" prefixes in filename
+                cleaned_count = filename.count("cleaned_")
+                
+                cleaned_files_list.append({
+                    "agent_id": agent_id,
+                    "cleaned_file": cleaned_file,
+                    "filename": filename,
+                    "cleaned_count": cleaned_count
+                })
+                print(f"[{agent_id}] Collected cleaned file: {filename} (cleaned count: {cleaned_count})")
+    
+    # Sort by cleaned_count in ascending order (least cleaned to most cleaned)
+    cleaned_files_list.sort(key=lambda x: x["cleaned_count"])
+    
+    # # Convert to dictionary with agent_id as key
+    # cleaned_files = {}
+    # for item in cleaned_files_list:
+    #     cleaned_files[item["agent_id"]] = item["cleaned_file"]
+
+    # Only use the file with the maximum cleaned count (most processed)
+    cleaned_files = {}
+    if cleaned_files_list:
+        most_cleaned_item = cleaned_files_list[-1]  # Last item after sorting (highest count)
+        cleaned_file_data = most_cleaned_item["cleaned_file"]
+        
+        # Extract base filename and remove all "cleaned_" prefixes
+        original_filename = most_cleaned_item["filename"]
+        # Remove all "cleaned_" occurrences from the filename
+        base_filename = original_filename.replace("cleaned_", "")
+        # Update the filename in the cleaned file metadata
+        cleaned_file_data["filename"] = base_filename
+        
+        cleaned_files[most_cleaned_item["agent_id"]] = cleaned_file_data
+        print(f"Using most processed file from [{most_cleaned_item['agent_id']}]: {most_cleaned_item['filename']} -> {base_filename}")
     
     downloader = CleanMyDataDownloads()
     downloads = downloader.generate_downloads(

@@ -145,10 +145,6 @@ def execute_quarantine_agent(
         else:
             quality_status = "needs_improvement"
 
-        # Generate quarantine zone file (CSV format)
-        quarantine_file_bytes = _generate_quarantine_file(quarantined_data)
-        quarantine_file_base64 = base64.b64encode(quarantine_file_bytes).decode('utf-8')
-
         # Generate cleaned file (CSV format)
         cleaned_file_bytes = _generate_cleaned_file(df_clean, filename)
         cleaned_file_base64 = base64.b64encode(cleaned_file_bytes).decode('utf-8')
@@ -560,12 +556,6 @@ def execute_quarantine_agent(
                 "size_bytes": len(cleaned_file_bytes),
                 "format": filename.split('.')[-1].lower()
             },
-            "quarantine_file": {
-                "filename": f"quarantined_{filename}",
-                "content": quarantine_file_base64,
-                "size_bytes": len(quarantine_file_bytes),
-                "format": filename.split('.')[-1].lower()
-            },
             "row_level_issues": row_level_issues,
             "issue_summary": issue_summary
         }
@@ -931,21 +921,6 @@ def _extract_row_level_issues(quarantined_df: pd.DataFrame, quarantine_analysis:
         })
     
     return issues
-
-
-def _generate_quarantine_file(quarantined_df: pd.DataFrame) -> bytes:
-    """
-    Generate quarantine zone file containing all quarantined records.
-    
-    Args:
-        quarantined_df: DataFrame of quarantined records
-        
-    Returns:
-        File contents as bytes
-    """
-    output = io.BytesIO()
-    quarantined_df.to_csv(output, index=False)
-    return output.getvalue()
 
 
 def _generate_cleaned_file(df: pd.DataFrame, original_filename: str) -> bytes:

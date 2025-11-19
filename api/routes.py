@@ -8,6 +8,7 @@ Supports flexible file handling based on tool definitions.
 import json
 import uuid
 import time
+import base64
 from datetime import datetime
 from typing import Dict, Any, Optional, List
 from fastapi import APIRouter, HTTPException, File, UploadFile, Form
@@ -134,6 +135,41 @@ def build_agent_input(
         "files": agent_files,
         "parameters": agent_params
     }
+
+
+def update_files_from_result(
+    files_map: Dict[str, tuple],
+    result: Dict[str, Any]
+) -> None:
+    """
+    Update files map with cleaned file from agent result.
+    Modifies files_map in place to chain agent outputs.
+    
+    Args:
+        files_map: Current files map (file_key -> (bytes, filename))
+        result: Result from previous agent execution
+    """
+    agent_id = result.get("agent_id", "unknown_agent")
+    
+    if result.get("status") == "success" and "cleaned_file" in result:
+        cleaned_file = result["cleaned_file"]
+        if cleaned_file and "content" in cleaned_file:
+            try:
+                # Decode base64 content
+                new_content = base64.b64decode(cleaned_file["content"])
+                new_filename = cleaned_file.get("filename", "cleaned_data.csv")
+                
+                # Update primary file for next agent
+                # This enables the chaining of data cleaning operations
+                files_map["primary"] = (new_content, new_filename)
+                print(f"[{agent_id}] Successfully updated primary file: {new_filename}. New size: {len(new_content)} bytes")
+            except Exception as e:
+                # If decoding fails, we keep the previous file
+                # This prevents the chain from breaking completely on a bad output
+                print(f"[{agent_id}] Error updating file from result: {str(e)}")
+                pass
+    else:
+        print(f"[{agent_id}] No cleaned file produced. Continuing with previous file.")
 
 
 # ============================================================================
@@ -294,6 +330,10 @@ async def analyze(
                 )
                 
                 agent_results[agent_id] = result
+                
+                # Update files map for next agent (only for clean-my-data)
+                if tool_id == "clean-my-data":
+                    update_files_from_result(files_map, result)
             except Exception as e:
                 agent_results[agent_id] = {
                     "status": "error",
@@ -695,4 +735,7 @@ async def chat(
             status_code=500,
             detail=f"Chat processing failed: {str(e)}"
         )
+
+
+
 
