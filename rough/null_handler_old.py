@@ -3,16 +3,16 @@ Null Handler Agent
 
 Detects and handles missing values in data.
 Analyzes null patterns and applies configurable imputation strategies.
-Input: CSV file (primary)
+Input: CSV/JSON/XLSX file (primary)
 Output: Standardized null handling results with cleaning effectiveness scores
 """
 
-import polars as pl
+import pandas as pd
 import numpy as np
 import io
 import time
 import base64
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, Optional
 
 try:
     from sklearn.impute import KNNImputer
@@ -53,27 +53,23 @@ def execute_null_handler(
     good_threshold = parameters.get("good_threshold", 75)
 
     try:
-        # Read file based on format - Enforce CSV only
-        if not filename.endswith('.csv'):
+        # Read file based on format
+        if filename.endswith('.csv'):
+            df = pd.read_csv(io.BytesIO(file_contents), on_bad_lines='skip')
+        elif filename.endswith('.json'):
+            df = pd.read_json(io.BytesIO(file_contents))
+        elif filename.endswith(('.xlsx', '.xls')):
+            df = pd.read_excel(io.BytesIO(file_contents))
+        else:
             return {
                 "status": "error",
                 "agent_id": "null-handler",
-                "error": f"Unsupported file format: {filename}. Only CSV is supported.",
-                "execution_time_ms": int((time.time() - start_time) * 1000)
-            }
-
-        try:
-            df = pl.read_csv(io.BytesIO(file_contents), ignore_errors=True, infer_schema_length=10000)
-        except Exception as e:
-            return {
-                "status": "error",
-                "agent_id": "null-handler",
-                "error": f"Failed to parse CSV: {str(e)}",
+                "error": f"Unsupported file format: {filename}",
                 "execution_time_ms": int((time.time() - start_time) * 1000)
             }
 
         # Validate data
-        if df.height == 0:
+        if df.empty:
             return {
                 "status": "error",
                 "agent_id": "null-handler",
@@ -83,7 +79,7 @@ def execute_null_handler(
             }
 
         # Store original data for comparison
-        original_df = df.clone()
+        original_df = df.copy()
         
         # Analyze null patterns
         null_analysis = _analyze_null_patterns(df)
@@ -108,93 +104,53 @@ def execute_null_handler(
         else:
             quality_status = "needs_improvement"
         
-        # Identify null handling issues (row-level)
-        # We'll generate row_level_issues here directly instead of separate function call to be efficient
+        # Identify null handling issues
+        null_issues = _identify_null_issues(original_df, df_cleaned)
         
         # ==================== GENERATE ROW-LEVEL-ISSUES ====================
         row_level_issues = []
         
-        # Calculate null count per row
-        # We need to check original_df for issues
-        
-        # Add row index
-        df_with_idx = original_df.with_row_index("row_index")
-        
-        # Find rows with nulls
-        # Calculate null count per row
-        null_counts = df_with_idx.select(
-            pl.col("row_index"),
-            pl.sum_horizontal(pl.all().exclude("row_index").is_null()).alias("null_count")
-        ).filter(pl.col("null_count") > 0)
-        
-        # Get total columns
-        total_cols = len(original_df.columns)
-        
-        # Iterate over rows with nulls (limit to 1000)
-        # We need to know WHICH columns are null for each row.
-        # This is expensive to do for all rows.
-        # We'll prioritize rows with high null counts or just take the first 1000.
-        
-        target_rows = null_counts.head(1000)
-        
-        # To get specific columns that are null for these rows, we can iterate.
-        # Since we limited to 1000, iteration is acceptable.
-        
-        # We need to fetch the actual rows from original_df corresponding to these indices
-        # Or just iterate the original dataframe with index if it's small, but for large df, filter is better.
-        
-        # Let's just iterate the target_rows indices and look up in original_df
-        # Actually, let's filter original_df by these indices.
-        
-        target_indices = target_rows["row_index"].to_list()
-        if target_indices:
-            # Get the rows
-            rows_data = df_with_idx.filter(pl.col("row_index").is_in(target_indices))
+        for idx, row in original_df.iterrows():
+            null_cols = row[row.isnull()].index.tolist()
             
-            for row in rows_data.iter_rows(named=True):
-                if len(row_level_issues) >= 1000: break
-                
-                row_idx = row["row_index"]
-                null_cols = [k for k, v in row.items() if v is None and k != "row_index"]
-                
-                if null_cols:
-                    # Issue 1: Individual null values
-                    for col in null_cols:
-                        if len(row_level_issues) < 1000:
-                            row_level_issues.append({
-                                "row_index": row_idx,
-                                "column": str(col),
-                                "issue_type": "null",
-                                "severity": "warning",
-                                "message": f"Null/missing value found in column '{col}'",
-                                "value": None
-                            })
-                    
-                    # Issue 2: Rows with multiple nulls
-                    null_count = len(null_cols)
-                    null_ratio = null_count / total_cols
-                    
-                    if null_ratio > 0.3 and len(row_level_issues) < 1000:
+            if null_cols:
+                # Issue 1: Individual null values
+                for col in null_cols:
+                    if len(row_level_issues) < 1000:
                         row_level_issues.append({
-                            "row_index": row_idx,
-                            "column": "multiple",
-                            "issue_type": "null_pattern",
-                            "severity": "critical",
-                            "message": f"Row has {null_count} null values ({null_ratio*100:.1f}% of columns are null). This may indicate data collection failure.",
-                            "null_count": null_count,
-                            "null_ratio": round(null_ratio, 2)
-                        })
-                    elif null_ratio > 0.15 and len(row_level_issues) < 1000:
-                        row_level_issues.append({
-                            "row_index": row_idx,
-                            "column": "multiple",
-                            "issue_type": "missing_data_anomaly",
+                            "row_index": int(idx),
+                            "column": str(col),
+                            "issue_type": "null",
                             "severity": "warning",
-                            "message": f"Row has {null_count} null values ({null_ratio*100:.1f}% of columns). Anomalous null pattern detected.",
-                            "null_count": null_count,
-                            "null_ratio": round(null_ratio, 2)
+                            "message": f"Null/missing value found in column '{col}'",
+                            "value": None
                         })
-
+                
+                # Issue 2: Rows with multiple nulls (suspicious pattern)
+                null_count = len(null_cols)
+                null_ratio = null_count / len(original_df.columns)
+                
+                if null_ratio > 0.3 and len(row_level_issues) < 1000:
+                    row_level_issues.append({
+                        "row_index": int(idx),
+                        "column": "multiple",
+                        "issue_type": "null_pattern",
+                        "severity": "critical",
+                        "message": f"Row has {null_count} null values ({null_ratio*100:.1f}% of columns are null). This may indicate data collection failure.",
+                        "null_count": null_count,
+                        "null_ratio": round(null_ratio, 2)
+                    })
+                elif null_ratio > 0.15 and len(row_level_issues) < 1000:
+                    row_level_issues.append({
+                        "row_index": int(idx),
+                        "column": "multiple",
+                        "issue_type": "missing_data_anomaly",
+                        "severity": "warning",
+                        "message": f"Row has {null_count} null values ({null_ratio*100:.1f}% of columns). Anomalous null pattern detected.",
+                        "null_count": null_count,
+                        "null_ratio": round(null_ratio, 2)
+                    })
+        
         # Cap row-level-issues at 1000
         row_level_issues = row_level_issues[:1000]
         
@@ -227,8 +183,8 @@ def execute_null_handler(
             "quality_status": quality_status,
             "null_analysis": null_analysis,
             "imputation_log": imputation_log,
-            "summary": f"Null handling completed. Quality: {quality_status}. Processed {original_df.height} rows, handled {null_analysis['total_nulls_detected']} null values.",
-            "row_level_issues": row_level_issues[:100],  # Limit to first 100
+            "summary": f"Null handling completed. Quality: {quality_status}. Processed {len(original_df)} rows, handled {null_analysis['total_nulls_detected']} null values.",
+            "row_level_issues": null_issues[:100],  # Limit to first 100
             "overrides": {
                 "global_strategy": global_strategy,
                 "column_strategies": column_strategies,
@@ -273,8 +229,7 @@ def execute_null_handler(
         alerts = []
         
         # Calculate additional metrics for alerts
-        total_cells = original_df.height * len(original_df.columns)
-        null_percentage = (null_analysis['total_nulls_detected'] / total_cells * 100) if total_cells > 0 else 0
+        null_percentage = (null_analysis['total_nulls_detected'] / (len(original_df) * len(original_df.columns)) * 100) if len(original_df) * len(original_df.columns) > 0 else 0
         
         # Alert 1: High null volume alert
         if null_percentage > 30:
@@ -331,21 +286,19 @@ def execute_null_handler(
                 "alert_id": "alert_nulls_data_loss",
                 "severity": severity,
                 "category": "data_retention",
-                "message": f"Data retention: {row_retention_pct:.1f}% rows retained ({original_df.height - df_cleaned.height} rows lost)",
-                "affected_fields_count": original_df.height - df_cleaned.height,
+                "message": f"Data retention: {row_retention_pct:.1f}% rows retained ({len(original_df) - len(df_cleaned)} rows lost)",
+                "affected_fields_count": len(original_df) - len(df_cleaned),
                 "recommendation": "Review null handling strategy to minimize data loss. Consider alternative imputation methods or adjust thresholds."
             })
         
         # Alert 5: Null pattern consistency alert
-        # Count rows with > 30% nulls
-        rows_with_multiple_nulls = null_counts.filter(pl.col("null_count") > total_cols * 0.3).height
-        
-        if rows_with_multiple_nulls > original_df.height * 0.1:
+        rows_with_multiple_nulls = sum(1 for _, row in original_df.iterrows() if row.isnull().sum() > len(original_df.columns) * 0.3)
+        if rows_with_multiple_nulls > len(original_df) * 0.1:
             alerts.append({
                 "alert_id": "alert_nulls_pattern_clustering",
                 "severity": "medium",
                 "category": "data_quality",
-                "message": f"Null clustering detected: {rows_with_multiple_nulls} rows ({(rows_with_multiple_nulls/original_df.height*100):.1f}%) have >30% null values",
+                "message": f"Null clustering detected: {rows_with_multiple_nulls} rows ({(rows_with_multiple_nulls/len(original_df)*100):.1f}%) have >30% null values",
                 "affected_fields_count": rows_with_multiple_nulls,
                 "recommendation": "Investigate systematic data collection issues. Rows with clustered nulls may indicate process failures."
             })
@@ -392,18 +345,14 @@ def execute_null_handler(
         issues = []
         
         # Convert null issues to standardized format (row-level nulls)
-        # We already have row_level_issues, let's use them to populate issues list if needed, 
-        # but the original code had a separate _identify_null_issues function.
-        # We can reuse row_level_issues for this.
-        
-        for null_issue in row_level_issues[:100]:
+        for null_issue in null_issues[:100]:
             issues.append({
                 "issue_id": f"issue_nulls_{null_issue.get('row_index', 0)}_{null_issue.get('column', 'unknown')}",
                 "agent_id": "null-handler",
                 "field_name": null_issue.get('column', 'N/A'),
                 "issue_type": null_issue.get('issue_type', 'null_value'),
                 "severity": null_issue.get('severity', 'warning'),
-                "message": null_issue.get('message', 'Null value detected')
+                "message": null_issue.get('description', 'Null value detected')
             })
         
         # Add column-level issues for high null columns
@@ -431,14 +380,14 @@ def execute_null_handler(
             })
         
         # Add data loss issues if significant rows were dropped
-        if original_df.height - df_cleaned.height > original_df.height * 0.1:
+        if len(original_df) - len(df_cleaned) > len(original_df) * 0.1:
             issues.append({
                 "issue_id": "issue_nulls_significant_data_loss",
                 "agent_id": "null-handler",
                 "field_name": "dataset",
                 "issue_type": "data_retention",
                 "severity": "critical",
-                "message": f"Significant data loss: {original_df.height - df_cleaned.height} rows ({((original_df.height - df_cleaned.height)/original_df.height*100):.1f}%) removed due to null handling"
+                "message": f"Significant data loss: {len(original_df) - len(df_cleaned)} rows ({((len(original_df) - len(df_cleaned))/len(original_df)*100):.1f}%) removed due to null handling"
             })
         
         # ==================== GENERATE RECOMMENDATIONS ====================
@@ -449,6 +398,8 @@ def execute_null_handler(
                          if data.get('null_percentage', 0) > 50]
         medium_null_cols = [col for col, data in null_analysis.get('null_summary', {}).items() 
                            if 20 < data.get('null_percentage', 0) <= 50]
+        low_null_cols = [col for col, data in null_analysis.get('null_summary', {}).items() 
+                        if 0 < data.get('null_percentage', 0) <= 20]
         
         # Recommendation 1: Drop high-null columns
         if high_null_cols:
@@ -483,13 +434,14 @@ def execute_null_handler(
         })
         
         # Recommendation 4: Data source improvement (if high null rate)
-        if null_percentage > 20:
+        null_pct = (null_analysis['total_nulls_detected'] / (len(original_df) * len(original_df.columns)) * 100) if len(original_df) * len(original_df.columns) > 0 else 0
+        if null_pct > 20:
             agent_recommendations.append({
                 "recommendation_id": "rec_nulls_source_quality",
                 "agent_id": "null-handler",
                 "field_name": "all",
                 "priority": "high",
-                "recommendation": f"Improve data collection completeness at source ({null_percentage:.1f}% null rate). Address root causes in extraction, transformation, or entry processes.",
+                "recommendation": f"Improve data collection completeness at source ({null_pct:.1f}% null rate). Address root causes in extraction, transformation, or entry processes.",
                 "timeline": "1-2 weeks"
             })
         
@@ -551,6 +503,8 @@ def execute_null_handler(
             })
         
         # Recommendation 10: Data quality framework (if widespread issues)
+        columns_needing_attention = [col for col, data in null_analysis.get('null_summary', {}).items() 
+                                     if data.get('null_percentage', 0) > 20]
         if len(columns_needing_attention) > 5:
             agent_recommendations.append({
                 "recommendation_id": "rec_nulls_quality_framework",
@@ -568,11 +522,11 @@ def execute_null_handler(
             "agent_name": "Null Handler",
             "execution_time_ms": int((time.time() - start_time) * 1000),
             "summary_metrics": {
-                "total_rows_processed": df_cleaned.height,
+                "total_rows_processed": len(df_cleaned),
                 "nulls_handled": null_analysis['total_nulls_detected'],
                 "original_nulls": null_analysis['total_nulls_detected'],
-                "remaining_nulls": int(df_cleaned.null_count().sum_horizontal().sum()),
-                "total_issues": len(issues)
+                "remaining_nulls": int(df_cleaned.isnull().sum().sum()),
+                "total_issues": len(null_issues)
             },
             "data": null_handling_data,
             "alerts": alerts,
@@ -600,10 +554,10 @@ def execute_null_handler(
         }
 
 
-def _analyze_null_patterns(df: pl.DataFrame) -> Dict[str, Any]:
+def _analyze_null_patterns(df: pd.DataFrame) -> Dict[str, Any]:
     """Analyze null patterns in the dataset."""
     null_analysis = {
-        "total_rows": df.height,
+        "total_rows": len(df),
         "total_columns": len(df.columns),
         "columns_with_nulls": [],
         "total_nulls_detected": 0,
@@ -612,18 +566,18 @@ def _analyze_null_patterns(df: pl.DataFrame) -> Dict[str, Any]:
     }
     
     for col in df.columns:
-        null_count = df[col].null_count()
-        null_percentage = float((null_count / df.height * 100) if df.height > 0 else 0)
+        null_count = int(df[col].isnull().sum())
+        null_percentage = float((null_count / len(df) * 100) if len(df) > 0 else 0)
         
         null_analysis["total_nulls_detected"] += null_count
         
         if null_count > 0:
             null_analysis["columns_with_nulls"].append(str(col))
             null_analysis["null_summary"][str(col)] = {
-                "null_count": int(null_count),
+                "null_count": null_count,
                 "null_percentage": round(null_percentage, 2),
                 "data_type": str(df[col].dtype),
-                "non_null_count": int(df.height - null_count),
+                "non_null_count": int(df[col].count()),
                 "suggested_strategy": _suggest_imputation_strategy(df[col], null_percentage)
             }
             
@@ -653,47 +607,42 @@ def _analyze_null_patterns(df: pl.DataFrame) -> Dict[str, Any]:
     return null_analysis
 
 
-def _suggest_imputation_strategy(series: pl.Series, null_percentage: float) -> str:
+def _suggest_imputation_strategy(series: pd.Series, null_percentage: float) -> str:
     """Suggest the best imputation strategy for a column."""
     if null_percentage > 70:
         return "drop_column"
     elif null_percentage > 50:
         return "knn_imputation"
-    elif series.dtype in [pl.Float32, pl.Float64, pl.Int32, pl.Int64]:
-        non_null_data = series.drop_nulls()
-        if non_null_data.len() > 0:
-            # Skewness check is not built-in Polars, assume mean for simplicity or calculate
-            # Simple skewness approx: (mean - median) / std
-            mean = non_null_data.mean()
-            median = non_null_data.median()
-            std = non_null_data.std()
-            skewness = abs((mean - median) / std) if std and std != 0 else 0
-            return "median" if skewness > 0.5 else "mean" # Threshold adjusted
+    elif pd.api.types.is_numeric_dtype(series):
+        non_null_data = series.dropna()
+        if len(non_null_data) > 0:
+            skewness = abs(non_null_data.skew()) if hasattr(non_null_data, 'skew') else 0
+            return "median" if skewness > 1 else "mean"
         return "mean"
-    elif series.dtype == pl.Utf8 or series.dtype == pl.Boolean:
+    elif pd.api.types.is_categorical_dtype(series) or series.dtype == 'object':
         return "mode"
-    elif series.dtype in [pl.Date, pl.Datetime]:
+    elif pd.api.types.is_datetime64_any_dtype(series):
         return "forward_fill"
     else:
         return "mode"
 
 
 def _apply_null_handling(
-    df: pl.DataFrame,
+    df: pd.DataFrame,
     global_strategy: str,
     column_strategies: Dict[str, str],
     fill_values: Dict[str, Any],
     knn_neighbors: int
 ) -> tuple:
     """Apply null handling strategies to the dataframe."""
-    df_cleaned = df.clone()
+    df_cleaned = df.copy()
     imputation_log = []
     
     # Apply global strategy
     if global_strategy == 'drop_rows':
-        initial_rows = df_cleaned.height
-        df_cleaned = df_cleaned.drop_nulls()
-        rows_dropped = initial_rows - df_cleaned.height
+        initial_rows = len(df_cleaned)
+        df_cleaned = df_cleaned.dropna()
+        rows_dropped = initial_rows - len(df_cleaned)
         imputation_log.append(f"Dropped {rows_dropped} rows with any null values")
     
     # Apply column-specific strategies
@@ -701,73 +650,53 @@ def _apply_null_handling(
         if col not in df_cleaned.columns:
             continue
         
-        null_count_before = df_cleaned[col].null_count()
+        null_count_before = int(df_cleaned[col].isnull().sum())
         if null_count_before == 0:
             continue
         
         try:
             if strategy == 'drop_column':
-                df_cleaned = df_cleaned.drop(col)
+                df_cleaned = df_cleaned.drop(columns=[col])
                 imputation_log.append(f"Dropped column '{col}' (had {null_count_before} nulls)")
             
-            elif strategy == 'mean' and df_cleaned[col].dtype in [pl.Float32, pl.Float64, pl.Int32, pl.Int64]:
-                mean_val = df_cleaned[col].mean()
-                df_cleaned = df_cleaned.with_columns(pl.col(col).fill_null(mean_val))
+            elif strategy == 'mean' and pd.api.types.is_numeric_dtype(df_cleaned[col]):
+                mean_val = float(df_cleaned[col].mean())
+                df_cleaned[col] = df_cleaned[col].fillna(mean_val)
                 imputation_log.append(f"Filled {null_count_before} nulls in '{col}' with mean ({mean_val:.2f})")
             
-            elif strategy == 'median' and df_cleaned[col].dtype in [pl.Float32, pl.Float64, pl.Int32, pl.Int64]:
-                median_val = df_cleaned[col].median()
-                df_cleaned = df_cleaned.with_columns(pl.col(col).fill_null(median_val))
+            elif strategy == 'median' and pd.api.types.is_numeric_dtype(df_cleaned[col]):
+                median_val = float(df_cleaned[col].median())
+                df_cleaned[col] = df_cleaned[col].fillna(median_val)
                 imputation_log.append(f"Filled {null_count_before} nulls in '{col}' with median ({median_val:.2f})")
             
             elif strategy == 'mode':
                 mode_val = df_cleaned[col].mode()
-                if mode_val.len() > 0:
-                    fill_val = mode_val[0]
-                    df_cleaned = df_cleaned.with_columns(pl.col(col).fill_null(fill_val))
-                    imputation_log.append(f"Filled {null_count_before} nulls in '{col}' with mode ({fill_val})")
+                if len(mode_val) > 0:
+                    df_cleaned[col] = df_cleaned[col].fillna(mode_val.iloc[0])
+                    imputation_log.append(f"Filled {null_count_before} nulls in '{col}' with mode ({mode_val.iloc[0]})")
             
             elif strategy == 'forward_fill':
-                df_cleaned = df_cleaned.with_columns(pl.col(col).forward_fill())
-                null_count_after = df_cleaned[col].null_count()
+                df_cleaned[col] = df_cleaned[col].fillna(method='ffill')
+                null_count_after = int(df_cleaned[col].isnull().sum())
                 filled_count = null_count_before - null_count_after
                 imputation_log.append(f"Forward filled {filled_count} nulls in '{col}'")
             
             elif strategy == 'backward_fill':
-                df_cleaned = df_cleaned.with_columns(pl.col(col).backward_fill())
-                null_count_after = df_cleaned[col].null_count()
+                df_cleaned[col] = df_cleaned[col].fillna(method='bfill')
+                null_count_after = int(df_cleaned[col].isnull().sum())
                 filled_count = null_count_before - null_count_after
                 imputation_log.append(f"Backward filled {filled_count} nulls in '{col}'")
             
             elif strategy == 'constant' and col in fill_values:
                 fill_value = fill_values[col]
-                df_cleaned = df_cleaned.with_columns(pl.col(col).fill_null(fill_value))
+                df_cleaned[col] = df_cleaned[col].fillna(fill_value)
                 imputation_log.append(f"Filled {null_count_before} nulls in '{col}' with constant ({fill_value})")
             
             elif strategy == 'knn_imputation':
-                # KNN requires conversion to pandas/numpy if using sklearn
-                if HAS_SKLEARN:
-                    # We only impute this column using other numeric columns
-                    numeric_cols = [c for c in df_cleaned.columns if df_cleaned[c].dtype in [pl.Float32, pl.Float64, pl.Int32, pl.Int64]]
-                    if col in numeric_cols:
-                        # Convert to pandas
-                        pdf = df_cleaned.select(numeric_cols).to_pandas()
-                        imputer = KNNImputer(n_neighbors=knn_neighbors)
-                        imputed_data = imputer.fit_transform(pdf)
-                        
-                        # Update column in Polars
-                        col_idx = numeric_cols.index(col)
-                        imputed_col = imputed_data[:, col_idx]
-                        df_cleaned = df_cleaned.with_columns(pl.Series(col, imputed_col))
-                        
-                        null_count_after = df_cleaned[col].null_count()
-                        filled_count = null_count_before - null_count_after
-                        imputation_log.append(f"KNN imputed {filled_count} nulls in '{col}'")
-                else:
-                    # Fallback to median
-                    median_val = df_cleaned[col].median()
-                    df_cleaned = df_cleaned.with_columns(pl.col(col).fill_null(median_val))
-                    imputation_log.append(f"KNN unavailable, filled {null_count_before} nulls in '{col}' with median ({median_val})")
+                df_cleaned = _apply_knn_imputation(df_cleaned, [col], knn_neighbors)
+                null_count_after = int(df_cleaned[col].isnull().sum())
+                filled_count = null_count_before - null_count_after
+                imputation_log.append(f"KNN imputed {filled_count} nulls in '{col}'")
         
         except Exception as e:
             imputation_log.append(f"Error applying {strategy} to '{col}': {str(e)}")
@@ -775,20 +704,56 @@ def _apply_null_handling(
     return df_cleaned, imputation_log
 
 
+def _apply_knn_imputation(df: pd.DataFrame, columns: list, n_neighbors: int = 5) -> pd.DataFrame:
+    """Apply KNN imputation to numeric columns."""
+    df_result = df.copy()
+    
+    if not HAS_SKLEARN:
+        # Fallback to median imputation if sklearn not available
+        numeric_cols = df.select_dtypes(include=[np.number]).columns.tolist()
+        for col in columns:
+            if col in numeric_cols and df_result[col].isnull().sum() > 0:
+                df_result[col] = df_result[col].fillna(df_result[col].median())
+        return df_result
+    
+    numeric_cols = df.select_dtypes(include=[np.number]).columns.tolist()
+    target_cols = [col for col in columns if col in numeric_cols]
+    
+    if not target_cols:
+        return df_result
+    
+    try:
+        imputer = KNNImputer(n_neighbors=n_neighbors)
+        df_numeric = df[numeric_cols]
+        imputed_data = imputer.fit_transform(df_numeric)
+        
+        for i, col in enumerate(numeric_cols):
+            if col in target_cols:
+                df_result[col] = imputed_data[:, i]
+    
+    except Exception as e:
+        # Fallback to median imputation if KNN fails
+        for col in target_cols:
+            if pd.api.types.is_numeric_dtype(df_result[col]):
+                df_result[col] = df_result[col].fillna(df_result[col].median())
+    
+    return df_result
+
+
 def _calculate_cleaning_score(
-    original_df: pl.DataFrame,
-    cleaned_df: pl.DataFrame,
+    original_df: pd.DataFrame,
+    cleaned_df: pd.DataFrame,
     null_analysis: Dict[str, Any],
     config: Dict[str, Any]
 ) -> Dict[str, Any]:
     """Calculate cleaning effectiveness score."""
     original_nulls = null_analysis["total_nulls_detected"]
-    remaining_nulls = int(cleaned_df.null_count().sum_horizontal().sum())
+    remaining_nulls = int(cleaned_df.isnull().sum().sum())
     nulls_handled = original_nulls - remaining_nulls
     
     # Calculate metrics
     null_reduction_rate = ((original_nulls - remaining_nulls) / original_nulls * 100) if original_nulls > 0 else 100
-    data_retention_rate = (cleaned_df.height / original_df.height * 100) if original_df.height > 0 else 0
+    data_retention_rate = (len(cleaned_df) / len(original_df) * 100) if len(original_df) > 0 else 0
     column_retention_rate = (len(cleaned_df.columns) / len(original_df.columns) * 100) if len(original_df.columns) > 0 else 0
     
     # Calculate weighted score
@@ -811,15 +776,37 @@ def _calculate_cleaning_score(
             "original_nulls": original_nulls,
             "nulls_handled": nulls_handled,
             "remaining_nulls": remaining_nulls,
-            "original_rows": original_df.height,
-            "cleaned_rows": cleaned_df.height,
+            "original_rows": len(original_df),
+            "cleaned_rows": len(cleaned_df),
             "original_columns": len(original_df.columns),
             "cleaned_columns": len(cleaned_df.columns)
         }
     }
 
 
-def _generate_cleaned_file(df: pl.DataFrame, original_filename: str) -> bytes:
+def _identify_null_issues(original_df: pd.DataFrame, cleaned_df: pd.DataFrame) -> list:
+    """Identify row-level null issues."""
+    issues = []
+    
+    for idx, row in original_df.iterrows():
+        null_cols = row[row.isnull()].index.tolist()
+        if null_cols:
+            if len(issues) >= 100:
+                break
+            
+            for col in null_cols:
+                issues.append({
+                    "row_index": int(idx),
+                    "column": str(col),
+                    "issue_type": "null_value",
+                    "description": f"Null value found in column '{col}'",
+                    "severity": "warning"
+                })
+    
+    return issues
+
+
+def _generate_cleaned_file(df: pd.DataFrame, original_filename: str) -> bytes:
     """
     Generate cleaned data file in CSV format.
     
@@ -832,5 +819,5 @@ def _generate_cleaned_file(df: pl.DataFrame, original_filename: str) -> bytes:
     """
     # Always export as CSV for consistency and compatibility
     output = io.BytesIO()
-    df.write_csv(output)
+    df.to_csv(output, index=False)
     return output.getvalue()

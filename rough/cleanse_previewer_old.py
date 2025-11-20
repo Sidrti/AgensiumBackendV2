@@ -1,5 +1,5 @@
 """
-Cleanse Previewer Agent (Optimized)
+Cleanse Previewer Agent
 
 Provides "What If" analysis for data cleaning operations before execution.
 Calculates and presents anticipated effects of cleaning operations to mitigate risk
@@ -9,15 +9,19 @@ Primary Goal: Mitigate Risk and Build Trust
 Workflow: Runs pre-emptively before actual cleaning agents execute
 Analysis: Calculates Current vs Preview metrics for impact assessment
 
-Input: CSV file (primary) + cleaning rules
+Input: CSV/JSON/XLSX file (primary) + cleaning rules
 Output: Impact assessment with before/after comparison and risk analysis
 """
 
-import polars as pl
+import pandas as pd
 import numpy as np
 import io
 import time
+import re
+import base64
 from typing import Dict, Any, Optional, List, Tuple
+from scipy import stats
+
 
 def execute_cleanse_previewer(
     file_contents: bytes,
@@ -35,14 +39,15 @@ def execute_cleanse_previewer(
     Returns:
         Standardized output dictionary with impact assessment
     """
+
     start_time = time.time()
     parameters = parameters or {}
 
     # Extract parameters with defaults
-    preview_rules = parameters.get("preview_rules", [])
-    impact_threshold_high = parameters.get("impact_threshold_high", 10)
-    impact_threshold_medium = parameters.get("impact_threshold_medium", 5)
-    confidence_level = parameters.get("confidence_level", 0.95)
+    preview_rules = parameters.get("preview_rules", [])  # List of cleaning rules to simulate
+    impact_threshold_high = parameters.get("impact_threshold_high", 10)  # % change considered high impact
+    impact_threshold_medium = parameters.get("impact_threshold_medium", 5)  # % change considered medium impact
+    confidence_level = parameters.get("confidence_level", 0.95)  # Statistical confidence level
     calculate_distributions = parameters.get("calculate_distributions", True)
     compare_statistics = parameters.get("compare_statistics", True)
     analyze_correlations = parameters.get("analyze_correlations", False)
@@ -55,27 +60,23 @@ def execute_cleanse_previewer(
     good_threshold = parameters.get("good_threshold", 75)
 
     try:
-        # Read file - CSV only
-        if not filename.endswith('.csv'):
-             return {
+        # Read file based on format
+        if filename.endswith('.csv'):
+            df = pd.read_csv(io.BytesIO(file_contents), on_bad_lines='skip')
+        elif filename.endswith('.json'):
+            df = pd.read_json(io.BytesIO(file_contents))
+        elif filename.endswith(('.xlsx', '.xls')):
+            df = pd.read_excel(io.BytesIO(file_contents))
+        else:
+            return {
                 "status": "error",
                 "agent_id": "cleanse-previewer",
-                "error": f"Unsupported file format: {filename}. Only CSV is supported.",
-                "execution_time_ms": int((time.time() - start_time) * 1000)
-            }
-
-        try:
-            df = pl.read_csv(io.BytesIO(file_contents), ignore_errors=True)
-        except Exception as e:
-             return {
-                "status": "error",
-                "agent_id": "cleanse-previewer",
-                "error": f"Failed to parse CSV: {str(e)}",
+                "error": f"Unsupported file format: {filename}",
                 "execution_time_ms": int((time.time() - start_time) * 1000)
             }
 
         # Validate data
-        if df.height == 0:
+        if df.empty:
             return {
                 "status": "error",
                 "agent_id": "cleanse-previewer",
@@ -105,7 +106,7 @@ def execute_cleanse_previewer(
         for rule_idx, rule in enumerate(preview_rules):
             try:
                 # Apply rule simulation
-                df_simulated, simulation_log = _simulate_cleaning_rule(df.clone(), rule)
+                df_simulated, simulation_log = _simulate_cleaning_rule(df.copy(), rule)
                 
                 # Profile simulated data
                 simulated_profile = _profile_dataset(df_simulated, {
@@ -249,12 +250,14 @@ def execute_cleanse_previewer(
             })
 
         # Large memory change alert
-        memory_change = 0
-        if simulated_results:
-            try:
+        memory_change = preview_analysis.get('original_profile', {}).get('memory_usage_mb', 0) - preview_analysis.get('simulated_results', [{}])[0].get('preview_metrics', {}).get('memory_mb', 0) if simulated_results else 0
+        # fallback: compute approximate memory change across first simulation
+        try:
+            memory_change = 0
+            if simulated_results:
                 memory_change = simulated_results[0].get('preview_metrics', {}).get('memory_mb', 0) - original_profile.get('memory_usage_mb', 0)
-            except:
-                memory_change = 0
+        except:
+            memory_change = 0
 
         if abs(memory_change) > 50:  # MB
             alerts.append({
@@ -425,7 +428,7 @@ def execute_cleanse_previewer(
                     # For rows that will be removed (negative row_change)
                     if row_change < 0:
                         # Estimate affected rows based on operation type
-                        affected_rows_count = min(abs(row_change), max(1, df.height // 100))  # Sample up to 1% of rows
+                        affected_rows_count = min(abs(row_change), max(1, len(df) // 100))  # Sample up to 1% of rows
                         
                         for row_idx in range(affected_rows_count):
                             row_level_issues.append({
@@ -448,25 +451,28 @@ def execute_cleanse_previewer(
                             
                             if abs(mean_change_pct) > 30:
                                 # Find rows with values far from mean (will be significantly affected)
-                                if col_name in df.columns and df[col_name].dtype in [pl.Float64, pl.Int64, pl.Float32, pl.Int32]:
-                                    col_data = df[col_name].drop_nulls()
+                                if col_name in df.columns and pd.api.types.is_numeric_dtype(df[col_name]):
+                                    col_data = df[col_name].dropna()
                                     if len(col_data) > 0:
                                         col_mean = col_data.mean()
                                         col_std = col_data.std()
                                         
-                                        # Find extreme rows (simplified for Polars)
-                                        # We can't easily iterate rows like pandas, so we'll just add a generic warning
-                                        # or sample a few if needed. For now, just a generic warning per column.
-                                        row_level_issues.append({
-                                            "row_index": 0,
-                                            "column": col_name,
-                                            "issue_type": "high_impact_change",
-                                            "severity": "warning",
-                                            "message": f"High-impact change on '{col_name}': value will change significantly ({abs(mean_change_pct):.1f}% mean shift)",
-                                            "value": None,
-                                            "rule_id": result.get("rule_id"),
-                                            "change_percentage": round(mean_change_pct, 2)
-                                        })
+                                        # Find extreme rows
+                                        for idx, val in enumerate(col_data.items()):
+                                            if col_std > 0 and abs(val[1] - col_mean) > 2 * col_std:
+                                                row_level_issues.append({
+                                                    "row_index": idx,
+                                                    "column": col_name,
+                                                    "issue_type": "high_impact_change",
+                                                    "severity": "warning",
+                                                    "message": f"High-impact change on '{col_name}': value will change significantly ({abs(mean_change_pct):.1f}% mean shift)",
+                                                    "value": float(val[1]),
+                                                    "rule_id": result.get("rule_id"),
+                                                    "change_percentage": round(mean_change_pct, 2)
+                                                })
+                                                
+                                                if len(row_level_issues) >= 1000:
+                                                    break
                             
                             if len(row_level_issues) >= 1000:
                                 break
@@ -516,7 +522,7 @@ def execute_cleanse_previewer(
             "preview_score": preview_score,
             "quality_status": quality_status,
             "preview_analysis": preview_analysis,
-            "summary": f"Preview analysis completed. Quality: {quality_status}. Analyzed {len(preview_rules)} cleaning rules across {df.height} rows. Safety: {preview_analysis['execution_safety']}.",
+            "summary": f"Preview analysis completed. Quality: {quality_status}. Analyzed {len(preview_rules)} cleaning rules across {len(df)} rows. Safety: {preview_analysis['execution_safety']}.",
             "impact_issues": _extract_impact_issues(simulated_results)[:100],
             "overrides": {
                 "preview_rules": preview_rules,
@@ -540,7 +546,7 @@ def execute_cleanse_previewer(
             "agent_name": "Cleanse Previewer",
             "execution_time_ms": int((time.time() - start_time) * 1000),
             "summary_metrics": {
-                "total_rows_analyzed": df.height,
+                "total_rows_analyzed": len(df),
                 "total_rules_previewed": len(preview_rules),
                 "high_impact_rules": overall_impact_assessment["high_impact_rules"],
                 "medium_impact_rules": overall_impact_assessment["medium_impact_rules"],
@@ -567,42 +573,40 @@ def execute_cleanse_previewer(
             "execution_time_ms": int((time.time() - start_time) * 1000)
         }
 
-def _profile_dataset(df: pl.DataFrame, config: Dict[str, Any]) -> Dict[str, Any]:
-    """Generate comprehensive profile of dataset using Polars."""
+
+def _profile_dataset(df: pd.DataFrame, config: Dict[str, Any]) -> Dict[str, Any]:
+    """Generate comprehensive profile of dataset."""
     profile = {
-        "row_count": df.height,
+        "row_count": len(df),
         "column_count": len(df.columns),
-        "memory_usage_mb": df.estimated_size() / (1024 * 1024),
+        "memory_usage_mb": df.memory_usage(deep=True).sum() / (1024 * 1024),
         "columns": {}
     }
     
     for col in df.columns:
-        null_count = df[col].null_count()
-        unique_count = df[col].n_unique()
-        
         col_profile = {
             "dtype": str(df[col].dtype),
-            "null_count": int(null_count),
-            "null_percentage": round((null_count / df.height * 100) if df.height > 0 else 0, 2),
-            "unique_count": int(unique_count),
-            "unique_percentage": round((unique_count / df.height * 100) if df.height > 0 else 0, 2)
+            "null_count": int(df[col].isna().sum()),
+            "null_percentage": round((df[col].isna().sum() / len(df) * 100) if len(df) > 0 else 0, 2),
+            "unique_count": int(df[col].nunique()),
+            "unique_percentage": round((df[col].nunique() / len(df) * 100) if len(df) > 0 else 0, 2)
         }
         
         # Numeric columns
-        if df[col].dtype in [pl.Float64, pl.Int64, pl.Float32, pl.Int32]:
+        if pd.api.types.is_numeric_dtype(df[col]):
             col_profile["statistics"] = {
-                "mean": float(df[col].mean()) if null_count < df.height else None,
-                "median": float(df[col].median()) if null_count < df.height else None,
-                "std": float(df[col].std()) if null_count < df.height else None,
-                "min": float(df[col].min()) if null_count < df.height else None,
-                "max": float(df[col].max()) if null_count < df.height else None,
-                "q25": float(df[col].quantile(0.25)) if null_count < df.height else None,
-                "q75": float(df[col].quantile(0.75)) if null_count < df.height else None
+                "mean": float(df[col].mean()) if df[col].notna().any() else None,
+                "median": float(df[col].median()) if df[col].notna().any() else None,
+                "std": float(df[col].std()) if df[col].notna().any() else None,
+                "min": float(df[col].min()) if df[col].notna().any() else None,
+                "max": float(df[col].max()) if df[col].notna().any() else None,
+                "q25": float(df[col].quantile(0.25)) if df[col].notna().any() else None,
+                "q75": float(df[col].quantile(0.75)) if df[col].notna().any() else None
             }
             
             if config.get("calculate_distributions"):
                 # Calculate distribution metrics
-                non_null = df[col].drop_nulls()
+                non_null = df[col].dropna()
                 if len(non_null) > 0:
                     col_profile["distribution"] = {
                         "skewness": float(non_null.skew()),
@@ -610,27 +614,19 @@ def _profile_dataset(df: pl.DataFrame, config: Dict[str, Any]) -> Dict[str, Any]
                     }
         
         # String columns
-        elif df[col].dtype == pl.Utf8:
-            # Mode calculation in Polars
-            mode_df = df[col].mode()
-            most_common = str(mode_df[0]) if len(mode_df) > 0 else None
-            
-            # Count of most common
-            most_common_count = 0
-            if most_common is not None:
-                most_common_count = int(df.filter(pl.col(col) == most_common).height)
-
+        elif df[col].dtype == 'object':
             col_profile["statistics"] = {
-                "most_common": most_common,
-                "most_common_count": most_common_count,
-                "avg_length": float(df[col].str.len_bytes().mean()) if null_count < df.height else None
+                "most_common": str(df[col].mode().iloc[0]) if not df[col].mode().empty else None,
+                "most_common_count": int(df[col].value_counts().iloc[0]) if len(df[col].value_counts()) > 0 else 0,
+                "avg_length": float(df[col].astype(str).str.len().mean()) if df[col].notna().any() else None
             }
         
         profile["columns"][col] = col_profile
     
     return profile
 
-def _simulate_cleaning_rule(df: pl.DataFrame, rule: Dict[str, Any]) -> Tuple[pl.DataFrame, List[str]]:
+
+def _simulate_cleaning_rule(df: pd.DataFrame, rule: Dict[str, Any]) -> Tuple[pd.DataFrame, List[str]]:
     """Simulate application of a cleaning rule without modifying original data."""
     log = []
     rule_type = rule.get("type", "unknown")
@@ -639,9 +635,9 @@ def _simulate_cleaning_rule(df: pl.DataFrame, rule: Dict[str, Any]) -> Tuple[pl.
         # Drop rows with nulls in specified columns
         target_cols = rule.get("target_columns", [])
         if target_cols:
-            original_count = df.height
-            df = df.drop_nulls(subset=target_cols)
-            log.append(f"Dropped {original_count - df.height} rows with nulls in {target_cols}")
+            original_count = len(df)
+            df = df.dropna(subset=target_cols)
+            log.append(f"Dropped {original_count - len(df)} rows with nulls in {target_cols}")
     
     elif rule_type == "impute_nulls":
         # Impute nulls with specified strategy
@@ -652,24 +648,20 @@ def _simulate_cleaning_rule(df: pl.DataFrame, rule: Dict[str, Any]) -> Tuple[pl.
             if col not in df.columns:
                 continue
             
-            null_count = df[col].null_count()
+            null_count = df[col].isna().sum()
             
-            if strategy == "mean" and df[col].dtype in [pl.Float64, pl.Int64, pl.Float32, pl.Int32]:
-                mean_val = df[col].mean()
-                df = df.with_columns(pl.col(col).fill_null(mean_val))
+            if strategy == "mean" and pd.api.types.is_numeric_dtype(df[col]):
+                df[col] = df[col].fillna(df[col].mean())
                 log.append(f"Imputed {null_count} nulls in '{col}' with mean")
-            elif strategy == "median" and df[col].dtype in [pl.Float64, pl.Int64, pl.Float32, pl.Int32]:
-                median_val = df[col].median()
-                df = df.with_columns(pl.col(col).fill_null(median_val))
+            elif strategy == "median" and pd.api.types.is_numeric_dtype(df[col]):
+                df[col] = df[col].fillna(df[col].median())
                 log.append(f"Imputed {null_count} nulls in '{col}' with median")
             elif strategy == "mode":
-                mode_val = df[col].mode()
-                if len(mode_val) > 0:
-                    df = df.with_columns(pl.col(col).fill_null(mode_val[0]))
-                    log.append(f"Imputed {null_count} nulls in '{col}' with mode")
+                df[col] = df[col].fillna(df[col].mode().iloc[0] if not df[col].mode().empty else 0)
+                log.append(f"Imputed {null_count} nulls in '{col}' with mode")
             elif strategy == "constant":
                 fill_value = rule.get("fill_value", 0)
-                df = df.with_columns(pl.col(col).fill_null(fill_value))
+                df[col] = df[col].fillna(fill_value)
                 log.append(f"Imputed {null_count} nulls in '{col}' with constant: {fill_value}")
     
     elif rule_type == "remove_outliers":
@@ -678,44 +670,36 @@ def _simulate_cleaning_rule(df: pl.DataFrame, rule: Dict[str, Any]) -> Tuple[pl.
         method = rule.get("method", "iqr")
         
         for col in target_cols:
-            if col not in df.columns or df[col].dtype not in [pl.Float64, pl.Int64, pl.Float32, pl.Int32]:
+            if col not in df.columns or not pd.api.types.is_numeric_dtype(df[col]):
                 continue
             
-            original_count = df.height
+            original_count = len(df)
             
             if method == "iqr":
                 Q1 = df[col].quantile(0.25)
                 Q3 = df[col].quantile(0.75)
                 IQR = Q3 - Q1
                 multiplier = rule.get("iqr_multiplier", 1.5)
-                
-                lower_bound = Q1 - multiplier * IQR
-                upper_bound = Q3 + multiplier * IQR
-                
-                df = df.filter((pl.col(col) >= lower_bound) & (pl.col(col) <= upper_bound))
-                
+                df = df[(df[col] >= Q1 - multiplier * IQR) & (df[col] <= Q3 + multiplier * IQR)]
             elif method == "z_score":
                 threshold = rule.get("z_threshold", 3.0)
-                mean_val = df[col].mean()
-                std_val = df[col].std()
-                
-                if std_val != 0:
-                    df = df.filter(((pl.col(col) - mean_val).abs() / std_val) < threshold)
+                z_scores = np.abs(stats.zscore(df[col].dropna()))
+                df = df[np.abs(stats.zscore(df[col])) < threshold]
             
-            log.append(f"Removed {original_count - df.height} outliers from '{col}' using {method}")
+            log.append(f"Removed {original_count - len(df)} outliers from '{col}' using {method}")
     
     elif rule_type == "drop_duplicates":
         # Drop duplicate rows
         subset_cols = rule.get("target_columns", None)
-        original_count = df.height
-        df = df.unique(subset=subset_cols, keep='first')
-        log.append(f"Removed {original_count - df.height} duplicate rows")
+        original_count = len(df)
+        df = df.drop_duplicates(subset=subset_cols, keep='first')
+        log.append(f"Removed {original_count - len(df)} duplicate rows")
     
     elif rule_type == "drop_columns":
         # Drop specified columns
         target_cols = rule.get("target_columns", [])
         existing_cols = [col for col in target_cols if col in df.columns]
-        df = df.drop(existing_cols)
+        df = df.drop(columns=existing_cols)
         log.append(f"Dropped {len(existing_cols)} columns: {existing_cols}")
     
     elif rule_type == "convert_types":
@@ -729,11 +713,11 @@ def _simulate_cleaning_rule(df: pl.DataFrame, rule: Dict[str, Any]) -> Tuple[pl.
             
             try:
                 if target_type == "numeric":
-                    df = df.with_columns(pl.col(col).cast(pl.Float64, strict=False))
+                    df[col] = pd.to_numeric(df[col], errors='coerce')
                 elif target_type == "datetime":
-                    df = df.with_columns(pl.col(col).str.to_datetime(strict=False))
+                    df[col] = pd.to_datetime(df[col], errors='coerce')
                 elif target_type == "string":
-                    df = df.with_columns(pl.col(col).cast(pl.Utf8))
+                    df[col] = df[col].astype(str)
                 
                 log.append(f"Converted '{col}' to {target_type}")
             except Exception as e:
@@ -743,6 +727,7 @@ def _simulate_cleaning_rule(df: pl.DataFrame, rule: Dict[str, Any]) -> Tuple[pl.
         log.append(f"Unknown rule type: {rule_type}")
     
     return df, log
+
 
 def _calculate_impact(
     original_profile: Dict[str, Any],
@@ -871,6 +856,7 @@ def _calculate_impact(
         "recommendations": recommendations
     }
 
+
 def _calculate_preview_score(
     original_profile: Dict[str, Any],
     simulated_results: List[Dict[str, Any]],
@@ -921,6 +907,7 @@ def _calculate_preview_score(
             "safe_to_execute": overall_impact["safe_to_execute"]
         }
     }
+
 
 def _generate_preview_recommendations(
     simulated_results: List[Dict[str, Any]],
@@ -975,6 +962,7 @@ def _generate_preview_recommendations(
             })
     
     return recommendations
+
 
 def _extract_impact_issues(simulated_results: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     """Extract issues from simulated results for reporting."""

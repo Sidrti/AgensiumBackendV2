@@ -2,12 +2,11 @@
 Risk Scorer Agent
 
 Identifies PII, calculates risk scores, and assesses compliance requirements.
-Input: CSV file (primary)
+Input: CSV/JSON/XLSX file (primary)
 Output: Uniform risk assessment structure matching API specification
 """
 
-import polars as pl
-import numpy as np
+import pandas as pd
 import io
 import time
 import re
@@ -76,21 +75,17 @@ def score_risk(
     governance_check_enabled = parameters.get("governance_check_enabled", True)
     
     try:
-        # Read file - CSV only
-        if not filename.endswith('.csv'):
+        # Read file
+        if filename.endswith('.csv'):
+            df = pd.read_csv(io.BytesIO(file_contents))
+        elif filename.endswith('.json'):
+            df = pd.read_json(io.BytesIO(file_contents))
+        elif filename.endswith(('.xlsx', '.xls')):
+            df = pd.read_excel(io.BytesIO(file_contents))
+        else:
             return {
                 "status": "error",
-                "error": f"Unsupported file format: {filename}. Only CSV files are supported.",
-                "execution_time_ms": int((time.time() - start_time) * 1000)
-            }
-        
-        try:
-            # Read CSV with Polars
-            df = pl.read_csv(io.BytesIO(file_contents), ignore_errors=True, infer_schema_length=10000)
-        except Exception as e:
-            return {
-                "status": "error",
-                "error": f"Failed to parse CSV: {str(e)}",
+                "error": f"Unsupported file format: {filename}",
                 "execution_time_ms": int((time.time() - start_time) * 1000)
             }
         
@@ -102,9 +97,6 @@ def score_risk(
         pii_fields_detected = 0
         sensitive_fields_detected = 0
         governance_gaps = 0
-        
-        # Pre-compile regex patterns
-        compiled_patterns = {k: re.compile(v) for k, v in PII_PATTERNS.items()}
         
         for col in df.columns:
             col_data = df[col]
@@ -126,48 +118,43 @@ def score_risk(
             detected_pii_type = None
             pii_confidence = 0
             
-            if pii_detection_enabled:
+            if pii_detection_enabled and col_data.dtype == 'object':
                 # Sample data for PII detection
-                non_null_data = col_data.drop_nulls()
-                sample_size = min(len(non_null_data), pii_sample_size)
+                sample = col_data.dropna().astype(str).head(pii_sample_size)
                 
-                if sample_size > 0:
-                    # Take a sample and convert to python list of strings for regex matching
-                    sample = non_null_data.sample(n=sample_size, with_replacement=False, seed=42).cast(pl.Utf8).to_list()
+                for pii_type, pattern in PII_PATTERNS.items():
+                    matches = sample.str.match(pattern).sum()
+                    match_percentage = (matches / len(sample) * 100) if len(sample) > 0 else 0
                     
-                    for pii_type, pattern in compiled_patterns.items():
-                        matches = sum(1 for x in sample if pattern.match(x))
-                        match_percentage = (matches / len(sample) * 100)
+                    if match_percentage > 50:
+                        detected_pii_type = pii_type
+                        pii_confidence = min(0.99, match_percentage / 100)
+                        pii_fields_detected += 1
                         
-                        if match_percentage > 50:
-                            detected_pii_type = pii_type
-                            pii_confidence = min(0.99, match_percentage / 100)
-                            pii_fields_detected += 1
-                            
-                            risk_factors.append({
-                                "factor": "pii_detected",
-                                "confidence": round(pii_confidence, 2),
-                                "pii_type": pii_type
-                            })
-                            
-                            field_risk_score += 80
-                            break
-                    
-                    # Check for email addresses even if pattern doesn't match
-                    if not detected_pii_type and col_lower in ['email', 'email_address']:
-                        email_count = sum(1 for x in sample if '@' in x)
-                        if email_count / len(sample) > 0.7:
-                            detected_pii_type = "email_address"
-                            pii_confidence = 0.85
-                            pii_fields_detected += 1
-                            
-                            risk_factors.append({
-                                "factor": "pii_detected",
-                                "confidence": 0.85,
-                                "pii_type": "email_address"
-                            })
-                            
-                            field_risk_score += 75
+                        risk_factors.append({
+                            "factor": "pii_detected",
+                            "confidence": round(pii_confidence, 2),
+                            "pii_type": pii_type
+                        })
+                        
+                        field_risk_score += 80
+                        break
+                
+                # Check for email addresses even if pattern doesn't match
+                if not detected_pii_type and col_lower in ['email', 'email_address']:
+                    email_count = sample.str.contains('@').sum()
+                    if email_count / len(sample) > 0.7:
+                        detected_pii_type = "email_address"
+                        pii_confidence = 0.85
+                        pii_fields_detected += 1
+                        
+                        risk_factors.append({
+                            "factor": "pii_detected",
+                            "confidence": 0.85,
+                            "pii_type": "email_address"
+                        })
+                        
+                        field_risk_score += 75
             
             # Sensitive field detection
             if sensitive_field_detection_enabled and is_sensitive_field and not detected_pii_type:
@@ -252,115 +239,117 @@ def score_risk(
         # Generate ROW-LEVEL-ISSUES
         row_level_issues = []
         
-        # Identify columns of interest
+        # Iterate through data to identify rows with high-risk data
         high_risk_pii_columns = [f["field_name"] for f in field_risk_assessments if f.get("risk_level") == "high" and any(rf.get("pii_type") for rf in f.get("risk_factors", []))]
-        compliance_columns = [f["field_name"] for f in field_risk_assessments if f.get("compliance_issues")]
-        medium_high_risk_cols = [f["field_name"] for f in field_risk_assessments if f.get("risk_level") in ["high", "medium"]]
         
-        relevant_cols = list(set(high_risk_pii_columns + compliance_columns + medium_high_risk_cols))
-        
-        if relevant_cols:
-            # Add row index to track original indices
-            df_with_idx = df.with_row_index("row_index")
+        for row_idx, row in df.iterrows():
+            if len(row_level_issues) >= 1000:
+                break
             
-            # Iterate over rows to find issues (limit to 1000 issues)
-            for row in df_with_idx.select(["row_index"] + relevant_cols).iter_rows(named=True):
+            has_pii = False
+            pii_types_found = []
+            
+            # Check if row has PII or high-risk data
+            for col in high_risk_pii_columns:
+                if col in row.index and pd.notna(row[col]):
+                    has_pii = True
+                    # Try to identify PII type from field assessment
+                    for field_assess in field_risk_assessments:
+                        if field_assess["field_name"] == col:
+                            for risk_factor in field_assess.get("risk_factors", []):
+                                if risk_factor.get("pii_type"):
+                                    pii_types_found.append(risk_factor.get("pii_type"))
+                            break
+            
+            if has_pii:
+                # Determine severity based on PII type
+                severity = "critical"
+                if "ssn" in pii_types_found or "credit_card" in pii_types_found:
+                    severity = "critical"
+                elif "email" in pii_types_found or "phone" in pii_types_found:
+                    severity = "warning"
+                else:
+                    severity = "info"
+                
+                row_level_issues.append({
+                    "row_index": int(row_idx),
+                    "column": ", ".join(high_risk_pii_columns),
+                    "issue_type": "risk_high",
+                    "severity": severity,
+                    "message": f"Row contains {', '.join(set(pii_types_found))} data with high risk score",
+                    "pii_types": list(set(pii_types_found))
+                })
+        
+        # Add compliance violation issues for rows with compliance-impacted fields
+        compliance_frameworks = _get_impacted_frameworks(field_risk_assessments)
+        compliance_columns = [f["field_name"] for f in field_risk_assessments if f.get("compliance_issues")]
+        
+        if compliance_columns:
+            for row_idx, row in df.iterrows():
                 if len(row_level_issues) >= 1000:
                     break
                 
-                row_idx = row["row_index"]
+                # Check if row has data in compliance-sensitive columns
+                has_compliance_data = False
+                affected_frameworks = set()
                 
-                # 1. High Risk PII Check
-                has_pii = False
-                pii_types_found = []
-                
-                for col in high_risk_pii_columns:
-                    if row[col] is not None and row[col] != "":
-                        has_pii = True
+                for col in compliance_columns:
+                    if col in row.index and pd.notna(row[col]):
+                        has_compliance_data = True
+                        # Find which frameworks are affected
                         for field_assess in field_risk_assessments:
                             if field_assess["field_name"] == col:
-                                for risk_factor in field_assess.get("risk_factors", []):
-                                    if risk_factor.get("pii_type"):
-                                        pii_types_found.append(risk_factor.get("pii_type"))
+                                for issue in field_assess.get("compliance_issues", []):
+                                    if "GDPR" in issue:
+                                        affected_frameworks.add("GDPR")
+                                    if "HIPAA" in issue:
+                                        affected_frameworks.add("HIPAA")
+                                    if "CCPA" in issue:
+                                        affected_frameworks.add("CCPA")
                                 break
                 
-                if has_pii:
-                    severity = "critical"
-                    if "ssn" in pii_types_found or "credit_card" in pii_types_found:
-                        severity = "critical"
-                    elif "email" in pii_types_found or "phone" in pii_types_found:
-                        severity = "warning"
-                    else:
-                        severity = "info"
+                if has_compliance_data and affected_frameworks:
+                    severity = "critical" if any(f in ["GDPR", "HIPAA"] for f in affected_frameworks) else "warning"
                     
                     row_level_issues.append({
                         "row_index": int(row_idx),
-                        "column": ", ".join(high_risk_pii_columns),
-                        "issue_type": "risk_high",
+                        "column": ", ".join(compliance_columns),
+                        "issue_type": "compliance_violation",
                         "severity": severity,
-                        "message": f"Row contains {', '.join(set(pii_types_found))} data with high risk score",
-                        "pii_types": list(set(pii_types_found))
+                        "message": f"Row subject to {', '.join(affected_frameworks)} compliance requirements",
+                        "frameworks": list(affected_frameworks)
                     })
-                
-                if len(row_level_issues) >= 1000: break
-                
-                # 2. Compliance Check
-                if compliance_columns:
-                    has_compliance_data = False
-                    affected_frameworks = set()
-                    
-                    for col in compliance_columns:
-                        if row[col] is not None and row[col] != "":
-                            has_compliance_data = True
-                            for field_assess in field_risk_assessments:
-                                if field_assess["field_name"] == col:
-                                    for issue in field_assess.get("compliance_issues", []):
-                                        if "GDPR" in issue: affected_frameworks.add("GDPR")
-                                        if "HIPAA" in issue: affected_frameworks.add("HIPAA")
-                                        if "CCPA" in issue: affected_frameworks.add("CCPA")
-                                    break
-                    
-                    if has_compliance_data and affected_frameworks:
-                        severity = "critical" if any(f in ["GDPR", "HIPAA"] for f in affected_frameworks) else "warning"
-                        
-                        row_level_issues.append({
-                            "row_index": int(row_idx),
-                            "column": ", ".join(compliance_columns),
-                            "issue_type": "compliance_violation",
-                            "severity": severity,
-                            "message": f"Row subject to {', '.join(affected_frameworks)} compliance requirements",
-                            "frameworks": list(affected_frameworks)
-                        })
-                
-                if len(row_level_issues) >= 1000: break
-                
-                # 3. Remediation Check
-                if medium_high_risk_cols:
-                    needs_remediation = False
-                    risk_fields_affected = []
-                    
-                    for col in medium_high_risk_cols:
-                        if row[col] is not None and row[col] != "":
-                            needs_remediation = True
-                            risk_fields_affected.append(col)
-                    
-                    if needs_remediation and risk_fields_affected:
-                        # Check for duplicate row index in current issues list
-                        is_duplicate = False
-                        for issue in row_level_issues:
-                            if issue["row_index"] == row_idx:
-                                is_duplicate = True
-                                break
-                        
-                        if not is_duplicate:
-                            row_level_issues.append({
-                                "row_index": int(row_idx),
-                                "column": ", ".join(risk_fields_affected),
-                                "issue_type": "remediation_needed",
-                                "severity": "warning",
-                                "message": f"Row contains {len(risk_fields_affected)} field(s) requiring security remediation",
-                                "affected_fields": risk_fields_affected
-                            })
+        
+        # Add remediation needed issues for rows with medium/high risk fields
+        medium_high_risk_cols = [f["field_name"] for f in field_risk_assessments if f.get("risk_level") in ["high", "medium"]]
+        
+        for row_idx, row in df.iterrows():
+            if len(row_level_issues) >= 1000:
+                break
+            
+            needs_remediation = False
+            risk_fields_affected = []
+            
+            for col in medium_high_risk_cols:
+                if col in row.index and pd.notna(row[col]):
+                    needs_remediation = True
+                    risk_fields_affected.append(col)
+            
+            if needs_remediation and risk_fields_affected:
+                # Only add if not already added as PII or compliance issue
+                is_duplicate = any(issue["row_index"] == row_idx for issue in row_level_issues)
+                if not is_duplicate:
+                    row_level_issues.append({
+                        "row_index": int(row_idx),
+                        "column": ", ".join(risk_fields_affected),
+                        "issue_type": "remediation_needed",
+                        "severity": "warning",
+                        "message": f"Row contains {len(risk_fields_affected)} field(s) requiring security remediation",
+                        "affected_fields": risk_fields_affected
+                    })
+        
+        # Cap at 1000 issues
+        row_level_issues = row_level_issues[:1000]
         
         # Calculate issue summary
         issue_summary = {

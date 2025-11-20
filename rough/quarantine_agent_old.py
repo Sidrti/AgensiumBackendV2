@@ -31,7 +31,7 @@ Key Features:
    - Quality metrics and impact analysis
 """
 
-import polars as pl
+import pandas as pd
 import numpy as np
 import io
 import time
@@ -40,6 +40,7 @@ import json
 from typing import Dict, Any, Optional, Tuple, List
 from datetime import datetime
 import re
+
 
 def execute_quarantine_agent(
     file_contents: bytes,
@@ -79,29 +80,23 @@ def execute_quarantine_agent(
     good_threshold = parameters.get("good_threshold", 75)
 
     try:
-        # Read file based on format - CSV ONLY
-        if not filename.endswith('.csv'):
-             return {
+        # Read file based on format
+        if filename.endswith('.csv'):
+            df = pd.read_csv(io.BytesIO(file_contents), on_bad_lines='skip')
+        elif filename.endswith('.json'):
+            df = pd.read_json(io.BytesIO(file_contents))
+        elif filename.endswith(('.xlsx', '.xls')):
+            df = pd.read_excel(io.BytesIO(file_contents))
+        else:
+            return {
                 "status": "error",
                 "agent_id": "quarantine-agent",
-                "error": f"Unsupported file format: {filename}. Only CSV is supported.",
-                "execution_time_ms": int((time.time() - start_time) * 1000)
-            }
-
-        try:
-            # Read as String to capture all values for validation
-            # infer_schema_length=0 forces all columns to be read as String (Utf8)
-            df = pl.read_csv(io.BytesIO(file_contents), infer_schema_length=0, ignore_errors=True)
-        except Exception as e:
-             return {
-                "status": "error",
-                "agent_id": "quarantine-agent",
-                "error": f"Failed to parse CSV: {str(e)}",
+                "error": f"Unsupported file format: {filename}",
                 "execution_time_ms": int((time.time() - start_time) * 1000)
             }
 
         # Validate data
-        if df.height == 0:
+        if df.empty:
             return {
                 "status": "error",
                 "agent_id": "quarantine-agent",
@@ -110,10 +105,8 @@ def execute_quarantine_agent(
                 "execution_time_ms": int((time.time() - start_time) * 1000)
             }
 
-        # Add row index
-        df = df.with_row_index("row_index")
-        original_df = df.clone()
-
+        # Store original data for comparison
+        original_df = df.copy()
         quarantined_data, quarantine_log, quarantine_analysis = _analyze_and_quarantine(
             df,
             required_fields,
@@ -131,8 +124,7 @@ def execute_quarantine_agent(
         )
 
         # Remove quarantined records from main data
-        quarantined_indices = set(quarantined_data["row_index"].to_list())
-        df_clean = df.filter(~pl.col("row_index").is_in(quarantined_indices))
+        df_clean = df.drop(quarantined_data.index).reset_index(drop=True)
 
         # Calculate quality scores
         quality_score = _calculate_quarantine_score(
@@ -154,9 +146,7 @@ def execute_quarantine_agent(
             quality_status = "needs_improvement"
 
         # Generate cleaned file (CSV format)
-        # Remove row_index before export
-        df_clean_export = df_clean.drop("row_index")
-        cleaned_file_bytes = _generate_cleaned_file(df_clean_export, filename)
+        cleaned_file_bytes = _generate_cleaned_file(df_clean, filename)
         cleaned_file_base64 = base64.b64encode(cleaned_file_bytes).decode('utf-8')
 
         # Build results
@@ -165,7 +155,7 @@ def execute_quarantine_agent(
             "quality_status": quality_status,
             "quarantine_analysis": quarantine_analysis,
             "quarantine_log": quarantine_log,
-            "summary": f"Quarantine agent completed. Identified {quarantined_data.height} problematic records. Quality: {quality_status}.",
+            "summary": f"Quarantine agent completed. Identified {len(quarantined_data)} problematic records. Quality: {quality_status}.",
             "row_level_issues": _extract_row_level_issues(quarantined_data, quarantine_analysis),
             "overrides": {
                 "detect_missing_fields": detect_missing_fields,
@@ -192,7 +182,7 @@ def execute_quarantine_agent(
             "title": "Data Quarantine Status",
             "value": f"{quality_score['overall_score']:.1f}",
             "status": "excellent" if quality_status == "excellent" else "good" if quality_status == "good" else "needs_improvement",
-            "description": f"Quality: {quality_status}, Quarantined: {quarantined_data.height} records ({round((quarantined_data.height / original_df.height * 100) if original_df.height > 0 else 0, 2):.1f}%), Clean: {df_clean.height} records, {len(quarantine_analysis.get('issue_types', {}))} issue types"
+            "description": f"Quality: {quality_status}, Quarantined: {len(quarantined_data)} records ({round((len(quarantined_data) / len(original_df) * 100) if len(original_df) > 0 else 0, 2):.1f}%), Clean: {len(df_clean)} records, {len(quarantine_analysis.get('issue_types', {}))} issue types"
         }]
         
         # ==================== GENERATE AI ANALYSIS TEXT ====================
@@ -200,8 +190,8 @@ def execute_quarantine_agent(
         ai_analysis_parts.append(f"QUARANTINE AGENT ANALYSIS:")
         ai_analysis_parts.append(f"- Quality Score: {quality_score['overall_score']:.1f}/100 (Quarantine Reduction: {quality_score['metrics']['quarantine_reduction_rate']:.1f}, Data Integrity: {quality_score['metrics']['data_integrity_rate']:.1f}, Processing Efficiency: {quality_score['metrics']['processing_efficiency_rate']:.1f})")
         
-        quarantine_pct = round((quarantined_data.height / original_df.height * 100) if original_df.height > 0 else 0, 2)
-        ai_analysis_parts.append(f"- Quarantine Stats: {quarantined_data.height} records quarantined ({quarantine_pct:.1f}%), {df_clean.height} clean records ({100 - quarantine_pct:.1f}%)")
+        quarantine_pct = round((len(quarantined_data) / len(original_df) * 100) if len(original_df) > 0 else 0, 2)
+        ai_analysis_parts.append(f"- Quarantine Stats: {len(quarantined_data)} records quarantined ({quarantine_pct:.1f}%), {len(df_clean)} clean records ({100 - quarantine_pct:.1f}%)")
         
         issue_types = quarantine_analysis.get('issue_types', {})
         ai_analysis_parts.append(f"- Issue Types: {len(issue_types)} distinct types - {', '.join([f'{k}: {v}' for k, v in list(issue_types.items())[:5]])}")
@@ -210,12 +200,14 @@ def execute_quarantine_agent(
         ai_analysis_parts.append(f"- Severity Breakdown: Critical: {severity_breakdown.get('critical', 0)}, High: {severity_breakdown.get('high', 0)}, Medium: {severity_breakdown.get('medium', 0)}, Low: {severity_breakdown.get('low', 0)}")
         ai_analysis_parts.append(f"- Data Integrity Rate: {quality_score['metrics']['data_integrity_rate']:.1f}%, Processing Efficiency: {quality_score['metrics']['processing_efficiency_rate']:.1f}%")
         
-        if quarantined_data.height > 0:
-            ai_analysis_parts.append(f"- Recommendation: Review {quarantined_data.height} quarantined records and investigate root causes of data quality issues")
+        if len(quarantined_data) > 0:
+            ai_analysis_parts.append(f"- Recommendation: Review {len(quarantined_data)} quarantined records and investigate root causes of data quality issues")
         else:
             ai_analysis_parts.append(f"- Recommendation: No data quality issues detected - dataset is clean and ready for processing")
         
         ai_analysis_text = "\n".join(ai_analysis_parts)
+        
+        
         
         # ==================== GENERATE ROW-LEVEL-ISSUES ====================
         row_level_issues = []
@@ -265,15 +257,11 @@ def execute_quarantine_agent(
             })
         
         # Add data quality anomaly for rows in quarantine zone
-        if quarantined_data.height > 0:
-            # We need to get the reason from the dataframe if we added it, or from issues
-            # In _analyze_and_quarantine we added _quarantine_reason
-            
-            # Let's iterate over the first 100 rows of quarantined_data
-            for row in quarantined_data.head(100).iter_rows(named=True):
-                reason = row.get("_quarantine_reason", "Data quality anomaly")
+        if len(quarantined_data) > 0:
+            for idx in quarantined_data.index[:100]:
+                reason = quarantined_data.loc[idx, "_quarantine_reason"] if "_quarantine_reason" in quarantined_data.columns else "Data quality anomaly"
                 row_level_issues.append({
-                    "row_index": int(row["row_index"]),
+                    "row_index": int(idx),
                     "column": "global",
                     "issue_type": "data_anomaly",
                     "severity": "critical",
@@ -312,7 +300,7 @@ def execute_quarantine_agent(
         # ==================== GENERATE ALERTS ====================
         alerts = []
         
-        quarantine_pct = round((quarantined_data.height / original_df.height * 100) if original_df.height > 0 else 0, 2)
+        quarantine_pct = round((len(quarantined_data) / len(original_df) * 100) if len(original_df) > 0 else 0, 2)
         severity_breakdown = quarantine_analysis.get('severity_breakdown', {})
         critical_issues = severity_breakdown.get('critical', 0)
         high_issues = severity_breakdown.get('high', 0)
@@ -327,7 +315,7 @@ def execute_quarantine_agent(
                 "alert_id": "alert_quarantine_001_volume_critical",
                 "severity": "critical",
                 "category": "data_quality",
-                "message": f"CRITICAL: {quarantined_data.height} records ({quarantine_pct:.1f}%) quarantined - exceeds 30% threshold",
+                "message": f"CRITICAL: {len(quarantined_data)} records ({quarantine_pct:.1f}%) quarantined - exceeds 30% threshold",
                 "affected_fields_count": len(issue_types),
                 "recommendation": "URGENT: Data quality degradation detected. Review source data immediately and implement stricter validation at ingestion."
             })
@@ -336,7 +324,7 @@ def execute_quarantine_agent(
                 "alert_id": "alert_quarantine_001_volume_high",
                 "severity": "high",
                 "category": "data_quality",
-                "message": f"High quarantine volume: {quarantined_data.height} records ({quarantine_pct:.1f}%) quarantined",
+                "message": f"High quarantine volume: {len(quarantined_data)} records ({quarantine_pct:.1f}%) quarantined",
                 "affected_fields_count": len(issue_types),
                 "recommendation": "Investigate quarantine patterns. Data source quality may need improvement."
             })
@@ -345,7 +333,7 @@ def execute_quarantine_agent(
                 "alert_id": "alert_quarantine_001_volume_medium",
                 "severity": "medium",
                 "category": "data_quality",
-                "message": f"Moderate quarantine volume: {quarantined_data.height} records ({quarantine_pct:.1f}%) quarantined",
+                "message": f"Moderate quarantine volume: {len(quarantined_data)} records ({quarantine_pct:.1f}%) quarantined",
                 "affected_fields_count": len(issue_types),
                 "recommendation": "Monitor quarantine trends for patterns indicating systemic issues."
             })
@@ -362,7 +350,7 @@ def execute_quarantine_agent(
             })
         
         # Alert 3: High severity issues
-        if high_issues > original_df.height * 0.05:
+        if high_issues > len(original_df) * 0.05:
             alerts.append({
                 "alert_id": "alert_quarantine_003_high_severity",
                 "severity": "high",
@@ -379,7 +367,7 @@ def execute_quarantine_agent(
                 "severity": "high" if quality_score['metrics']['data_integrity_rate'] < 70 else "medium",
                 "category": "data_integrity",
                 "message": f"Data integrity rate: {quality_score['metrics']['data_integrity_rate']:.1f}% (below 80% threshold)",
-                "affected_fields_count": quarantined_data.height,
+                "affected_fields_count": len(quarantined_data),
                 "recommendation": "Improve data validation processes at source. Low integrity rate indicates missing or insufficient validation rules."
             })
         
@@ -387,7 +375,7 @@ def execute_quarantine_agent(
         if missing_field_count > 0:
             alerts.append({
                 "alert_id": "alert_quarantine_005_missing_fields",
-                "severity": "critical" if missing_field_count > original_df.height * 0.1 else "high",
+                "severity": "critical" if missing_field_count > len(original_df) * 0.1 else "high",
                 "category": "data_integrity",
                 "message": f"Missing required fields: {missing_field_count} records missing mandatory fields",
                 "affected_fields_count": missing_field_count,
@@ -398,7 +386,7 @@ def execute_quarantine_agent(
         if type_mismatch_count > 0:
             alerts.append({
                 "alert_id": "alert_quarantine_006_type_mismatches",
-                "severity": "high" if type_mismatch_count > original_df.height * 0.05 else "medium",
+                "severity": "high" if type_mismatch_count > len(original_df) * 0.05 else "medium",
                 "category": "data_quality",
                 "message": f"Type mismatches detected: {type_mismatch_count} records with incorrect data types",
                 "affected_fields_count": type_mismatch_count,
@@ -411,8 +399,8 @@ def execute_quarantine_agent(
                 "alert_id": "alert_quarantine_007_schema_mismatch",
                 "severity": "critical",
                 "category": "data_integrity",
-                "message": f"Schema mismatches: {quarantined_data.height} records fail schema validation",
-                "affected_fields_count": quarantined_data.height,
+                "message": f"Schema mismatches: {len(quarantined_data)} records fail schema validation",
+                "affected_fields_count": len(quarantined_data),
                 "recommendation": "Validate and align data source schema. Schema mismatches prevent all record processing."
             })
         
@@ -421,7 +409,7 @@ def execute_quarantine_agent(
         if corrupted_count > 0:
             alerts.append({
                 "alert_id": "alert_quarantine_008_corrupted_invalid",
-                "severity": "high" if corrupted_count > original_df.height * 0.1 else "medium",
+                "severity": "high" if corrupted_count > len(original_df) * 0.1 else "medium",
                 "category": "data_quality",
                 "message": f"Corrupted/invalid records: {corrupted_count} records with format violations or out-of-range values",
                 "affected_fields_count": corrupted_count,
@@ -480,7 +468,7 @@ def execute_quarantine_agent(
             })
         
         # Recommendation 2: Investigate data source
-        if quarantined_data.height > original_df.height * 0.2:
+        if len(quarantined_data) > len(original_df) * 0.2:
             agent_recommendations.append({
                 "recommendation_id": "rec_quarantine_source",
                 "agent_id": "quarantine-agent",
@@ -497,7 +485,7 @@ def execute_quarantine_agent(
                 "recommendation_id": f"rec_quarantine_issue_{idx}",
                 "agent_id": "quarantine-agent",
                 "field_name": "various",
-                "priority": "high" if count > original_df.height * 0.1 else "medium",
+                "priority": "high" if count > len(original_df) * 0.1 else "medium",
                 "recommendation": f"Address {issue_type} issues ({count} occurrences) with targeted validation rules",
                 "timeline": "1-2 weeks"
             })
@@ -514,7 +502,7 @@ def execute_quarantine_agent(
             })
         
         # Recommendation 5: Review quarantined data
-        if quarantined_data.height > 0:
+        if len(quarantined_data) > 0:
             agent_recommendations.append({
                 "recommendation_id": "rec_quarantine_review",
                 "agent_id": "quarantine-agent",
@@ -540,7 +528,7 @@ def execute_quarantine_agent(
             "agent_id": "quarantine-agent",
             "field_name": "all",
             "priority": "low",
-            "recommendation": "Establish quarantine rate monitoring to detect data quality degradation early",
+            "recommendation": "Establish quarantine rate monitoring and alerting to detect data quality degradation early",
             "timeline": "3 weeks"
         })
 
@@ -550,10 +538,10 @@ def execute_quarantine_agent(
             "agent_name": "Quarantine Agent",
             "execution_time_ms": int((time.time() - start_time) * 1000),
             "summary_metrics": {
-                "total_rows_processed": original_df.height,
-                "quarantined_records": quarantined_data.height,
-                "clean_records": df_clean.height,
-                "quarantine_percentage": round((quarantined_data.height / original_df.height * 100) if original_df.height > 0 else 0, 2),
+                "total_rows_processed": len(original_df),
+                "quarantined_records": len(quarantined_data),
+                "clean_records": len(df_clean),
+                "quarantine_percentage": round((len(quarantined_data) / len(original_df) * 100) if len(original_df) > 0 else 0, 2),
                 "quarantine_issues_found": len(quarantine_analysis.get("quarantine_issues", []))
             },
             "data": quarantine_data,
@@ -573,8 +561,6 @@ def execute_quarantine_agent(
         }
 
     except Exception as e:
-        import traceback
-        traceback.print_exc()
         return {
             "status": "error",
             "agent_id": "quarantine-agent",
@@ -585,13 +571,13 @@ def execute_quarantine_agent(
 
 
 def _analyze_and_quarantine(
-    df: pl.DataFrame,
+    df: pd.DataFrame,
     required_fields: List[str],
     range_constraints: Dict[str, Dict[str, float]],
     format_constraints: Dict[str, str],
     expected_schema: Dict[str, str],
     detection_flags: Dict[str, bool]
-) -> Tuple[pl.DataFrame, List[str], Dict[str, Any]]:
+) -> Tuple[pd.DataFrame, List[str], Dict[str, Any]]:
     """
     Analyze data for issues and separate quarantine candidates.
     
@@ -606,15 +592,16 @@ def _analyze_and_quarantine(
     if detection_flags.get("detect_missing_fields", True) and required_fields:
         for col in required_fields:
             if col in df.columns:
-                # Check for null or empty string
-                missing_df = df.filter(pl.col(col).is_null() | (pl.col(col) == ""))
+                missing_mask = df[col].isnull()
+                missing_indices = df[missing_mask].index.tolist()
                 
-                if missing_df.height > 0:
-                    indices = missing_df["row_index"].to_list()
-                    quarantine_indices.update(indices)
-                    quarantine_log.append(f"Missing required field '{col}': {len(indices)} rows")
+                if missing_indices:
+                    quarantine_indices.update(missing_indices)
+                    quarantine_log.append(
+                        f"Missing required field '{col}': {len(missing_indices)} rows"
+                    )
                     
-                    for idx in indices[:100]:
+                    for idx in missing_indices[:100]:
                         quarantine_issues.append({
                             "row_index": int(idx),
                             "column": col,
@@ -626,150 +613,105 @@ def _analyze_and_quarantine(
     # 2. DETECT TYPE MISMATCHES
     if detection_flags.get("detect_type_mismatches", True):
         for col in df.columns:
-            if col == "row_index": continue
             expected_type = expected_schema.get(col, None)
             
             if expected_type:
-                mismatch_indices = []
-                
-                if expected_type in ["numeric", "integer", "float"]:
-                    # Check if can be cast to Float64
-                    mismatch_df = df.filter(
-                        (pl.col(col).is_not_null()) & (pl.col(col) != "") &
-                        (pl.col(col).cast(pl.Float64, strict=False).is_null())
-                    )
-                    mismatch_indices = mismatch_df["row_index"].to_list()
-
-                elif expected_type == "boolean":
-                     # Check if value is in true/false/1/0/yes/no
-                     valid_bools = ['true', 'false', '1', '0', 'yes', 'no']
-                     mismatch_df = df.filter(
-                        (pl.col(col).is_not_null()) & (pl.col(col) != "") &
-                        (~pl.col(col).str.to_lowercase().is_in(valid_bools))
-                     )
-                     mismatch_indices = mismatch_df["row_index"].to_list()
-                
-                if mismatch_indices:
-                    quarantine_indices.update(mismatch_indices)
-                    quarantine_log.append(f"Type mismatch in '{col}': expected {expected_type} ({len(mismatch_indices)} rows)")
-                    for idx in mismatch_indices[:50]:
-                         quarantine_issues.append({
-                            "row_index": int(idx),
-                            "column": col,
-                            "issue_type": "type_mismatch",
-                            "severity": "high",
-                            "description": f"Type mismatch: expected {expected_type}"
-                        })
+                try:
+                    actual_type = _infer_column_type(df[col])
+                    
+                    if actual_type != expected_type:
+                        # Try to detect which rows have the mismatch
+                        mismatch_indices = _find_type_mismatch_rows(df[col], expected_type)
+                        
+                        if mismatch_indices:
+                            quarantine_indices.update(mismatch_indices)
+                            quarantine_log.append(
+                                f"Type mismatch in '{col}': expected {expected_type}, found {actual_type} ({len(mismatch_indices)} rows)"
+                            )
+                            
+                            for idx in mismatch_indices[:50]:
+                                quarantine_issues.append({
+                                    "row_index": int(idx),
+                                    "column": col,
+                                    "issue_type": "type_mismatch",
+                                    "severity": "high",
+                                    "description": f"Type mismatch: expected {expected_type}, found {actual_type}"
+                                })
+                except Exception as e:
+                    quarantine_log.append(f"Error checking type in '{col}': {str(e)}")
 
     # 3. DETECT OUT-OF-RANGE VALUES
     if detection_flags.get("detect_out_of_range", True) and range_constraints:
         for col, constraints in range_constraints.items():
-            if col in df.columns:
+            if col in df.columns and pd.api.types.is_numeric_dtype(df[col]):
                 min_val = constraints.get("min", None)
                 max_val = constraints.get("max", None)
                 
-                valid_numeric_df = df.filter(
-                    (pl.col(col).is_not_null()) & (pl.col(col) != "") &
-                    (pl.col(col).cast(pl.Float64, strict=False).is_not_null())
-                )
+                out_of_range = pd.Series([False] * len(df), index=df.index)
                 
-                if valid_numeric_df.height > 0:
-                    numeric_col = valid_numeric_df.select(["row_index", pl.col(col).cast(pl.Float64).alias("val")])
-                    
-                    out_of_range_df = numeric_col.filter(
-                        ((pl.lit(min_val).is_not_null()) & (pl.col("val") < min_val)) |
-                        ((pl.lit(max_val).is_not_null()) & (pl.col("val") > max_val))
+                if min_val is not None:
+                    out_of_range |= df[col] < min_val
+                if max_val is not None:
+                    out_of_range |= df[col] > max_val
+                
+                out_of_range_indices = df[out_of_range].index.tolist()
+                
+                if out_of_range_indices:
+                    quarantine_indices.update(out_of_range_indices)
+                    quarantine_log.append(
+                        f"Out-of-range values in '{col}': {len(out_of_range_indices)} rows (range: {min_val}-{max_val})"
                     )
                     
-                    indices = out_of_range_df["row_index"].to_list()
-                    if indices:
-                        quarantine_indices.update(indices)
-                        quarantine_log.append(f"Out-of-range values in '{col}': {len(indices)} rows")
-                        for row in out_of_range_df.head(50).iter_rows(named=True):
-                             quarantine_issues.append({
-                                "row_index": int(row["row_index"]),
-                                "column": col,
-                                "issue_type": "out_of_range",
-                                "severity": "high",
-                                "description": f"Value {row['val']} outside range [{min_val}, {max_val}]"
-                            })
+                    for idx in out_of_range_indices[:50]:
+                        val = df.loc[idx, col]
+                        quarantine_issues.append({
+                            "row_index": int(idx),
+                            "column": col,
+                            "issue_type": "out_of_range",
+                            "severity": "high",
+                            "description": f"Value {val} outside range [{min_val}, {max_val}]"
+                        })
 
     # 4. DETECT INVALID FORMATS
     if detection_flags.get("detect_invalid_formats", True) and format_constraints:
         for col, pattern in format_constraints.items():
             if col in df.columns:
-                # Use regex
-                invalid_df = df.filter(
-                    (pl.col(col).is_not_null()) & (pl.col(col) != "") &
-                    (~pl.col(col).str.contains(pattern))
-                )
+                invalid_indices = _find_format_violations(df[col], pattern)
                 
-                indices = invalid_df["row_index"].to_list()
-                if indices:
-                    quarantine_indices.update(indices)
-                    quarantine_log.append(f"Invalid format in '{col}': {len(indices)} rows (pattern: {pattern})")
-                    for row in invalid_df.head(50).iter_rows(named=True):
+                if invalid_indices:
+                    quarantine_indices.update(invalid_indices)
+                    quarantine_log.append(
+                        f"Invalid format in '{col}': {len(invalid_indices)} rows (pattern: {pattern})"
+                    )
+                    
+                    for idx in invalid_indices[:50]:
+                        val = df.loc[idx, col]
                         quarantine_issues.append({
-                            "row_index": int(row["row_index"]),
+                            "row_index": int(idx),
                             "column": col,
                             "issue_type": "invalid_format",
                             "severity": "medium",
-                            "description": f"Value '{row[col]}' does not match pattern '{pattern}'"
+                            "description": f"Value '{val}' does not match pattern '{pattern}'"
                         })
 
     # 5. DETECT BROKEN/CORRUPTED RECORDS
     if detection_flags.get("detect_broken_records", True):
-        # Check for all nulls (empty strings in our case since we read as string)
-        # Or actual nulls
+        corrupted_indices = _detect_corrupted_records(df)
         
-        # Check for rows where all columns (except row_index) are null or empty
-        cols_to_check = [c for c in df.columns if c != "row_index"]
-        if cols_to_check:
-            all_null_df = df.filter(
-                pl.all_horizontal([(pl.col(c).is_null() | (pl.col(c) == "")) for c in cols_to_check])
+        if corrupted_indices:
+            quarantine_indices.update(corrupted_indices)
+            quarantine_log.append(
+                f"Corrupted/broken records detected: {len(corrupted_indices)} rows"
             )
             
-            indices = all_null_df["row_index"].to_list()
-            if indices:
-                quarantine_indices.update(indices)
-                quarantine_log.append(f"Corrupted/broken records detected: {len(indices)} rows (empty)")
-                for idx in indices[:50]:
-                    quarantine_issues.append({
-                        "row_index": int(idx),
-                        "column": "record",
-                        "issue_type": "corrupted_record",
-                        "severity": "critical",
-                        "description": "Record appears to be corrupted or broken (empty)"
-                    })
-        
-        # Check for suspicious patterns (SQL injection)
-        suspicious_patterns = [
-            r"(?i)(?:drop\s+table|delete\s+from|insert\s+into|update\s+|select\s+\*)",
-            r"['\"]?\s*OR\s+['\"]?1['\"]?\s*=['\"]?1",
-            r"<script[^>]*>.*?</script>",
-            r"javascript:",
-        ]
-        
-        for col in cols_to_check:
-            # Only check string-like columns? We read everything as string.
-            for pattern in suspicious_patterns:
-                suspicious_df = df.filter(
-                    (pl.col(col).is_not_null()) &
-                    (pl.col(col).str.contains(pattern))
-                )
-                
-                indices = suspicious_df["row_index"].to_list()
-                if indices:
-                    quarantine_indices.update(indices)
-                    # Log once per column/pattern combo maybe?
-                    for idx in indices[:50]:
-                         quarantine_issues.append({
-                            "row_index": int(idx),
-                            "column": col,
-                            "issue_type": "corrupted_record",
-                            "severity": "critical",
-                            "description": f"Suspicious pattern detected in '{col}'"
-                        })
+            for idx in corrupted_indices[:50]:
+                quarantine_issues.append({
+                    "row_index": int(idx),
+                    "column": "record",
+                    "issue_type": "corrupted_record",
+                    "severity": "critical",
+                    "description": "Record appears to be corrupted or broken"
+                })
 
     # 6. DETECT SCHEMA MISMATCHES
     if detection_flags.get("detect_schema_mismatches", True) and expected_schema:
@@ -781,7 +723,7 @@ def _analyze_and_quarantine(
             )
             # Quarantine all records if critical schema mismatch
             if len(schema_mismatch_cols) >= len(expected_schema) * 0.5:
-                quarantine_indices.update(df["row_index"].to_list())
+                quarantine_indices.update(df.index.tolist())
                 quarantine_issues.append({
                     "row_index": 0,
                     "column": "schema",
@@ -791,50 +733,19 @@ def _analyze_and_quarantine(
                 })
 
     # Isolate quarantined records
-    quarantined_df = df.filter(pl.col("row_index").is_in(quarantine_indices))
-    
-    # Add metadata columns
-    quarantined_df = quarantined_df.with_columns(
-        pl.lit(datetime.utcnow().isoformat()).alias("_quarantine_timestamp")
+    quarantined_df = df.loc[list(quarantine_indices)].copy()
+    quarantined_df["_quarantine_timestamp"] = datetime.utcnow().isoformat()
+    quarantined_df["_quarantine_reason"] = quarantined_df.index.map(
+        lambda idx: next(
+            (issue["description"] for issue in quarantine_issues if issue["row_index"] == idx),
+            "Multiple issues detected"
+        )
     )
-    
-    # Add reason
-    # Create a mapping dataframe
-    if quarantine_issues:
-        # Prioritize issues: critical > high > medium
-        # Sort issues by severity
-        severity_map = {"critical": 0, "high": 1, "medium": 2, "low": 3}
-        sorted_issues = sorted(quarantine_issues, key=lambda x: severity_map.get(x.get("severity", "low"), 4))
-        
-        # Keep first issue for each row
-        unique_issues = {}
-        for issue in sorted_issues:
-            idx = issue["row_index"]
-            if idx not in unique_issues:
-                unique_issues[idx] = issue["description"]
-            else:
-                unique_issues[idx] = "Multiple issues detected"
-        
-        # Create DataFrame for join
-        reasons_df = pl.DataFrame({
-            "row_index": list(unique_issues.keys()),
-            "_quarantine_reason": list(unique_issues.values())
-        })
-        
-        # Join
-        # We need to cast row_index to match types if needed, but both should be int/u32
-        # pl.DataFrame creates Int64 by default for python ints
-        # df.with_row_index creates UInt32
-        
-        reasons_df = reasons_df.with_columns(pl.col("row_index").cast(pl.UInt32))
-        quarantined_df = quarantined_df.join(reasons_df, on="row_index", how="left")
-    else:
-        quarantined_df = quarantined_df.with_columns(pl.lit("Unknown").alias("_quarantine_reason"))
 
     quarantine_analysis = {
-        "total_rows_analyzed": df.height,
-        "total_quarantined": quarantined_df.height,
-        "quarantine_percentage": round((quarantined_df.height / df.height * 100) if df.height > 0 else 0, 2),
+        "total_rows_analyzed": len(df),
+        "total_quarantined": len(quarantined_df),
+        "quarantine_percentage": round((len(quarantined_df) / len(df) * 100) if len(df) > 0 else 0, 2),
         "quarantine_issues": quarantine_issues,
         "issue_types": _count_issue_types(quarantine_issues),
         "severity_breakdown": _count_severity_breakdown(quarantine_issues),
@@ -842,6 +753,99 @@ def _analyze_and_quarantine(
     }
 
     return quarantined_df, quarantine_log, quarantine_analysis
+
+
+def _infer_column_type(series: pd.Series) -> str:
+    """Infer the overall type of a column."""
+    series_clean = series.dropna()
+    
+    if len(series_clean) == 0:
+        return "unknown"
+    
+    if pd.api.types.is_numeric_dtype(series):
+        return "numeric"
+    elif pd.api.types.is_datetime64_any_dtype(series):
+        return "datetime"
+    elif pd.api.types.is_categorical_dtype(series):
+        return "category"
+    elif pd.api.types.is_bool_dtype(series):
+        return "boolean"
+    else:
+        return "string"
+
+
+def _find_type_mismatch_rows(series: pd.Series, expected_type: str) -> List[int]:
+    """Find rows that don't match the expected type."""
+    mismatches = []
+    
+    for idx, val in series.items():
+        if pd.isna(val):
+            continue
+        
+        try:
+            if expected_type == "numeric":
+                float(val)
+            elif expected_type == "integer":
+                int(val)
+            elif expected_type == "datetime":
+                pd.Timestamp(val)
+            elif expected_type == "boolean":
+                str(val).lower() in ['true', 'false', '1', '0', 'yes', 'no']
+            elif expected_type == "string":
+                str(val)
+        except (ValueError, TypeError):
+            mismatches.append(int(idx))
+    
+    return mismatches
+
+
+def _find_format_violations(series: pd.Series, pattern: str) -> List[int]:
+    """Find values that don't match the format pattern."""
+    violations = []
+    
+    try:
+        regex = re.compile(f"^{pattern}$")
+        
+        for idx, val in series.items():
+            if pd.isna(val):
+                continue
+            
+            if not regex.match(str(val)):
+                violations.append(int(idx))
+    except:
+        pass
+    
+    return violations
+
+
+def _detect_corrupted_records(df: pd.DataFrame) -> List[int]:
+    """Detect records that appear to be corrupted or broken."""
+    corrupted = []
+    
+    # Check for records with all nulls
+    all_null_mask = df.isnull().all(axis=1)
+    corrupted.extend(df[all_null_mask].index.tolist())
+    
+    # Check for records with suspicious values (e.g., SQL injection patterns)
+    # Using non-capturing groups (?:...) to avoid pandas warning about match groups
+    suspicious_patterns = [
+        r"(?i)(?:drop\s+table|delete\s+from|insert\s+into|update\s+|select\s+\*)",
+        r"['\"]?\s*OR\s+['\"]?1['\"]?\s*=['\"]?1",
+        r"<script[^>]*>.*?</script>",
+        r"javascript:",
+    ]
+    
+    for col in df.columns:
+        if df[col].dtype == 'object':
+            for pattern in suspicious_patterns:
+                try:
+                    mask = df[col].astype(str).str.contains(pattern, regex=True, case=False, na=False)
+                    corrupted.extend(df[mask].index.tolist())
+                except:
+                    pass
+    
+    return list(set(corrupted))
+
 
 def _count_issue_types(issues: List[Dict]) -> Dict[str, int]:
     """Count issues by type."""
@@ -862,16 +866,16 @@ def _count_severity_breakdown(issues: List[Dict]) -> Dict[str, int]:
 
 
 def _calculate_quarantine_score(
-    original_df: pl.DataFrame,
-    cleaned_df: pl.DataFrame,
-    quarantined_df: pl.DataFrame,
+    original_df: pd.DataFrame,
+    cleaned_df: pd.DataFrame,
+    quarantined_df: pd.DataFrame,
     quarantine_analysis: Dict[str, Any],
     config: Dict[str, Any]
 ) -> Dict[str, Any]:
     """Calculate quarantine effectiveness score."""
-    total_rows = original_df.height
-    clean_rows = cleaned_df.height
-    quarantined_rows = quarantined_df.height
+    total_rows = len(original_df)
+    clean_rows = len(cleaned_df)
+    quarantined_rows = len(quarantined_df)
     
     # Calculate metrics
     quarantine_reduction_rate = (quarantined_rows / total_rows * 100) if total_rows > 0 else 0
@@ -903,7 +907,7 @@ def _calculate_quarantine_score(
     }
 
 
-def _extract_row_level_issues(quarantined_df: pl.DataFrame, quarantine_analysis: Dict) -> List[Dict]:
+def _extract_row_level_issues(quarantined_df: pd.DataFrame, quarantine_analysis: Dict) -> List[Dict]:
     """Extract row-level issue details."""
     issues = []
     
@@ -919,7 +923,7 @@ def _extract_row_level_issues(quarantined_df: pl.DataFrame, quarantine_analysis:
     return issues
 
 
-def _generate_cleaned_file(df: pl.DataFrame, original_filename: str) -> bytes:
+def _generate_cleaned_file(df: pd.DataFrame, original_filename: str) -> bytes:
     """
     Generate cleaned data file (after quarantine removal).
     
@@ -931,5 +935,5 @@ def _generate_cleaned_file(df: pl.DataFrame, original_filename: str) -> bytes:
         File contents as bytes
     """
     output = io.BytesIO()
-    df.write_csv(output)
+    df.to_csv(output, index=False)
     return output.getvalue()

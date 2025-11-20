@@ -3,11 +3,11 @@ Type Fixer Agent
 
 Detects and fixes data type inconsistencies in data.
 Analyzes column types and applies configurable type conversion strategies.
-Input: CSV file (primary)
+Input: CSV/JSON/XLSX file (primary)
 Output: Standardized type fixing results with effectiveness scores
 """
 
-import polars as pl
+import pandas as pd
 import numpy as np
 import io
 import re
@@ -48,29 +48,23 @@ def execute_type_fixer(
     good_threshold = parameters.get("good_threshold", 75)
 
     try:
-        # Read file - CSV only
-        if not filename.endswith('.csv'):
+        # Read file based on format
+        if filename.endswith('.csv'):
+            df = pd.read_csv(io.BytesIO(file_contents), on_bad_lines='skip')
+        elif filename.endswith('.json'):
+            df = pd.read_json(io.BytesIO(file_contents))
+        elif filename.endswith(('.xlsx', '.xls')):
+            df = pd.read_excel(io.BytesIO(file_contents))
+        else:
             return {
                 "status": "error",
                 "agent_id": "type-fixer",
-                "error": f"Unsupported file format: {filename}. Only CSV files are supported.",
-                "execution_time_ms": int((time.time() - start_time) * 1000)
-            }
-
-        try:
-            # Read CSV with Polars
-            # infer_schema_length=10000 to get good type inference initially
-            df = pl.read_csv(io.BytesIO(file_contents), ignore_errors=True, infer_schema_length=10000)
-        except Exception as e:
-            return {
-                "status": "error",
-                "agent_id": "type-fixer",
-                "error": f"Failed to parse CSV: {str(e)}",
+                "error": f"Unsupported file format: {filename}",
                 "execution_time_ms": int((time.time() - start_time) * 1000)
             }
 
         # Validate data
-        if df.height == 0:
+        if df.empty:
             return {
                 "status": "error",
                 "agent_id": "type-fixer",
@@ -79,8 +73,8 @@ def execute_type_fixer(
                 "execution_time_ms": int((time.time() - start_time) * 1000)
             }
 
-        # Store original data for comparison (clone)
-        original_df = df.clone()
+        # Store original data for comparison
+        original_df = df.copy()
         
         # Analyze type issues
         type_analysis = _analyze_type_issues(df)
@@ -125,100 +119,73 @@ def execute_type_fixer(
                 continue
             
             type_data = type_analysis.get("type_summary", {}).get(col, {})
-            current_type = type_data.get("current_type", "Utf8")
+            current_type = type_data.get("current_type", "object")
             suggested_type = type_data.get("suggested_type", current_type)
             
-            # We need to find rows that violate the suggested type
-            # Filter rows
-            
-            if suggested_type == "numeric" and current_type == "Utf8":
-                # Find non-numeric strings
-                # Use regex or cast check
-                # Regex for numeric: ^-?\d+(\.\d+)?$
-                # Polars regex
-                numeric_pattern = r"^-?\d+(\.\d+)?$"
+            # Iterate through rows to identify type violations
+            for row_idx, value in enumerate(original_df[col]):
+                if pd.isna(value):
+                    continue
                 
-                non_numeric = original_df.with_row_index("row_index").filter(
-                    pl.col(col).is_not_null() &
-                    ~pl.col(col).str.contains(numeric_pattern)
-                )
+                # Determine if row has type issue
+                has_type_issue = False
+                issue_type = "type_mismatch"
+                severity = "warning"
+                message = ""
                 
-                for row in non_numeric.iter_rows(named=True):
-                    if len(row_level_issues) >= 1000: break
+                # Check for numeric-should-be type issues
+                if suggested_type == "numeric" and current_type == "object":
+                    if not _is_numeric_string(str(value)):
+                        has_type_issue = True
+                        issue_type = "type_mismatch"
+                        severity = "warning"
+                        message = f"Non-numeric value '{value}' found in column '{col}' that should contain numeric values"
+                
+                # Check for datetime-should-be type issues
+                elif suggested_type == "datetime" and current_type == "object":
+                    if not _is_date_string(str(value)):
+                        has_type_issue = True
+                        issue_type = "format_violation"
+                        severity = "warning"
+                        message = f"Non-datetime value '{value}' found in column '{col}' that should contain datetime values"
+                
+                # Check for float-should-be-integer issues
+                elif suggested_type == "integer" and current_type == "float64":
+                    try:
+                        if not float(value).is_integer():
+                            has_type_issue = True
+                            issue_type = "type_conflict"
+                            severity = "info"
+                            message = f"Float value '{value}' found in column '{col}' that contains only integers"
+                    except (ValueError, TypeError):
+                        pass
+                
+                # Check for mixed types in object columns
+                elif current_type == "object":
+                    type_check_results = []
+                    if _is_numeric_string(str(value)):
+                        type_check_results.append("numeric")
+                    if _is_date_string(str(value)):
+                        type_check_results.append("datetime")
+                    if len(type_check_results) > 1 or len(type_check_results) == 0:
+                        has_type_issue = True
+                        issue_type = "type_conflict"
+                        severity = "warning" if suggested_type != "string" else "info"
+                        detected_type = type_check_results[0] if type_check_results else "unknown"
+                        message = f"Mixed or ambiguous type in column '{col}' - value '{value}' type: {detected_type}"
+                
+                if has_type_issue and len(row_level_issues) < 1000:
                     row_level_issues.append({
-                        "row_index": int(row["row_index"]),
+                        "row_index": int(row_idx),
                         "column": str(col),
-                        "issue_type": "type_mismatch",
-                        "severity": "warning",
-                        "message": f"Non-numeric value '{row[col]}' found in column '{col}' that should contain numeric values",
-                        "value": str(row[col]),
+                        "issue_type": issue_type,
+                        "severity": severity,
+                        "message": message,
+                        "value": str(value),
                         "current_type": str(current_type),
                         "suggested_type": str(suggested_type)
                     })
-
-            elif suggested_type == "datetime" and current_type == "Utf8":
-                # Find non-datetime strings
-                # This is harder with regex as date formats vary.
-                # We can try to cast to date and see what fails (returns null)
-                # But we need to be careful not to count nulls that were already null.
-                
-                # Try casting with strict=False (returns null on failure)
-                # But we need to know if it failed.
-                # original not null AND cast is null => failure
-                
-                # Note: Polars str.to_datetime requires a format or it tries strict ISO.
-                # If we want flexible parsing, we might need to try multiple formats or use a heuristic.
-                # For now, let's use a simple regex check for common date patterns if possible, or just skip row-level detail for complex dates if too slow.
-                # The original code used `_is_date_string` with regexes.
-                
-                date_patterns = [
-                    r'\d{4}-\d{2}-\d{2}',  # YYYY-MM-DD
-                    r'\d{2}/\d{2}/\d{4}',  # MM/DD/YYYY
-                    r'\d{2}-\d{2}-\d{4}',  # MM-DD-YYYY
-                ]
-                combined_pattern = "|".join(date_patterns)
-                
-                non_date = original_df.with_row_index("row_index").filter(
-                    pl.col(col).is_not_null() &
-                    ~pl.col(col).str.contains(combined_pattern)
-                )
-                
-                for row in non_date.iter_rows(named=True):
-                    if len(row_level_issues) >= 1000: break
-                    row_level_issues.append({
-                        "row_index": int(row["row_index"]),
-                        "column": str(col),
-                        "issue_type": "format_violation",
-                        "severity": "warning",
-                        "message": f"Non-datetime value '{row[col]}' found in column '{col}' that should contain datetime values",
-                        "value": str(row[col]),
-                        "current_type": str(current_type),
-                        "suggested_type": str(suggested_type)
-                    })
-
-            elif suggested_type == "integer" and current_type == "Float64":
-                # Check for non-integer floats
-                # (val % 1 != 0)
-                non_int = original_df.with_row_index("row_index").filter(
-                    pl.col(col).is_not_null() &
-                    (pl.col(col) % 1 != 0)
-                )
-                
-                for row in non_int.iter_rows(named=True):
-                    if len(row_level_issues) >= 1000: break
-                    row_level_issues.append({
-                        "row_index": int(row["row_index"]),
-                        "column": str(col),
-                        "issue_type": "type_conflict",
-                        "severity": "info",
-                        "message": f"Float value '{row[col]}' found in column '{col}' that contains only integers",
-                        "value": str(row[col]),
-                        "current_type": str(current_type),
-                        "suggested_type": str(suggested_type)
-                    })
-            
-            if len(row_level_issues) >= 1000: break
-
+        
         # Cap at 1000 issues
         row_level_issues = row_level_issues[:1000]
         
@@ -287,6 +254,8 @@ def execute_type_fixer(
             ai_analysis_parts.append(f"- Top Recommendation: {type_analysis['recommendations'][0].get('recommendation', 'Review type conversion strategy')}")
         
         ai_analysis_text = "\n".join(ai_analysis_parts)
+        
+       
         
         # ==================== GENERATE ALERTS ====================
         alerts = []
@@ -570,7 +539,7 @@ def execute_type_fixer(
         }
 
 
-def _analyze_type_issues(df: pl.DataFrame) -> Dict[str, Any]:
+def _analyze_type_issues(df: pd.DataFrame) -> Dict[str, Any]:
     """Analyze data type inconsistencies in the dataset."""
     type_analysis = {
         "total_columns": len(df.columns),
@@ -581,32 +550,31 @@ def _analyze_type_issues(df: pl.DataFrame) -> Dict[str, Any]:
     }
     
     for col in df.columns:
-        # Polars dtype
+        col_data = df[col].dropna()
+        if len(col_data) == 0:
+            continue
+            
         current_dtype = str(df[col].dtype)
         issues = []
         suggested_type = current_dtype
         
-        # Check for mixed types in Utf8 columns
-        if current_dtype == 'Utf8':
-            # Sample data
-            col_data = df.select(pl.col(col)).drop_nulls().head(100)
+        # Check for mixed types in object columns
+        if current_dtype == 'object':
+            numeric_count = 0
+            date_count = 0
+            string_count = 0
             
-            if col_data.height > 0:
-                # Check numeric
-                numeric_pattern = r"^-?\d+(\.\d+)?$"
-                numeric_count = col_data.filter(pl.col(col).str.contains(numeric_pattern)).height
-                
-                # Check date
-                date_patterns = [
-                    r'\d{4}-\d{2}-\d{2}',  # YYYY-MM-DD
-                    r'\d{2}/\d{2}/\d{4}',  # MM/DD/YYYY
-                    r'\d{2}-\d{2}-\d{4}',  # MM-DD-YYYY
-                ]
-                combined_date_pattern = "|".join(date_patterns)
-                date_count = col_data.filter(pl.col(col).str.contains(combined_date_pattern)).height
-                
-                total_sampled = col_data.height
-                
+            sample_size = min(100, len(col_data))
+            for val in col_data.head(sample_size):
+                if _is_numeric_string(str(val)):
+                    numeric_count += 1
+                elif _is_date_string(str(val)):
+                    date_count += 1
+                else:
+                    string_count += 1
+            
+            total_sampled = numeric_count + date_count + string_count
+            if total_sampled > 0:
                 numeric_pct = (numeric_count / total_sampled) * 100
                 date_pct = (date_count / total_sampled) * 100
                 
@@ -617,31 +585,25 @@ def _analyze_type_issues(df: pl.DataFrame) -> Dict[str, Any]:
                     issues.append("Should be datetime type")
                     suggested_type = "datetime"
         
-        # Check for incorrectly typed numeric columns (Float that are all Int)
-        elif current_dtype in ['Float32', 'Float64']:
-            # Check if all non-null values are integers
-            # (val % 1 == 0)
-            is_all_int = df.select(
-                (pl.col(col).drop_nulls() % 1 == 0).all()
-            ).item()
-            
-            if is_all_int:
-                issues.append("Float column contains only integer values")
-                suggested_type = "integer"
+        # Check for incorrectly typed numeric columns
+        elif current_dtype in ['int64', 'float64']:
+            if current_dtype == 'float64':
+                try:
+                    is_all_int = col_data.apply(lambda x: float(x).is_integer() if pd.notnull(x) else True).all()
+                    if is_all_int:
+                        issues.append("Float column contains only integer values")
+                        suggested_type = "integer"
+                except:
+                    pass
         
         if issues:
             type_analysis["columns_with_issues"].append(str(col))
             type_analysis["total_issues"] += 1
-            
-            # Get sample values
-            sample_vals = df.select(pl.col(col)).head(5).to_series().to_list()
-            sample_vals_str = [str(x) for x in sample_vals]
-            
             type_analysis["type_summary"][str(col)] = {
                 "current_type": current_dtype,
                 "suggested_type": suggested_type,
                 "issues": issues,
-                "sample_values": sample_vals_str
+                "sample_values": [str(x) for x in col_data.head(5).tolist()]
             }
             
             priority = "high" if len(issues) > 1 else "medium"
@@ -653,6 +615,29 @@ def _analyze_type_issues(df: pl.DataFrame) -> Dict[str, Any]:
             })
     
     return type_analysis
+
+
+def _is_numeric_string(value: str) -> bool:
+    """Check if a string represents a numeric value."""
+    try:
+        float(value)
+        return True
+    except (ValueError, TypeError):
+        return False
+
+
+def _is_date_string(value: str) -> bool:
+    """Check if a string represents a date."""
+    date_patterns = [
+        r'\d{4}-\d{2}-\d{2}',  # YYYY-MM-DD
+        r'\d{2}/\d{2}/\d{4}',  # MM/DD/YYYY
+        r'\d{2}-\d{2}-\d{4}',  # MM-DD-YYYY
+    ]
+    
+    for pattern in date_patterns:
+        if re.match(pattern, str(value)):
+            return True
+    return False
 
 
 def _generate_fix_config(
@@ -677,9 +662,9 @@ def _generate_fix_config(
     return config
 
 
-def _apply_type_fixes(df: pl.DataFrame, fix_config: Dict[str, Any]) -> tuple:
+def _apply_type_fixes(df: pd.DataFrame, fix_config: Dict[str, Any]) -> tuple:
     """Apply type fixes to the dataframe."""
-    df_fixed = df.clone()
+    df_fixed = df.copy()
     fix_log = []
     
     column_fixes = fix_config.get('column_fixes', {})
@@ -692,31 +677,23 @@ def _apply_type_fixes(df: pl.DataFrame, fix_config: Dict[str, Any]) -> tuple:
             original_type = str(df_fixed[col].dtype)
             
             if target_type == 'numeric':
-                # Try cast to Float64, strict=False (null on error)
-                # Or infer?
-                # Polars cast to Float64 handles strings
-                df_fixed = df_fixed.with_columns(pl.col(col).cast(pl.Float64, strict=False))
+                df_fixed[col] = pd.to_numeric(df_fixed[col], errors='coerce')
                 fix_log.append(f"Converted '{col}' from {original_type} to numeric")
                 
             elif target_type == 'integer':
-                # Cast to Int64
-                df_fixed = df_fixed.with_columns(pl.col(col).cast(pl.Int64, strict=False))
+                df_fixed[col] = df_fixed[col].astype('Int64')
                 fix_log.append(f"Converted '{col}' from {original_type} to integer")
                 
             elif target_type == 'datetime':
-                # Try to cast to datetime
-                # str.to_datetime without format tries strict ISO.
-                # We might need to try parsing.
-                # For now, let's use strict=False which produces nulls on failure
-                df_fixed = df_fixed.with_columns(pl.col(col).str.to_datetime(strict=False))
+                df_fixed[col] = pd.to_datetime(df_fixed[col], errors='coerce', dayfirst=True)
                 fix_log.append(f"Converted '{col}' from {original_type} to datetime")
                 
             elif target_type == 'string':
-                df_fixed = df_fixed.with_columns(pl.col(col).cast(pl.Utf8))
+                df_fixed[col] = df_fixed[col].astype(str)
                 fix_log.append(f"Converted '{col}' from {original_type} to string")
                 
             elif target_type == 'category':
-                df_fixed = df_fixed.with_columns(pl.col(col).cast(pl.Categorical))
+                df_fixed[col] = df_fixed[col].astype('category')
                 fix_log.append(f"Converted '{col}' from {original_type} to category")
                 
         except Exception as e:
@@ -726,8 +703,8 @@ def _apply_type_fixes(df: pl.DataFrame, fix_config: Dict[str, Any]) -> tuple:
 
 
 def _calculate_fixing_score(
-    original_df: pl.DataFrame,
-    fixed_df: pl.DataFrame,
+    original_df: pd.DataFrame,
+    fixed_df: pd.DataFrame,
     type_analysis: Dict[str, Any],
     config: dict
 ) -> Dict[str, Any]:
@@ -792,8 +769,8 @@ def _calculate_fixing_score(
 
 
 def _identify_type_issues(
-    original_df: pl.DataFrame,
-    fixed_df: pl.DataFrame,
+    original_df: pd.DataFrame,
+    fixed_df: pd.DataFrame,
     type_analysis: Dict[str, Any]
 ) -> List[Dict[str, Any]]:
     """Identify type-level issues in the DataFrame."""
@@ -842,7 +819,7 @@ def _convert_numpy_types(obj):
         return obj
 
 
-def _generate_cleaned_file(df: pl.DataFrame, original_filename: str) -> bytes:
+def _generate_cleaned_file(df: pd.DataFrame, original_filename: str) -> bytes:
     """
     Generate cleaned data file in CSV format.
     
@@ -855,5 +832,5 @@ def _generate_cleaned_file(df: pl.DataFrame, original_filename: str) -> bytes:
     """
     # Always export as CSV for consistency and compatibility
     output = io.BytesIO()
-    df.write_csv(output)
+    df.to_csv(output, index=False)
     return output.getvalue()
