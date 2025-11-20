@@ -309,40 +309,69 @@ async def analyze(
                 file_contents = await file_obj.read()
                 files_map[file_key] = (file_contents, file_obj.filename)
         
-        # Convert input files to CSV for clean-my-data tool to ensure consistent processing
-        if tool_id == "clean-my-data":
-            for file_key, (content, filename) in list(files_map.items()):
-                try:
-                    file_ext = filename.split(".")[-1].lower() if "." in filename else ""
+        # Convert input files to CSV for all tools to ensure consistent processing
+        for file_key, (content, filename) in list(files_map.items()):
+            try:
+                file_ext = filename.split(".")[-1].lower() if "." in filename else ""
+                
+                # Skip if already CSV
+                if file_ext == "csv":
+                    continue
                     
-                    # Skip if already CSV
-                    if file_ext == "csv":
-                        continue
+                df = None
+                # Handle Excel files
+                if file_ext in ["xlsx", "xls"]:
+                    try:
+                        engine = "openpyxl" if file_ext == "xlsx" else "xlrd"
+                        df = pd.read_excel(io.BytesIO(content), engine=engine)
+                    except Exception as first_error:
+                        print(f"Primary engine {engine} failed for {filename}: {first_error}")
+                        # Fallback strategies
+                        success = False
                         
-                    df = None
-                    # Handle Excel files
-                    if file_ext in ["xlsx", "xls"]:
-                        df = pd.read_excel(io.BytesIO(content))
-                    # Handle JSON files
-                    elif file_ext == "json":
-                        df = pd.read_json(io.BytesIO(content))
+                        # Strategy 1: Try the other Excel engine (e.g. xls renamed to xlsx)
+                        if not success:
+                            try:
+                                fallback_engine = "xlrd" if engine == "openpyxl" else "openpyxl"
+                                df = pd.read_excel(io.BytesIO(content), engine=fallback_engine)
+                                success = True
+                                print(f"Fallback to {fallback_engine} successful")
+                            except Exception:
+                                pass
+                        
+                        # Strategy 2: Try reading as CSV (sometimes files are misnamed)
+                        if not success:
+                            try:
+                                # Try with default encoding
+                                df = pd.read_csv(io.BytesIO(content))
+                                success = True
+                                print(f"Fallback to CSV reader successful")
+                            except Exception:
+                                pass
+                                
+                        if not success:
+                            raise first_error
+                # Handle JSON files
+                elif file_ext == "json":
+                    df = pd.read_json(io.BytesIO(content))
+                
+                # If conversion was successful, update the file in memory
+                if df is not None:
+                    # Convert to CSV string then bytes
+                    csv_buffer = io.StringIO()
+                    df.to_csv(csv_buffer, index=False)
+                    new_content = csv_buffer.getvalue().encode('utf-8')
                     
-                    # If conversion was successful, update the file in memory
-                    if df is not None:
-                        # Convert to CSV string then bytes
-                        csv_buffer = io.StringIO()
-                        df.to_csv(csv_buffer, index=False)
-                        new_content = csv_buffer.getvalue().encode('utf-8')
-                        
-                        # Update filename
-                        base_name = ".".join(filename.split(".")[:-1]) if "." in filename else filename
-                        new_filename = f"{base_name}.csv"
-                        
-                        # Update map
-                        files_map[file_key] = (new_content, new_filename)
-                except Exception as e:
-                    # Log error but continue with original file
-                    print(f"Warning: Failed to convert {filename} to CSV: {str(e)}")
+                    # Update filename
+                    base_name = ".".join(filename.split(".")[:-1]) if "." in filename else filename
+                    new_filename = f"{base_name}.csv"
+                    
+                    # Update map
+                    files_map[file_key] = (new_content, new_filename)
+            except Exception as e:
+                # Log error and fail because agents only support CSV
+                print(f"Error: Failed to convert {filename} to CSV: {str(e)}")
+                raise HTTPException(status_code=400, detail=f"Failed to convert {filename} to CSV: {str(e)}")
 
         # Parse parameters
         parameters = {}

@@ -5,17 +5,18 @@ Standardizes field values across datasets with comprehensive normalization strat
 Handles case normalization, whitespace trimming, synonym replacement, and unit alignment
 to ensure data consistency and uniformity.
 
-Input: CSV file (primary)
+Input: CSV/JSON/XLSX file (primary)
 Output: Standardized field standardization results with effectiveness scores
 """
 
-import polars as pl
+import pandas as pd
 import numpy as np
 import io
 import time
 import re
 import base64
 from typing import Dict, Any, Optional, List, Set, Tuple
+
 
 def execute_field_standardization(
     file_contents: bytes,
@@ -56,27 +57,23 @@ def execute_field_standardization(
     good_threshold = parameters.get("good_threshold", 75)
 
     try:
-        # Read file based on format - Enforce CSV only as per requirements
-        if not filename.endswith('.csv'):
-             return {
+        # Read file based on format
+        if filename.endswith('.csv'):
+            df = pd.read_csv(io.BytesIO(file_contents), on_bad_lines='skip')
+        elif filename.endswith('.json'):
+            df = pd.read_json(io.BytesIO(file_contents))
+        elif filename.endswith(('.xlsx', '.xls')):
+            df = pd.read_excel(io.BytesIO(file_contents))
+        else:
+            return {
                 "status": "error",
                 "agent_id": "field-standardization",
-                "error": f"Unsupported file format: {filename}. Only CSV is supported.",
-                "execution_time_ms": int((time.time() - start_time) * 1000)
-            }
-
-        try:
-            df = pl.read_csv(io.BytesIO(file_contents), ignore_errors=True, infer_schema_length=10000)
-        except Exception as e:
-             return {
-                "status": "error",
-                "agent_id": "field-standardization",
-                "error": f"Failed to parse CSV: {str(e)}",
+                "error": f"Unsupported file format: {filename}",
                 "execution_time_ms": int((time.time() - start_time) * 1000)
             }
 
         # Validate data
-        if df.height == 0:
+        if df.empty:
             return {
                 "status": "error",
                 "agent_id": "field-standardization",
@@ -85,19 +82,15 @@ def execute_field_standardization(
                 "execution_time_ms": int((time.time() - start_time) * 1000)
             }
 
-        # Store original data for comparison (lazy clone not needed as we will modify new df)
-        original_df = df.clone()
+        # Store original data for comparison
+        original_df = df.copy()
         
         # Determine columns to process
-        all_columns = df.columns
         if target_columns:
-            columns_to_process = [col for col in target_columns if col in all_columns]
+            columns_to_process = [col for col in target_columns if col in df.columns]
         else:
-            columns_to_process = [col for col in all_columns if col not in preserve_columns]
+            columns_to_process = [col for col in df.columns if col not in preserve_columns]
         
-        # Filter for string columns only
-        columns_to_process = [col for col in columns_to_process if df[col].dtype == pl.Utf8]
-
         # Analyze pre-standardization state
         pre_analysis = _analyze_field_variations(df, columns_to_process)
         
@@ -146,7 +139,6 @@ def execute_field_standardization(
         row_level_issues = []
         
         # Iterate through standardization issues to create row-level entries
-        # standardization_issues is a list of dicts from _apply_standardization
         for std_issue in standardization_issues:
             issue_type = "inconsistent_format"  # Default for case/whitespace issues
             severity = "info"
@@ -181,47 +173,51 @@ def execute_field_standardization(
                 })
         
         # Also add row-level issues for values with format inconsistencies (not yet changed)
-        # In the original code, this iterates over original_df and checks for issues.
-        # We can do this efficiently with Polars.
-        
         for col in columns_to_process:
-            if len(row_level_issues) >= 1000:
-                break
-                
+            if col not in original_df.columns:
+                continue
+            
             col_analysis = pre_analysis.get("column_analysis", {}).get(col, {})
             
             # Only add issues if column has case or whitespace variations
             if col_analysis.get("case_variations", 0) > 0 or col_analysis.get("whitespace_issues", 0) > 0:
-                
-                # Find rows with whitespace issues
-                ws_issues_df = original_df.select([
-                    pl.col(col),
-                    pl.arange(0, pl.count()).alias("row_index")
-                ]).filter(
-                    (pl.col(col).is_not_null()) &
-                    (
-                        (pl.col(col) != pl.col(col).str.strip_chars()) | 
-                        (pl.col(col).str.contains("  "))
-                    )
-                ).head(1000 - len(row_level_issues))
-                
-                for row in ws_issues_df.iter_rows(named=True):
-                    if len(row_level_issues) >= 1000: break
-                    value_str = str(row[col])
-                    row_level_issues.append({
-                        "row_index": row["row_index"],
-                        "column": str(col),
-                        "issue_type": "format_violation",
-                        "severity": "info",
-                        "message": f"Format inconsistency: '{value_str}' - format violation",
-                        "value": value_str
-                    })
-
-                # Case variations are harder to pinpoint row-by-row without context of other rows.
-                # The original code checks: "Check if value appears multiple times with different cases"
-                # We'll skip complex case variation row detection here to save complexity, 
-                # as the standardization_issues already capture where changes happened, which is the most important part.
-                # The original code's logic for this part was also quite heavy (iterating rows).
+                for row_idx, value in enumerate(original_df[col]):
+                    if pd.isna(value) or len(row_level_issues) >= 1000:
+                        continue
+                    
+                    value_str = str(value)
+                    has_issue = False
+                    issue_type = "format_violation"
+                    
+                    # Check for leading/trailing whitespace
+                    if value_str != value_str.strip():
+                        has_issue = True
+                        issue_type = "format_violation"
+                    
+                    # Check for multiple internal spaces
+                    elif '  ' in value_str:
+                        has_issue = True
+                        issue_type = "format_violation"
+                    
+                    # Check if value appears multiple times with different cases (case variation)
+                    elif col_analysis.get("case_variations", 0) > 0:
+                        # Try to find if this value has case variants
+                        unique_vals = original_df[col].dropna().unique()
+                        lowercase_version = value_str.lower()
+                        case_variants = [v for v in unique_vals if pd.notna(v) and str(v).lower() == lowercase_version and str(v) != value_str]
+                        if case_variants:
+                            has_issue = True
+                            issue_type = "inconsistent_format"
+                    
+                    if has_issue:
+                        row_level_issues.append({
+                            "row_index": int(row_idx),
+                            "column": str(col),
+                            "issue_type": issue_type,
+                            "severity": "info",
+                            "message": f"Format inconsistency: '{value_str}' - {issue_type.replace('_', ' ')}",
+                            "value": value_str
+                        })
         
         # Cap at 1000 issues
         row_level_issues = row_level_issues[:1000]
@@ -622,7 +618,7 @@ def execute_field_standardization(
         }
 
 
-def _analyze_field_variations(df: pl.DataFrame, columns: List[str]) -> Dict[str, Any]:
+def _analyze_field_variations(df: pd.DataFrame, columns: List[str]) -> Dict[str, Any]:
     """Analyze field variations in specified columns."""
     analysis = {}
     total_variations = 0
@@ -632,17 +628,16 @@ def _analyze_field_variations(df: pl.DataFrame, columns: List[str]) -> Dict[str,
             continue
         
         # Only analyze string columns
-        if df[col].dtype == pl.Utf8:
-            # Get unique values
-            unique_values_series = df[col].unique().drop_nulls()
-            total_unique = unique_values_series.len()
-            total_non_null = df[col].drop_nulls().len()
+        if df[col].dtype == 'object' or df[col].dtype.name == 'string':
+            unique_values = df[col].dropna().unique()
+            total_unique = len(unique_values)
+            total_non_null = df[col].notna().sum()
             
             # Analyze case variations
-            case_variations = _count_case_variations(unique_values_series)
+            case_variations = _count_case_variations(unique_values)
             
             # Analyze whitespace issues
-            whitespace_issues = _count_whitespace_issues(unique_values_series)
+            whitespace_issues = _count_whitespace_issues(unique_values)
             
             # Calculate variation score (lower is better)
             variation_score = (total_unique / total_non_null * 100) if total_non_null > 0 else 0
@@ -667,51 +662,58 @@ def _analyze_field_variations(df: pl.DataFrame, columns: List[str]) -> Dict[str,
     }
 
 
-def _count_case_variations(values: pl.Series) -> int:
+def _count_case_variations(values: np.ndarray) -> int:
     """Count how many values have case variations."""
-    if values.len() == 0:
+    if len(values) == 0:
         return 0
     
     # Group by lowercase version and count groups with multiple originals
-    # Create a DataFrame from the series
-    df_vals = pl.DataFrame({"val": values})
+    lowercase_groups = {}
+    for val in values:
+        if pd.isna(val):
+            continue
+        str_val = str(val)
+        lower_val = str_val.lower()
+        
+        if lower_val not in lowercase_groups:
+            lowercase_groups[lower_val] = set()
+        lowercase_groups[lower_val].add(str_val)
     
-    # Add lowercase column
-    df_vals = df_vals.with_columns(pl.col("val").str.to_lowercase().alias("lower"))
-    
-    # Group by lowercase and count unique original values
-    variations = df_vals.group_by("lower").agg(
-        pl.col("val").n_unique().alias("count")
-    ).filter(pl.col("count") > 1).height
-    
+    # Count groups with variations
+    variations = sum(1 for group in lowercase_groups.values() if len(group) > 1)
     return variations
 
 
-def _count_whitespace_issues(values: pl.Series) -> int:
+def _count_whitespace_issues(values: np.ndarray) -> int:
     """Count how many values have whitespace issues."""
-    if values.len() == 0:
+    if len(values) == 0:
         return 0
     
-    # Create a DataFrame to use pl.col expressions safely
-    # This avoids issues with using pl.col() on a Series directly
-    df_vals = pl.DataFrame({"val": values})
-    
-    # Check for leading/trailing whitespace or multiple internal spaces
-    issues = df_vals.filter(
-        (pl.col("val") != pl.col("val").str.strip_chars()) |
-        (pl.col("val").str.contains("  "))
-    ).height
+    issues = 0
+    for val in values:
+        if pd.isna(val):
+            continue
+        str_val = str(val)
+        
+        # Check for leading/trailing whitespace
+        if str_val != str_val.strip():
+            issues += 1
+            continue
+        
+        # Check for multiple internal spaces
+        if '  ' in str_val:
+            issues += 1
     
     return issues
 
 
 def _apply_standardization(
-    df: pl.DataFrame,
+    df: pd.DataFrame,
     columns: List[str],
     config: Dict[str, Any]
-) -> Tuple[pl.DataFrame, List[str], List[Dict]]:
+) -> Tuple[pd.DataFrame, List[str], List[Dict]]:
     """Apply standardization operations to specified columns."""
-    df_standardized = df.clone()
+    df_standardized = df.copy()
     log = []
     row_issues = []
     
@@ -728,107 +730,71 @@ def _apply_standardization(
             continue
         
         # Only process string columns
-        if df_standardized[col].dtype != pl.Utf8:
+        if df_standardized[col].dtype not in ['object', 'string']:
             continue
         
-        original_col = df_standardized[col]
+        changes_made = 0
+        original_values = df_standardized[col].copy()
         
-        # Build expression for transformation
-        expr = pl.col(col)
-        
-        # 1. Trim whitespace
-        if trim_whitespace:
-            expr = expr.str.strip_chars()
-        
-        # 2. Normalize internal spacing
-        if normalize_internal_spacing:
-            expr = expr.str.replace_all(r"\s+", " ")
-        
-        # 3. Apply case normalization
-        if case_strategy == "lowercase":
-            expr = expr.str.to_lowercase()
-        elif case_strategy == "uppercase":
-            expr = expr.str.to_uppercase()
-        elif case_strategy == "titlecase":
-            expr = expr.str.to_titlecase()
-        
-        # Apply basic transformations first
-        df_standardized = df_standardized.with_columns(expr)
-        
-        # 4. Apply synonym replacement
-        # This is tricky in Polars expressions if the map is large.
-        # We can use replace (map_dict in older versions, replace in newer)
-        if apply_synonyms and col in synonym_mappings:
-            mapping = synonym_mappings[col]
-            # Normalize keys in mapping to match current case strategy if needed?
-            # The original code checks: if standardized_value.lower() == synonym.lower():
-            # This implies case-insensitive matching for synonyms.
+        # Apply transformations
+        for idx, value in df_standardized[col].items():
+            if pd.isna(value):
+                continue
             
-            # To do this efficiently in Polars:
-            # We can use map_elements (slower) or a join.
-            # Let's use map_elements for flexibility with case insensitivity, 
-            # or better: normalize the column to lowercase temporarily for matching.
+            original_value = str(value)
+            standardized_value = original_value
             
-            # Let's stick to a python loop over the mapping if it's small, or map_elements.
-            # Given the complexity of "case insensitive match", map_elements is safest to replicate logic exactly.
+            # 1. Trim whitespace
+            if trim_whitespace:
+                standardized_value = standardized_value.strip()
             
-            def apply_synonyms_func(val, mapping=mapping):
-                if val is None: return None
-                val_lower = val.lower()
-                for syn, std in mapping.items():
-                    if val_lower == syn.lower():
-                        return std
-                return val
-
-            df_standardized = df_standardized.with_columns(
-                pl.col(col).map_elements(apply_synonyms_func, return_dtype=pl.Utf8).alias(col)
-            )
+            # 2. Normalize internal spacing
+            if normalize_internal_spacing:
+                standardized_value = re.sub(r'\s+', ' ', standardized_value)
             
-        # 5. Apply unit standardization
-        if unit_standardization and col in unit_mappings:
-            unit_config = unit_mappings[col]
+            # 3. Apply case normalization
+            if case_strategy == "lowercase":
+                standardized_value = standardized_value.lower()
+            elif case_strategy == "uppercase":
+                standardized_value = standardized_value.upper()
+            elif case_strategy == "titlecase":
+                standardized_value = standardized_value.title()
             
-            def apply_unit_func(val, config=unit_config):
-                if val is None: return None
-                return _apply_unit_conversion(val, config)
+            # 4. Apply synonym replacement
+            if apply_synonyms and col in synonym_mappings:
+                for synonym, standard in synonym_mappings[col].items():
+                    if standardized_value.lower() == synonym.lower():
+                        standardized_value = standard
+                        break
+            
+            # 5. Apply unit standardization
+            if unit_standardization and col in unit_mappings:
+                standardized_value = _apply_unit_conversion(
+                    standardized_value, unit_mappings[col]
+                )
+            
+            # Update if changed
+            if standardized_value != original_value:
+                df_standardized.at[idx, col] = standardized_value
+                changes_made += 1
                 
-            df_standardized = df_standardized.with_columns(
-                pl.col(col).map_elements(apply_unit_func, return_dtype=pl.Utf8).alias(col)
-            )
-            
-        # Detect changes and log
-        # We need to compare original_col with new col
-        # Since we modified df_standardized in place (conceptually), we can compare.
-        
-        # Find changed rows
-        changed_mask = (original_col != df_standardized[col]) & (original_col.is_not_null())
-        changes_count = df_standardized.filter(changed_mask).height
-        
-        if changes_count > 0:
-            log.append(
-                f"Standardized {changes_count} values in column '{col}' "
-                f"({(changes_count / df_standardized.height * 100):.1f}% of rows)"
-            )
-            
-            # Collect row issues (limit to 100 per column to avoid explosion)
-            changed_rows = df.select([
-                pl.col(col).alias("original_value"),
-                pl.arange(0, pl.count()).alias("row_index")
-            ]).with_columns(
-                df_standardized[col].alias("standardized_value")
-            ).filter(changed_mask).head(100)
-            
-            for row in changed_rows.iter_rows(named=True):
+                # Add row-level issue
                 if len(row_issues) < 100:
                     row_issues.append({
-                        "row_index": row["row_index"],
+                        "row_index": int(idx),
                         "column": col,
                         "issue_type": "field_standardized",
-                        "original_value": str(row["original_value"]),
-                        "standardized_value": str(row["standardized_value"]),
+                        "original_value": original_value,
+                        "standardized_value": standardized_value,
                         "severity": "info"
                     })
-
+        
+        if changes_made > 0:
+            log.append(
+                f"Standardized {changes_made} values in column '{col}' "
+                f"({(changes_made / len(df_standardized) * 100):.1f}% of rows)"
+            )
+    
     return df_standardized, log, row_issues
 
 
@@ -953,8 +919,8 @@ def _generate_recommendations(
 def _calculate_standardization_score(
     pre_analysis: Dict[str, Any],
     post_analysis: Dict[str, Any],
-    original_df: pl.DataFrame,
-    standardized_df: pl.DataFrame,
+    original_df: pd.DataFrame,
+    standardized_df: pd.DataFrame,
     config: Dict[str, Any]
 ) -> Dict[str, Any]:
     """Calculate standardization effectiveness score."""
@@ -967,7 +933,7 @@ def _calculate_standardization_score(
         if pre_variations > 0 else 100
     )
     
-    data_retention_rate = (standardized_df.height / original_df.height * 100) if original_df.height > 0 else 0
+    data_retention_rate = (len(standardized_df) / len(original_df) * 100) if len(original_df) > 0 else 0
     column_retention_rate = (len(standardized_df.columns) / len(original_df.columns) * 100) if len(original_df.columns) > 0 else 0
     
     # Calculate weighted score
@@ -990,15 +956,15 @@ def _calculate_standardization_score(
             "variations_before": pre_variations,
             "variations_after": post_variations,
             "variations_reduced": pre_variations - post_variations,
-            "original_rows": original_df.height,
-            "standardized_rows": standardized_df.height,
+            "original_rows": len(original_df),
+            "standardized_rows": len(standardized_df),
             "original_columns": len(original_df.columns),
             "standardized_columns": len(standardized_df.columns)
         }
     }
 
 
-def _generate_cleaned_file(df: pl.DataFrame, original_filename: str) -> bytes:
+def _generate_cleaned_file(df: pd.DataFrame, original_filename: str) -> bytes:
     """
     Generate cleaned data file in CSV format.
     
@@ -1011,5 +977,5 @@ def _generate_cleaned_file(df: pl.DataFrame, original_filename: str) -> bytes:
     """
     # Always export as CSV for consistency and compatibility
     output = io.BytesIO()
-    df.write_csv(output)
+    df.to_csv(output, index=False)
     return output.getvalue()

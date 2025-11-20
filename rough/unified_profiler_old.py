@@ -2,16 +2,15 @@
 Unified Profiler Agent
 
 Comprehensive data profiling with statistics and quality metrics.
-Input: CSV file (primary)
+Input: CSV/JSON/XLSX file (primary)
 Output: Uniform profiling structure with field-level analysis matching API specification
 """
 
-import polars as pl
+import pandas as pd
 import numpy as np
 import io
 import time
-import re
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, Optional
 from scipy import stats
 
 
@@ -44,22 +43,17 @@ def profile_data(
     outlier_alert_threshold = parameters.get("outlier_alert_threshold", 5)
     
     try:
-        # Read file - CSV only
-        if not filename.endswith('.csv'):
+        # Read file
+        if filename.endswith('.csv'):
+            df = pd.read_csv(io.BytesIO(file_contents))
+        elif filename.endswith('.json'):
+            df = pd.read_json(io.BytesIO(file_contents))
+        elif filename.endswith(('.xlsx', '.xls')):
+            df = pd.read_excel(io.BytesIO(file_contents))
+        else:
             return {
                 "status": "error",
-                "error": f"Unsupported file format: {filename}. Only CSV files are supported.",
-                "execution_time_ms": int((time.time() - start_time) * 1000)
-            }
-            
-        try:
-            # Read CSV with Polars
-            # infer_schema_length=10000 to get good type inference
-            df = pl.read_csv(io.BytesIO(file_contents), ignore_errors=True, infer_schema_length=10000)
-        except Exception as e:
-            return {
-                "status": "error",
-                "error": f"Failed to parse CSV: {str(e)}",
+                "error": f"Unsupported file format: {filename}",
                 "execution_time_ms": int((time.time() - start_time) * 1000)
             }
         
@@ -69,114 +63,101 @@ def profile_data(
         warnings = 0
         info_messages = 0
         
-        total_rows = df.height
-        
         for col in df.columns:
             col_data = df[col]
-            null_count = col_data.null_count()
-            missing_pct = (null_count / total_rows * 100) if total_rows > 0 else 0
+            missing_count = col_data.isna().sum()
+            missing_pct = (missing_count / len(df) * 100) if len(df) > 0 else 0
             
             # Determine data type
-            dtype = col_data.dtype
-            if dtype == pl.Utf8:
+            data_type = str(col_data.dtype)
+            if data_type == 'object':
                 semantic_type = 'string'
-            elif dtype in [pl.Int8, pl.Int16, pl.Int32, pl.Int64, pl.UInt8, pl.UInt16, pl.UInt32, pl.UInt64]:
+            elif data_type in ['int64', 'int32', 'int16', 'int8']:
                 semantic_type = 'integer'
-            elif dtype in [pl.Float32, pl.Float64]:
+            elif data_type in ['float64', 'float32']:
                 semantic_type = 'float'
-            elif dtype in [pl.Date, pl.Datetime]:
-                semantic_type = 'datetime'
-            elif dtype == pl.Boolean:
-                semantic_type = 'boolean'
             else:
-                semantic_type = str(dtype)
+                semantic_type = data_type
             
             # Check for PII/sensitivity
             estimated_pii_type = None
             estimated_sensitivity_level = "low"
             
             col_lower = col.lower()
+            non_null_sample = col_data.dropna().astype(str).head(100)
             
-            # Sample for PII detection (non-null strings)
-            if dtype == pl.Utf8:
-                non_null_sample = col_data.drop_nulls().head(100)
-            else:
-                non_null_sample = col_data.cast(pl.Utf8).drop_nulls().head(100)
-                
-            sample_len = non_null_sample.len()
-            
-            if sample_len > 0:
-                # Email detection
-                if col_lower in ['email', 'email_address', 'email_addr', 'contact_email']:
-                    email_matches = non_null_sample.str.contains('@', literal=True).sum()
-                    email_pct = (email_matches / sample_len * 100)
+            # Email detection - check for @ symbol pattern
+            if col_lower in ['email', 'email_address', 'email_addr', 'contact_email']:
+                if len(non_null_sample) > 0:
+                    email_matches = non_null_sample.str.contains('@', regex=False).sum()
+                    email_pct = (email_matches / len(non_null_sample) * 100) if len(non_null_sample) > 0 else 0
+                    
                     if email_pct > 70:
                         estimated_pii_type = "email_address"
                         estimated_sensitivity_level = "high"
-                
-                # Phone detection
-                elif col_lower in ['phone', 'phone_number', 'contact_phone', 'mobile', 'telephone']:
-                    phone_pattern = r'^[\d\s\-\(\)\+]{10,}$'
-                    phone_matches = non_null_sample.str.contains(phone_pattern).sum()
-                    phone_pct = (phone_matches / sample_len * 100)
+            
+            # Phone detection - check for common phone patterns
+            elif col_lower in ['phone', 'phone_number', 'contact_phone', 'mobile', 'telephone']:
+                if len(non_null_sample) > 0:
+                    phone_matches = non_null_sample.str.match(r'^[\d\s\-\(\)\+]{10,}$').sum()
+                    phone_pct = (phone_matches / len(non_null_sample) * 100) if len(non_null_sample) > 0 else 0
+                    
                     if phone_pct > 70:
                         estimated_pii_type = "phone_number"
                         estimated_sensitivity_level = "high"
-                
-                # SSN detection
-                elif col_lower in ['ssn', 'social_security', 'social_security_number']:
-                    ssn_pattern = r'^\d{3}-\d{2}-\d{4}$'
-                    ssn_matches = non_null_sample.str.contains(ssn_pattern).sum()
-                    ssn_pct = (ssn_matches / sample_len * 100)
+            
+            # SSN detection
+            elif col_lower in ['ssn', 'social_security', 'social_security_number']:
+                if len(non_null_sample) > 0:
+                    ssn_matches = non_null_sample.str.match(r'^\d{3}-\d{2}-\d{4}$').sum()
+                    ssn_pct = (ssn_matches / len(non_null_sample) * 100) if len(non_null_sample) > 0 else 0
+                    
                     if ssn_pct > 70:
                         estimated_pii_type = "ssn"
                         estimated_sensitivity_level = "high"
-                
-                # Name detection
-                elif col_lower in ['name', 'full_name', 'first_name', 'last_name', 'person_name', 'customer_name']:
-                    # Heuristic: contains letters and spaces, or starts with capital letter
-                    # Polars regex check
-                    name_pattern = r'[A-Z][a-z]*'
-                    name_matches = non_null_sample.str.contains(name_pattern).sum()
-                    name_pct = (name_matches / sample_len * 100)
+            
+            # Name detection - check if mostly text with capital letters
+            elif col_lower in ['name', 'full_name', 'first_name', 'last_name', 'person_name', 'customer_name']:
+                if len(non_null_sample) > 0:
+                    # Check if values look like names (contain spaces or capital letters)
+                    name_like = 0
+                    for val in non_null_sample:
+                        # Simple heuristic: contains letters and spaces, or starts with capital letter
+                        if any(c.isupper() for c in val) and any(c.isalpha() for c in val):
+                            name_like += 1
+                    
+                    name_pct = (name_like / len(non_null_sample) * 100) if len(non_null_sample) > 0 else 0
+                    
                     if name_pct > 80:
                         estimated_pii_type = "name"
                         estimated_sensitivity_level = "high"
-                
-                # Credit card detection
-                elif col_lower in ['credit_card', 'card_number', 'cc_number', 'payment_card']:
-                    cc_pattern = r'^\d{4}[\s\-]?\d{4}[\s\-]?\d{4}[\s\-]?\d{4}$'
-                    cc_matches = non_null_sample.str.contains(cc_pattern).sum()
-                    cc_pct = (cc_matches / sample_len * 100)
+            
+            # Credit card detection
+            elif col_lower in ['credit_card', 'card_number', 'cc_number', 'payment_card']:
+                if len(non_null_sample) > 0:
+                    cc_matches = non_null_sample.str.match(r'^\d{4}[\s\-]?\d{4}[\s\-]?\d{4}[\s\-]?\d{4}$').sum()
+                    cc_pct = (cc_matches / len(non_null_sample) * 100) if len(non_null_sample) > 0 else 0
+                    
                     if cc_pct > 70:
                         estimated_pii_type = "credit_card"
                         estimated_sensitivity_level = "critical"
             
             # Calculate quality indicators
             completeness_score = 100 - missing_pct
-            unique_count = col_data.n_unique()
-            unique_percentage = (unique_count / total_rows * 100) if total_rows > 0 else 0
+            unique_count = col_data.nunique()
+            unique_percentage = (unique_count / len(col_data) * 100) if len(col_data) > 0 else 0
             
             # Validity score (basic)
             validity_score = 100.0
-            outlier_count = 0
-            outlier_pct = 0.0
-            
-            if semantic_type in ['integer', 'float'] and total_rows > 0:
+            if data_type in ['int64', 'float64']:
                 # Check for outliers
-                q1 = col_data.quantile(0.25)
-                q3 = col_data.quantile(0.75)
-                
-                if q1 is not None and q3 is not None:
-                    iqr = q3 - q1
-                    lower_bound = q1 - outlier_iqr_multiplier * iqr
-                    upper_bound = q3 + outlier_iqr_multiplier * iqr
-                    
-                    # Use DataFrame filter to avoid Series.filter(expr) issues
-                    # We just need the count of outliers
-                    outlier_count = df.filter((pl.col(col) < lower_bound) | (pl.col(col) > upper_bound)).height
-                    outlier_pct = (outlier_count / total_rows * 100)
-                    validity_score = 100 - min(outlier_pct, 20)
+                Q1 = col_data.quantile(0.25)
+                Q3 = col_data.quantile(0.75)
+                IQR = Q3 - Q1
+                outliers = col_data[(col_data < (Q1 - outlier_iqr_multiplier * IQR)) | 
+                                   (col_data > (Q3 + outlier_iqr_multiplier * IQR))]
+                outlier_pct = (len(outliers) / len(col_data) * 100) if len(col_data) > 0 else 0
+                validity_score = 100 - min(outlier_pct, 20)
             
             # Consistency score
             consistency_score = 100.0 if unique_count > 1 else 50.0
@@ -191,7 +172,7 @@ def profile_data(
                 "data_type": semantic_type,
                 "semantic_type": semantic_type,
                 "properties": {
-                    "null_count": int(null_count),
+                    "null_count": int(missing_count),
                     "null_percentage": round(missing_pct, 2),
                     "unique_count": int(unique_count),
                     "unique_percentage": round(unique_percentage, 2),
@@ -203,97 +184,55 @@ def profile_data(
                 "quality_score": round(quality_score, 2),
                 "quality_indicators": {
                     "completeness_score": round(completeness_score, 2),
-                    "uniqueness_score": round(unique_percentage, 2),
+                    "uniqueness_score": round((unique_percentage) / 100 * 100, 2),
                     "validity_score": round(validity_score, 2),
                     "consistency_score": round(consistency_score, 2)
                 }
             }
             
-            # Add statistics
-            if semantic_type in ['integer', 'float']:
-                non_null_data = col_data.drop_nulls()
-                if non_null_data.len() > 0:
-                    # Calculate stats
-                    # Polars aggregations
-                    stats_df = non_null_data.to_frame("val").select([
-                        pl.min("val").alias("min"),
-                        pl.max("val").alias("max"),
-                        pl.mean("val").alias("mean"),
-                        pl.median("val").alias("median"),
-                        pl.std("val").alias("std"),
-                        pl.var("val").alias("var"),
-                        pl.col("val").quantile(0.25).alias("p25"),
-                        pl.col("val").quantile(0.50).alias("p50"),
-                        pl.col("val").quantile(0.75).alias("p75"),
-                        pl.col("val").skew().alias("skew"),
-                        pl.col("val").kurtosis().alias("kurtosis")
-                    ])
-                    
-                    stats_row = stats_df.row(0, named=True)
-                    
-                    # Entropy
-                    value_counts = non_null_data.value_counts()
-                    counts = value_counts["count"].to_numpy()
-                    entropy_val = stats.entropy(counts) if len(counts) > 0 else 0
-                    
+            # Add statistics for numeric fields
+            if data_type in ['int64', 'float64']:
+                non_null_data = col_data.dropna()
+                if len(non_null_data) > 0:
                     field_profile["statistics"] = {
                         "type": "numeric",
-                        "count": non_null_data.len(),
-                        "min": _safe_float(stats_row["min"]),
-                        "max": _safe_float(stats_row["max"]),
-                        "mean": _safe_float(stats_row["mean"]),
-                        "median": _safe_float(stats_row["median"]),
-                        "stddev": _safe_float(stats_row["std"]),
-                        "variance": _safe_float(stats_row["var"]),
-                        "p25": _safe_float(stats_row["p25"]),
-                        "p50": _safe_float(stats_row["p50"]),
-                        "p75": _safe_float(stats_row["p75"]),
-                        "skewness": _safe_float(stats_row["skew"]),
-                        "kurtosis": _safe_float(stats_row["kurtosis"]),
-                        "outlier_count": int(outlier_count),
-                        "outlier_percentage": round(outlier_pct, 2),
-                        "entropy": float(entropy_val)
+                        "count": len(non_null_data),
+                        "min": float(non_null_data.min()),
+                        "max": float(non_null_data.max()),
+                        "mean": float(non_null_data.mean()),
+                        "median": float(non_null_data.median()),
+                        "stddev": float(non_null_data.std()),
+                        "variance": float(non_null_data.var()),
+                        "p25": float(non_null_data.quantile(0.25)),
+                        "p50": float(non_null_data.quantile(0.50)),
+                        "p75": float(non_null_data.quantile(0.75)),
+                        "skewness": float(non_null_data.skew()),
+                        "kurtosis": float(non_null_data.kurtosis()),
+                        "outlier_count": int(len(col_data[(col_data < (col_data.quantile(0.25) - outlier_iqr_multiplier * (col_data.quantile(0.75) - col_data.quantile(0.25)))) | (col_data > (col_data.quantile(0.75) + outlier_iqr_multiplier * (col_data.quantile(0.75) - col_data.quantile(0.25))))])),
+                        "outlier_percentage": round((len(col_data[(col_data < (col_data.quantile(0.25) - outlier_iqr_multiplier * (col_data.quantile(0.75) - col_data.quantile(0.25)))) | (col_data > (col_data.quantile(0.75) + outlier_iqr_multiplier * (col_data.quantile(0.75) - col_data.quantile(0.25))))]) / len(col_data) * 100), 2) if len(col_data) > 0 else 0,
+                        "entropy": float(stats.entropy(col_data.value_counts()) if len(col_data.value_counts()) > 0 else 0)
                     }
             else:
                 # String statistics
-                non_null_data = col_data.drop_nulls().cast(pl.Utf8)
-                if non_null_data.len() > 0:
-                    lengths = non_null_data.str.len_bytes() # Approximate char length
-                    
-                    # Entropy
-                    value_counts = non_null_data.value_counts()
-                    counts = value_counts["count"].to_numpy()
-                    entropy_val = stats.entropy(counts) if len(counts) > 0 else 0
-                    
-                    # Charset diversity
-                    has_special = non_null_data.str.contains(r'[!@#$%^&*()_+=\[\]{};:\'",.<>?/\\|`~-]').any()
-                    
+                non_null_data = col_data.dropna().astype(str)
+                if len(non_null_data) > 0:
                     field_profile["statistics"] = {
                         "type": "string",
-                        "min_length": int(lengths.min()) if lengths.len() > 0 else 0,
-                        "max_length": int(lengths.max()) if lengths.len() > 0 else 0,
-                        "avg_length": round(float(lengths.mean()), 2) if lengths.len() > 0 else 0,
-                        "entropy": round(float(entropy_val), 2),
-                        "charset_diversity": ["alphanumeric", "special"] if has_special else ["alphanumeric"]
+                        "min_length": int(non_null_data.str.len().min()),
+                        "max_length": int(non_null_data.str.len().max()),
+                        "avg_length": round(non_null_data.str.len().mean(), 2),
+                        "entropy": round(float(stats.entropy(col_data.value_counts()) if len(col_data.value_counts()) > 0 else 0), 2),
+                        "charset_diversity": ["alphanumeric", "special"] if any(col_data.astype(str).str.contains(r'[!@#$%^&*()_+=\[\]{};:\'",.<>?/\\|`~-]', regex=True, na=False)) else ["alphanumeric"]
                     }
             
             # Add distribution (top values)
-            # Polars value_counts
-            top_vals_df = col_data.value_counts(sort=True).head(top_n_values)
-            top_values_list = []
-            
-            for row in top_vals_df.iter_rows(named=True):
-                val = row[col]
-                count = row["count"]
-                top_values_list.append({
-                    "value": str(val),
-                    "count": int(count),
-                    "percentage": round((count / total_rows * 100), 2)
-                })
-                
+            top_values = col_data.value_counts().head(top_n_values)
             field_profile["distribution"] = {
-                "type": "non_uniform" if len(top_values_list) > 1 else "uniform",
-                "top_values": top_values_list
+                "type": "non_uniform" if len(top_values) > 1 else "uniform",
+                "top_values": [
+                    {"value": str(k), "count": int(v), "percentage": round((v / len(col_data) * 100), 2)}
+                    for k, v in top_values.items()
+                ]
             }
             
             field_profiles.append(field_profile)
@@ -312,23 +251,16 @@ def profile_data(
         # ==================== GENERATE ROW-LEVEL-ISSUES ====================
         row_level_issues = []
         
-        # Limit row level issues processing to avoid performance hit on large files
-        # We can process in chunks or just limit the number of issues found
-        
-        for col in df.columns:
-            if len(row_level_issues) >= 1000: break
-            
+        for col_idx, col in enumerate(df.columns):
             col_data = df[col]
-            dtype = col_data.dtype
+            non_null_data = col_data.dropna()
+            data_type = str(col_data.dtype)
             
             # Issue 1: Null values
-            # Filter rows with nulls
-            null_rows = df.with_row_index("row_index").filter(pl.col(col).is_null())
-            
-            for row in null_rows.iter_rows(named=True):
-                if len(row_level_issues) >= 1000: break
+            null_mask = col_data.isna()
+            for row_idx in df[null_mask].index:
                 row_level_issues.append({
-                    "row_index": int(row["row_index"]),
+                    "row_index": int(row_idx),
                     "column": col,
                     "issue_type": "null",
                     "severity": "warning",
@@ -337,87 +269,73 @@ def profile_data(
                 })
             
             # Issue 2: Outliers (numeric fields only)
-            if dtype in [pl.Int8, pl.Int16, pl.Int32, pl.Int64, pl.UInt8, pl.UInt16, pl.UInt32, pl.UInt64, pl.Float32, pl.Float64]:
-                q1 = col_data.quantile(0.25)
-                q3 = col_data.quantile(0.75)
+            if data_type in ['int64', 'float64'] and len(non_null_data) > 0:
+                Q1 = col_data.quantile(0.25)
+                Q3 = col_data.quantile(0.75)
+                IQR = Q3 - Q1
+                lower_bound = Q1 - outlier_iqr_multiplier * IQR
+                upper_bound = Q3 + outlier_iqr_multiplier * IQR
                 
-                if q1 is not None and q3 is not None:
-                    iqr = q3 - q1
-                    lower_bound = q1 - outlier_iqr_multiplier * iqr
-                    upper_bound = q3 + outlier_iqr_multiplier * iqr
-                    
-                    outlier_rows = df.with_row_index("row_index").filter(
-                        (pl.col(col) < lower_bound) | (pl.col(col) > upper_bound)
-                    )
-                    
-                    for row in outlier_rows.iter_rows(named=True):
-                        if len(row_level_issues) >= 1000: break
-                        val = row[col]
-                        row_level_issues.append({
-                            "row_index": int(row["row_index"]),
-                            "column": col,
-                            "issue_type": "outlier",
-                            "severity": "warning",
-                            "message": f"Outlier detected in '{col}': value {val} outside IQR bounds [{lower_bound:.2f}, {upper_bound:.2f}]",
-                            "value": float(val) if val is not None else None,
-                            "bounds": {
-                                "lower": float(lower_bound),
-                                "upper": float(upper_bound)
-                            }
-                        })
-            
-            # Issue 3: Type mismatches (check if non-null values don't match expected type)
-            if dtype == pl.Utf8:
-                # Try to detect numeric values in string columns
-                # Regex check for numeric
-                numeric_pattern = r"^-?\d+(\.\d+)?$"
-                numeric_rows = df.with_row_index("row_index").filter(
-                    pl.col(col).is_not_null() & pl.col(col).str.contains(numeric_pattern)
-                )
-                
-                # Only report if it's a mixed column (not fully numeric which would be handled by type inference usually, but here we are checking Utf8)
-                # If the column is Utf8, it means Polars inferred it as string. If we find numbers, it might be mixed.
-                
-                for row in numeric_rows.iter_rows(named=True):
-                    if len(row_level_issues) >= 1000: break
-                    val = row[col]
+                outlier_mask = (col_data < lower_bound) | (col_data > upper_bound)
+                for row_idx in df[outlier_mask].index:
+                    row_value = col_data.loc[row_idx]
                     row_level_issues.append({
-                        "row_index": int(row["row_index"]),
+                        "row_index": int(row_idx),
                         "column": col,
-                        "issue_type": "type_mismatch",
-                        "severity": "info",
-                        "message": f"Value in '{col}' could be interpreted as numeric: {val}",
-                        "value": str(val)
+                        "issue_type": "outlier",
+                        "severity": "warning",
+                        "message": f"Outlier detected in '{col}': value {row_value} outside IQR bounds [{lower_bound:.2f}, {upper_bound:.2f}]",
+                        "value": float(row_value),
+                        "bounds": {
+                            "lower": float(lower_bound),
+                            "upper": float(upper_bound)
+                        }
                     })
             
-            # Issue 4: Distribution anomalies (z-score)
-            if dtype in [pl.Int8, pl.Int16, pl.Int32, pl.Int64, pl.UInt8, pl.UInt16, pl.UInt32, pl.UInt64, pl.Float32, pl.Float64]:
-                mean_val = col_data.mean()
-                std_val = col_data.std()
-                
-                if mean_val is not None and std_val is not None and std_val > 0:
-                    # Calculate z-scores
-                    # Filter rows with abs(z_score) > 3
-                    anomaly_rows = df.with_row_index("row_index").filter(
-                        pl.col(col).is_not_null() &
-                        (((pl.col(col) - mean_val) / std_val).abs() > 3)
-                    )
+            # Issue 3: Type mismatches (check if non-null values don't match expected type)
+            if data_type == 'object' and len(non_null_data) > 0:
+                # Try to detect numeric values in string columns (or vice versa)
+                try:
+                    numeric_attempt = pd.to_numeric(non_null_data, errors='coerce')
+                    type_mismatch_mask = numeric_attempt.notna() & non_null_data.notna() & (numeric_attempt != non_null_data)
                     
-                    for row in anomaly_rows.iter_rows(named=True):
-                        if len(row_level_issues) >= 1000: break
-                        val = row[col]
-                        z_score = (val - mean_val) / std_val
+                    for row_idx in df[type_mismatch_mask].index:
+                        if not pd.isna(col_data.loc[row_idx]):
+                            row_level_issues.append({
+                                "row_index": int(row_idx),
+                                "column": col,
+                                "issue_type": "type_mismatch",
+                                "severity": "info",
+                                "message": f"Value in '{col}' could be interpreted as numeric: {col_data.loc[row_idx]}",
+                                "value": str(col_data.loc[row_idx])
+                            })
+                except:
+                    pass
+            
+            # Issue 4: Distribution anomalies (values in low-probability areas)
+            if data_type in ['int64', 'float64'] and len(non_null_data) > 2:
+                # Calculate z-scores to identify values far from mean
+                mean_val = non_null_data.mean()
+                std_val = non_null_data.std()
+                
+                if std_val > 0:
+                    z_scores = np.abs((col_data - mean_val) / std_val)
+                    extreme_mask = (z_scores > 3) & (col_data.notna())
+                    
+                    for row_idx in df[extreme_mask].index:
+                        row_value = col_data.loc[row_idx]
+                        z_score = (row_value - mean_val) / std_val
                         row_level_issues.append({
-                            "row_index": int(row["row_index"]),
+                            "row_index": int(row_idx),
                             "column": col,
                             "issue_type": "distribution_anomaly",
                             "severity": "info",
-                            "message": f"Value in '{col}' is statistically unusual (z-score: {abs(z_score):.2f}): {val}",
-                            "value": float(val),
+                            "message": f"Value in '{col}' is statistically unusual (z-score: {abs(z_score):.2f}): {row_value}",
+                            "value": float(row_value),
                             "z_score": float(z_score)
                         })
-
-        # Cap row-level-issues at 1000
+        
+        # Cap row-level-issues at 1000 to avoid memory issues
         row_level_issues = row_level_issues[:1000]
         
         # Calculate issue summary
@@ -429,20 +347,24 @@ def profile_data(
             "affected_columns": sorted(list(set(issue["column"] for issue in row_level_issues)))
         }
         
+        # Count by type
         for issue in row_level_issues:
             issue_type = issue["issue_type"]
             issue_summary["by_type"][issue_type] = issue_summary["by_type"].get(issue_type, 0) + 1
+        
+        # Count by severity
+        for issue in row_level_issues:
             severity = issue["severity"]
             issue_summary["by_severity"][severity] = issue_summary["by_severity"].get(severity, 0) + 1
-            
+        
         # Create quality summary
         quality_summary = {
             "overall_quality_score": overall_quality_score,
             "quality_grade": "A" if overall_quality_score >= 90 else "B" if overall_quality_score >= 80 else "C" if overall_quality_score >= 70 else "D" if overall_quality_score >= 60 else "F",
-            "completeness_score": round(np.mean([f["quality_indicators"]["completeness_score"] for f in field_profiles]), 2) if field_profiles else 0,
-            "validity_score": round(np.mean([f["quality_indicators"]["validity_score"] for f in field_profiles]), 2) if field_profiles else 0,
-            "consistency_score": round(np.mean([f["quality_indicators"]["consistency_score"] for f in field_profiles]), 2) if field_profiles else 0,
-            "accuracy_score": round(np.mean([f["quality_indicators"]["validity_score"] for f in field_profiles]), 2) if field_profiles else 0,
+            "completeness_score": round(np.mean([f["quality_indicators"]["completeness_score"] for f in field_profiles]), 2),
+            "validity_score": round(np.mean([f["quality_indicators"]["validity_score"] for f in field_profiles]), 2),
+            "consistency_score": round(np.mean([f["quality_indicators"]["consistency_score"] for f in field_profiles]), 2),
+            "accuracy_score": round(np.mean([f["quality_indicators"]["validity_score"] for f in field_profiles]), 2),
             "fields_requiring_attention": len([f for f in field_profiles if f["quality_score"] < 80]),
             "critical_issues": critical_issues,
             "warnings": warnings,
@@ -488,7 +410,6 @@ def profile_data(
             })
         
         # Alert 3: Unexpected distribution shape anomalies
-        # (Simplified as we don't have distribution shape analysis in this version yet, but keeping structure)
         distribution_anomalies = [f for f in field_profiles if f.get("properties", {}).get("distribution_shape", "") in ["bimodal", "skewed", "highly_skewed"]]
         if distribution_anomalies:
             alerts.append({
@@ -673,6 +594,19 @@ def profile_data(
                     "message": f"Type conflict: Values in '{field_name}' don't match declared data type",
                     "declared_type": properties.get("data_type", "unknown"),
                     "actual_type": field.get("statistics", {}).get("inferred_type", "mixed")
+                })
+            
+            # Distribution anomalies
+            distribution_shape = properties.get("distribution_shape", "")
+            if distribution_shape in ["bimodal", "highly_skewed", "multimodal"]:
+                issues.append({
+                    "issue_id": f"issue_profile_distribution_{field_id}",
+                    "agent_id": "unified-profiler",
+                    "field_name": field_name,
+                    "issue_type": "unexpected_distribution",
+                    "severity": "medium",
+                    "message": f"Unusual distribution shape in '{field_name}': {distribution_shape} (may indicate multiple populations or data collection issues)",
+                    "distribution_shape": distribution_shape
                 })
             
             # PII/Sensitivity issues
@@ -870,15 +804,3 @@ def profile_data(
             "error": str(e),
             "execution_time_ms": int((time.time() - start_time) * 1000)
         }
-
-def _safe_float(val):
-    """Safely convert to float, handling None/NaN."""
-    if val is None:
-        return 0.0
-    try:
-        f = float(val)
-        if np.isnan(f) or np.isinf(f):
-            return 0.0
-        return f
-    except:
-        return 0.0

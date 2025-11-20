@@ -2,16 +2,16 @@
 Test Coverage Agent
 
 Validates data test coverage including uniqueness, range, and format constraints.
-Input: CSV file (primary)
+Input: CSV/JSON/XLSX file (primary)
 Output: Standardized test coverage validation results
 """
 
-import polars as pl
+import pandas as pd
 import numpy as np
 import io
 import time
 import re
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, Optional
 
 
 def execute_test_coverage(
@@ -42,28 +42,23 @@ def execute_test_coverage(
     good_threshold = parameters.get("good_threshold", 75)
 
     try:
-        # Read file - CSV only
-        if not filename.endswith('.csv'):
+        # Read file based on format
+        if filename.endswith('.csv'):
+            df = pd.read_csv(io.BytesIO(file_contents), on_bad_lines='skip')
+        elif filename.endswith('.json'):
+            df = pd.read_json(io.BytesIO(file_contents))
+        elif filename.endswith(('.xlsx', '.xls')):
+            df = pd.read_excel(io.BytesIO(file_contents))
+        else:
             return {
                 "status": "error",
                 "agent_id": "test-coverage-agent",
-                "error": f"Unsupported file format: {filename}. Only CSV files are supported.",
-                "execution_time_ms": int((time.time() - start_time) * 1000)
-            }
-
-        try:
-            # Read CSV with Polars
-            df = pl.read_csv(io.BytesIO(file_contents), ignore_errors=True, infer_schema_length=10000)
-        except Exception as e:
-            return {
-                "status": "error",
-                "agent_id": "test-coverage-agent",
-                "error": f"Failed to parse CSV: {str(e)}",
+                "error": f"Unsupported file format: {filename}",
                 "execution_time_ms": int((time.time() - start_time) * 1000)
             }
 
         # Validate data
-        if df.height == 0:
+        if df.empty:
             return {
                 "status": "error",
                 "agent_id": "test-coverage-agent",
@@ -103,137 +98,101 @@ def execute_test_coverage(
         for col in unique_columns:
             if col in df.columns:
                 # Find rows with duplicate values
-                # Polars: filter for is_duplicated
-                dups = df.with_row_index("row_index").filter(pl.col(col).is_duplicated())
-                
-                # We need to iterate to add issues, limit to 1000 total
-                for row in dups.iter_rows(named=True):
+                dup_mask = df[col].duplicated(keep=False)
+                for idx in df[dup_mask].index:
                     if len(row_level_issues) >= 1000:
                         break
-                    idx = row["row_index"]
-                    val = row[col]
                     row_level_issues.append({
                         "row_index": int(idx),
                         "column": str(col),
                         "issue_type": "test_coverage_gap",
                         "severity": "critical",
-                        "message": f"Row {idx}, column '{col}': Duplicate value {val} violates uniqueness constraint",
-                        "value": str(val),
+                        "message": f"Row {idx}, column '{col}': Duplicate value {df.loc[idx, col]} violates uniqueness constraint",
+                        "value": str(df.loc[idx, col]),
                         "validation_type": "uniqueness"
                     })
-                if len(row_level_issues) >= 1000: break
         
         # Check range constraints at row level
         range_tests = parameters.get('range_tests', {})
         for col, constraints in range_tests.items():
-            if len(row_level_issues) >= 1000: break
-            if col in df.columns and df[col].dtype in [pl.Int8, pl.Int16, pl.Int32, pl.Int64, pl.Float32, pl.Float64]:
+            if col in df.columns and pd.api.types.is_numeric_dtype(df[col]):
                 min_val = constraints.get('min')
                 max_val = constraints.get('max')
                 
-                # Filter for out of range
-                condition = pl.lit(False)
-                if min_val is not None:
-                    condition = condition | (pl.col(col) < min_val)
-                if max_val is not None:
-                    condition = condition | (pl.col(col) > max_val)
-                
-                out_of_range_rows = df.with_row_index("row_index").filter(condition)
-                
-                for row in out_of_range_rows.iter_rows(named=True):
+                for idx, val in df[col].items():
                     if len(row_level_issues) >= 1000:
                         break
-                    idx = row["row_index"]
-                    val = row[col]
-                    if val is None: continue # Skip nulls if any (though filter should handle it depending on logic, usually null < min is false/null)
+                    if pd.isna(val):
+                        continue
                     
-                    row_level_issues.append({
-                        "row_index": int(idx),
-                        "column": str(col),
-                        "issue_type": "validation_missing",
-                        "severity": "warning",
-                        "message": f"Row {idx}, column '{col}': Value {val} outside range [{min_val}, {max_val}]",
-                        "value": float(val),
-                        "bounds": {"lower": min_val, "upper": max_val},
-                        "validation_type": "range"
-                    })
+                    out_of_range = False
+                    if min_val is not None and val < min_val:
+                        out_of_range = True
+                    elif max_val is not None and val > max_val:
+                        out_of_range = True
+                    
+                    if out_of_range:
+                        row_level_issues.append({
+                            "row_index": int(idx),
+                            "column": str(col),
+                            "issue_type": "validation_missing",
+                            "severity": "warning",
+                            "message": f"Row {idx}, column '{col}': Value {val} outside range [{min_val}, {max_val}]",
+                            "value": float(val),
+                            "bounds": {"lower": min_val, "upper": max_val},
+                            "validation_type": "range"
+                        })
         
         # Check format constraints at row level
         format_tests = parameters.get('format_tests', {})
         for col, pattern_info in format_tests.items():
-            if len(row_level_issues) >= 1000: break
             if col in df.columns:
                 pattern = pattern_info.get('pattern') if isinstance(pattern_info, dict) else pattern_info
                 description = pattern_info.get('description', 'format') if isinstance(pattern_info, dict) else 'format'
                 
                 try:
-                    # Polars regex match
-                    # We need to cast to string first
-                    # Pattern needs to be anchored to start to match re.match behavior
-                    regex_pattern = pattern
-                    if not regex_pattern.startswith('^'):
-                        regex_pattern = '^' + regex_pattern
-                    
-                    # Filter for NO match
-                    # str.contains with regex
-                    non_matching = df.with_row_index("row_index").filter(
-                        pl.col(col).is_not_null() & 
-                        ~pl.col(col).cast(pl.Utf8).str.contains(regex_pattern)
-                    )
-                    
-                    for row in non_matching.iter_rows(named=True):
+                    for idx, val in df[col].items():
                         if len(row_level_issues) >= 1000:
                             break
-                        idx = row["row_index"]
-                        val = row[col]
-                        val_str = str(val)
+                        if pd.isna(val):
+                            continue
                         
-                        row_level_issues.append({
-                            "row_index": int(idx),
-                            "column": str(col),
-                            "issue_type": "edge_case_uncovered",
-                            "severity": "warning",
-                            "message": f"Row {idx}, column '{col}': Value '{val_str}' does not match {description} pattern",
-                            "value": val_str,
-                            "expected_format": description,
-                            "validation_type": "format"
-                        })
-                except Exception:
+                        val_str = str(val)
+                        matches = re.match(pattern, val_str)
+                        
+                        if not matches:
+                            row_level_issues.append({
+                                "row_index": int(idx),
+                                "column": str(col),
+                                "issue_type": "edge_case_uncovered",
+                                "severity": "warning",
+                                "message": f"Row {idx}, column '{col}': Value '{val_str}' does not match {description} pattern",
+                                "value": val_str,
+                                "expected_format": description,
+                                "validation_type": "format"
+                            })
+                except re.error:
                     pass  # Skip invalid regex patterns
         
         # Check for edge cases (null, empty, boundary values)
-        # "Check for rows with many null values"
-        # Calculate null count per row
-        if len(row_level_issues) < 1000:
-            # Polars doesn't have axis=1 null_count directly on DataFrame easily like pandas
-            # We can sum nulls across columns
-            null_counts = df.select(pl.sum_horizontal(pl.all().is_null())).to_series()
+        for idx, row in df.iterrows():
+            if len(row_level_issues) >= 1000:
+                break
             
-            null_counts_df = df.select(pl.sum_horizontal(pl.all().is_null()).alias("null_count"))
-            total_cols = len(df.columns)
+            # Check for rows with many null values (edge case coverage gap)
+            null_count = row.isna().sum()
+            null_ratio = null_count / len(df.columns) if len(df.columns) > 0 else 0
             
-            if total_cols > 0:
-                # Filter rows with > 20% nulls
-                high_null_rows = df.with_row_index("row_index").with_columns(
-                    pl.sum_horizontal(pl.all().is_null()).alias("null_count")
-                ).filter(pl.col("null_count") / total_cols > 0.2)
-                
-                for row in high_null_rows.iter_rows(named=True):
-                    if len(row_level_issues) >= 1000:
-                        break
-                    idx = row["row_index"]
-                    null_count = row["null_count"]
-                    null_ratio = null_count / total_cols
-                    
-                    row_level_issues.append({
-                        "row_index": int(idx),
-                        "column": "N/A",
-                        "issue_type": "edge_case_uncovered",
-                        "severity": "info",
-                        "message": f"Row {idx} has {null_ratio*100:.1f}% null values - edge case coverage may be insufficient",
-                        "null_count": int(null_count),
-                        "validation_type": "edge_case"
-                    })
+            if null_ratio > 0.2:  # >20% nulls indicates potential edge case issue
+                row_level_issues.append({
+                    "row_index": int(idx),
+                    "column": "N/A",
+                    "issue_type": "edge_case_uncovered",
+                    "severity": "info",
+                    "message": f"Row {idx} has {null_ratio*100:.1f}% null values - edge case coverage may be insufficient",
+                    "null_count": int(null_count),
+                    "validation_type": "edge_case"
+                })
         
         # Cap row-level-issues at 1000
         row_level_issues = row_level_issues[:1000]
@@ -726,7 +685,7 @@ def execute_test_coverage(
         }
 
 
-def _test_uniqueness(df: pl.DataFrame, config: Dict[str, Any]) -> float:
+def _test_uniqueness(df: pd.DataFrame, config: Dict[str, Any]) -> float:
     """
     Test uniqueness constraints on specified columns.
     """
@@ -741,9 +700,7 @@ def _test_uniqueness(df: pl.DataFrame, config: Dict[str, Any]) -> float:
             score -= 20  # Deduct for missing column
             continue
 
-        # Polars: count duplicates
-        duplicate_count = df.select(pl.col(col).is_duplicated().sum()).item()
-        
+        duplicate_count = df[col].duplicated().sum()
         if duplicate_count > 0:
             duplicate_pct = (duplicate_count / len(df)) * 100
             deduction = min(25, duplicate_pct)
@@ -752,7 +709,7 @@ def _test_uniqueness(df: pl.DataFrame, config: Dict[str, Any]) -> float:
     return max(0, score)
 
 
-def _test_ranges(df: pl.DataFrame, config: Dict[str, Any]) -> float:
+def _test_ranges(df: pd.DataFrame, config: Dict[str, Any]) -> float:
     """
     Test range constraints on numeric columns.
     """
@@ -767,40 +724,32 @@ def _test_ranges(df: pl.DataFrame, config: Dict[str, Any]) -> float:
             score -= 15  # Deduct for missing column
             continue
 
-        # Check if numeric
-        if df[col].dtype not in [pl.Int8, pl.Int16, pl.Int32, pl.Int64, pl.Float32, pl.Float64]:
+        if not pd.api.types.is_numeric_dtype(df[col]):
             score -= 10  # Deduct for non-numeric column
             continue
 
         min_val = constraints.get('min')
         max_val = constraints.get('max')
 
-        # Count violations
-        # Filter non-nulls first? Polars handles nulls in comparisons usually by returning null, which counts as false in filter?
-        # Actually we should drop nulls for this check to match pandas logic
-        
-        col_data = df.select(pl.col(col)).drop_nulls()
+        col_data = df[col].dropna()
         violations = 0
-        
-        if col_data.height > 0:
-            condition = pl.lit(False)
-            if min_val is not None:
-                condition = condition | (pl.col(col) < min_val)
-            if max_val is not None:
-                condition = condition | (pl.col(col) > max_val)
-            
-            violations = col_data.filter(condition).height
 
-            if violations > 0:
-                total_valid = col_data.height
-                violation_pct = (violations / total_valid * 100) if total_valid > 0 else 0
-                deduction = min(20, violation_pct)
-                score -= deduction
+        if min_val is not None:
+            violations += (col_data < min_val).sum()
+
+        if max_val is not None:
+            violations += (col_data > max_val).sum()
+
+        if violations > 0:
+            total_valid = len(col_data)
+            violation_pct = (violations / total_valid * 100) if total_valid > 0 else 0
+            deduction = min(20, violation_pct)
+            score -= deduction
 
     return max(0, score)
 
 
-def _test_formats(df: pl.DataFrame, config: Dict[str, Any]) -> float:
+def _test_formats(df: pd.DataFrame, config: Dict[str, Any]) -> float:
     """
     Test format constraints using regex patterns.
     """
@@ -818,34 +767,23 @@ def _test_formats(df: pl.DataFrame, config: Dict[str, Any]) -> float:
         pattern = pattern_info.get('pattern') if isinstance(pattern_info, dict) else pattern_info
 
         try:
-            # Polars regex check
-            # Cast to string, drop nulls
-            col_data = df.select(pl.col(col)).drop_nulls().select(pl.col(col).cast(pl.Utf8))
-            
-            if col_data.height > 0:
-                # Anchor pattern if needed
-                regex_pattern = pattern
-                if not regex_pattern.startswith('^'):
-                    regex_pattern = '^' + regex_pattern
-                
-                # Count non-matches
-                # str.contains returns boolean series
-                matches = col_data.select(pl.col(col).str.contains(regex_pattern)).to_series()
-                violations = (~matches).sum()
+            col_data = df[col].dropna().astype(str)
+            matches = col_data.str.match(pattern, na=False)
+            violations = (~matches).sum()
 
-                if violations > 0:
-                    total_valid = col_data.height
-                    violation_pct = (violations / total_valid * 100) if total_valid > 0 else 0
-                    deduction = min(15, violation_pct)
-                    score -= deduction
+            if violations > 0:
+                total_valid = len(col_data)
+                violation_pct = (violations / total_valid * 100) if total_valid > 0 else 0
+                deduction = min(15, violation_pct)
+                score -= deduction
 
-        except Exception:
+        except re.error:
             score -= 5  # Deduct for invalid regex
 
     return max(0, score)
 
 
-def _identify_test_coverage_issues(df: pl.DataFrame, config: Dict[str, Any]) -> list:
+def _identify_test_coverage_issues(df: pd.DataFrame, config: Dict[str, Any]) -> list:
     """
     Identify specific test coverage issues in the data.
     """
@@ -862,7 +800,7 @@ def _identify_test_coverage_issues(df: pl.DataFrame, config: Dict[str, Any]) -> 
                 "message": f"Required unique column '{col}' not found"
             })
         else:
-            duplicate_count = df.select(pl.col(col).is_duplicated().sum()).item()
+            duplicate_count = df[col].duplicated().sum()
             if duplicate_count > 0:
                 issues.append({
                     "type": "uniqueness_violation",
@@ -882,21 +820,18 @@ def _identify_test_coverage_issues(df: pl.DataFrame, config: Dict[str, Any]) -> 
                 "severity": "warning",
                 "message": f"Range test column '{col}' not found"
             })
-        elif df[col].dtype in [pl.Int8, pl.Int16, pl.Int32, pl.Int64, pl.Float32, pl.Float64]:
+        elif pd.api.types.is_numeric_dtype(df[col]):
             min_val = constraints.get('min')
             max_val = constraints.get('max')
 
-            col_data = df.select(pl.col(col)).drop_nulls()
+            col_data = df[col].dropna()
             violations = 0
-            
-            if col_data.height > 0:
-                condition = pl.lit(False)
-                if min_val is not None:
-                    condition = condition | (pl.col(col) < min_val)
-                if max_val is not None:
-                    condition = condition | (pl.col(col) > max_val)
-                
-                violations = col_data.filter(condition).height
+
+            if min_val is not None:
+                violations += (col_data < min_val).sum()
+
+            if max_val is not None:
+                violations += (col_data > max_val).sum()
 
             if violations > 0:
                 issues.append({
@@ -922,26 +857,20 @@ def _identify_test_coverage_issues(df: pl.DataFrame, config: Dict[str, Any]) -> 
             description = pattern_info.get('description', 'format') if isinstance(pattern_info, dict) else 'format'
 
             try:
-                col_data = df.select(pl.col(col)).drop_nulls().select(pl.col(col).cast(pl.Utf8))
-                
-                if col_data.height > 0:
-                    regex_pattern = pattern
-                    if not regex_pattern.startswith('^'):
-                        regex_pattern = '^' + regex_pattern
-                        
-                    matches = col_data.select(pl.col(col).str.contains(regex_pattern)).to_series()
-                    violations = (~matches).sum()
+                col_data = df[col].dropna().astype(str)
+                matches = col_data.str.match(pattern, na=False)
+                violations = (~matches).sum()
 
-                    if violations > 0:
-                        issues.append({
-                            "type": "format_violation",
-                            "field": col,
-                            "severity": "warning",
-                            "message": f"Column '{col}' has {violations} values not matching {description} pattern",
-                            "violations": int(violations)
-                        })
+                if violations > 0:
+                    issues.append({
+                        "type": "format_violation",
+                        "field": col,
+                        "severity": "warning",
+                        "message": f"Column '{col}' has {violations} values not matching {description} pattern",
+                        "violations": int(violations)
+                    })
 
-            except Exception as e:
+            except re.error as e:
                 issues.append({
                     "type": "invalid_regex_pattern",
                     "field": col,
