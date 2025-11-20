@@ -56,7 +56,7 @@ class RoutingDecisionAI:
             "clean-my-data": {
                 "name": "Clean My Data",
                 "description": "Data cleaning and validation - null handling, outlier removal, type fixing, duplicate resolution, governance validation, test coverage",
-                "agents": ["null-handler", "outlier-remover", "type-fixer", "duplicate-resolver", "governance-checker", "test-coverage-agent"],
+                "agents": ["cleanse-previewer", "quarantine-agent", "type-fixer", "field-standardization", "duplicate-resolver", "null-handler", "outlier-remover", "governance-checker", "test-coverage-agent", "cleanse-writeback"],
                 "requires_files": ["primary"],
                 "optional_files": [],
                 "use_cases": [
@@ -242,6 +242,48 @@ class RoutingDecisionAI:
 
         # ==================== CLEAN-MY-DATA ANALYSIS ====================
         elif current_tool == "clean-my-data":
+            # Cleanse previewer findings
+            if agent_results.get("cleanse-previewer", {}).get("status") == "success":
+                preview_metrics = agent_results["cleanse-previewer"].get("summary_metrics", {})
+                total_warnings = preview_metrics.get("total_warnings", 0)
+                if total_warnings > 0:
+                    analysis["key_findings"].append(f"Preview identified {total_warnings} potential issues")
+
+            # Quarantine agent findings
+            if agent_results.get("quarantine-agent", {}).get("status") == "success":
+                quarantine_metrics = agent_results["quarantine-agent"].get("summary_metrics", {})
+                issues_found = quarantine_metrics.get("quarantine_issues_found", 0)
+                if issues_found > 0:
+                    analysis["key_findings"].append(f"Quarantined {issues_found} invalid records")
+                    analysis["data_quality_issues"].append("invalid_records_quarantined")
+
+            # Type fixer findings
+            if agent_results.get("type-fixer", {}).get("status") == "success":
+                type_data = agent_results["type-fixer"].get("data", {})
+                fixing_score = type_data.get("fixing_score", {}).get("overall_score", 0)
+                type_issues_fixed = agent_results["type-fixer"].get("summary_metrics", {}).get("type_issues_fixed", 0)
+                analysis["scores"]["type_fixing"] = fixing_score
+
+                if type_issues_fixed > 0:
+                    analysis["key_findings"].append(f"Type issues fixed: {type_issues_fixed}")
+                    
+                if fixing_score < 80:
+                    analysis["data_quality_issues"].append("type_mismatch_concerns")
+
+            # Field standardization findings
+            if agent_results.get("field-standardization", {}).get("status") == "success":
+                std_metrics = agent_results["field-standardization"].get("summary_metrics", {})
+                total_issues = std_metrics.get("total_issues", 0)
+                if total_issues > 0:
+                    analysis["key_findings"].append(f"Standardized {total_issues} field values")
+
+            # Duplicate resolver findings
+            if agent_results.get("duplicate-resolver", {}).get("status") == "success":
+                dup_metrics = agent_results["duplicate-resolver"].get("summary_metrics", {})
+                total_issues = dup_metrics.get("total_issues", 0)
+                if total_issues > 0:
+                    analysis["key_findings"].append(f"Resolved {total_issues} duplicate records")
+
             # Null handler findings
             if agent_results.get("null-handler", {}).get("status") == "success":
                 null_data = agent_results["null-handler"].get("data", {})
@@ -262,19 +304,6 @@ class RoutingDecisionAI:
                 if outliers_handled > 0:
                     analysis["key_findings"].append(f"Outliers handled: {outliers_handled}")
 
-            # Type fixer findings
-            if agent_results.get("type-fixer", {}).get("status") == "success":
-                type_data = agent_results["type-fixer"].get("data", {})
-                fixing_score = type_data.get("fixing_score", {}).get("overall_score", 0)
-                type_issues_fixed = agent_results["type-fixer"].get("summary_metrics", {}).get("type_issues_fixed", 0)
-                analysis["scores"]["type_fixing"] = fixing_score
-
-                if type_issues_fixed > 0:
-                    analysis["key_findings"].append(f"Type issues fixed: {type_issues_fixed}")
-                    
-                if fixing_score < 80:
-                    analysis["data_quality_issues"].append("type_mismatch_concerns")
-
             # Governance findings
             if agent_results.get("governance-checker", {}).get("status") == "success":
                 gov_data = agent_results["governance-checker"].get("data", {})
@@ -290,6 +319,10 @@ class RoutingDecisionAI:
                 test_data = agent_results["test-coverage-agent"].get("data", {})
                 coverage_status = test_data.get("coverage_status", "unknown")
                 analysis["key_findings"].append(f"Test coverage status: {coverage_status}")
+
+            # Cleanse writeback findings
+            if agent_results.get("cleanse-writeback", {}).get("status") == "success":
+                analysis["key_findings"].append("Cleaned data successfully written back")
 
         return analysis
 
