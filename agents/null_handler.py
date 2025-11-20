@@ -63,7 +63,7 @@ def execute_null_handler(
             }
 
         try:
-            df = pl.read_csv(io.BytesIO(file_contents), ignore_errors=True, infer_schema_length=10000, null_values=["", "NA", "N/A", "null", "NULL"])
+            df = pl.read_csv(io.BytesIO(file_contents), ignore_errors=True, infer_schema_length=10000)
         except Exception as e:
             return {
                 "status": "error",
