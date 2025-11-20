@@ -11,6 +11,8 @@ import time
 import base64
 from datetime import datetime
 from typing import Dict, Any, Optional, List
+import io
+import pandas as pd
 from fastapi import APIRouter, HTTPException, File, UploadFile, Form
 
 from agents import readiness_rater, unified_profiler, drift_detector, score_risk, governance_checker, test_coverage_agent, null_handler, outlier_remover, type_fixer, duplicate_resolver, quarantine_agent, cleanse_writeback, field_standardization, cleanse_previewer
@@ -307,6 +309,41 @@ async def analyze(
                 file_contents = await file_obj.read()
                 files_map[file_key] = (file_contents, file_obj.filename)
         
+        # Convert input files to CSV for clean-my-data tool to ensure consistent processing
+        if tool_id == "clean-my-data":
+            for file_key, (content, filename) in list(files_map.items()):
+                try:
+                    file_ext = filename.split(".")[-1].lower() if "." in filename else ""
+                    
+                    # Skip if already CSV
+                    if file_ext == "csv":
+                        continue
+                        
+                    df = None
+                    # Handle Excel files
+                    if file_ext in ["xlsx", "xls"]:
+                        df = pd.read_excel(io.BytesIO(content))
+                    # Handle JSON files
+                    elif file_ext == "json":
+                        df = pd.read_json(io.BytesIO(content))
+                    
+                    # If conversion was successful, update the file in memory
+                    if df is not None:
+                        # Convert to CSV string then bytes
+                        csv_buffer = io.StringIO()
+                        df.to_csv(csv_buffer, index=False)
+                        new_content = csv_buffer.getvalue().encode('utf-8')
+                        
+                        # Update filename
+                        base_name = ".".join(filename.split(".")[:-1]) if "." in filename else filename
+                        new_filename = f"{base_name}.csv"
+                        
+                        # Update map
+                        files_map[file_key] = (new_content, new_filename)
+                except Exception as e:
+                    # Log error but continue with original file
+                    print(f"Warning: Failed to convert {filename} to CSV: {str(e)}")
+
         # Parse parameters
         parameters = {}
         if parameters_json:
