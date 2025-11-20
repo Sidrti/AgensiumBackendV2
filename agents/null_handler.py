@@ -63,7 +63,7 @@ def execute_null_handler(
             }
 
         try:
-            df = pl.read_csv(io.BytesIO(file_contents), ignore_errors=True, infer_schema_length=10000)
+            df = pl.read_csv(io.BytesIO(file_contents), ignore_errors=True, infer_schema_length=10000, null_values=["", "NA", "N/A", "null", "NULL"])
         except Exception as e:
             return {
                 "status": "error",
@@ -89,6 +89,13 @@ def execute_null_handler(
         null_analysis = _analyze_null_patterns(df)
         
         # Apply null handling strategies
+        # If no column strategies are provided, use the suggested ones from the analysis
+        if not column_strategies and global_strategy == "column_specific":
+            column_strategies = {
+                col: summary["suggested_strategy"]
+                for col, summary in null_analysis.get("null_summary", {}).items()
+            }
+
         df_cleaned, imputation_log = _apply_null_handling(df, global_strategy, column_strategies, fill_values, knn_neighbors)
         
         # Calculate cleaning effectiveness

@@ -47,6 +47,7 @@ def execute_field_standardization(
     unit_mappings = parameters.get("unit_mappings", {})  # Dict of column -> {unit -> standard_unit, conversion_factor}
     target_columns = parameters.get("target_columns", [])  # Columns to standardize (all if empty)
     preserve_columns = parameters.get("preserve_columns", [])  # Columns to preserve from standardization
+    standardize_dates = parameters.get("standardize_dates", True)  # Standardize date formats to ISO
     
     # Scoring weights
     standardization_effectiveness_weight = parameters.get("standardization_effectiveness_weight", 0.5)
@@ -95,8 +96,11 @@ def execute_field_standardization(
         else:
             columns_to_process = [col for col in all_columns if col not in preserve_columns]
         
-        # Filter for string columns only
-        columns_to_process = [col for col in columns_to_process if df[col].dtype == pl.Utf8]
+        # Identify columns that are likely dates
+        date_columns = [col for col in columns_to_process if df[col].dtype == pl.Utf8 and _is_likely_date_column(df[col])]
+        
+        # Filter for string columns only for other standardizations
+        columns_to_process = [col for col in columns_to_process if df[col].dtype == pl.Utf8 and col not in date_columns]
 
         # Analyze pre-standardization state
         pre_analysis = _analyze_field_variations(df, columns_to_process)
@@ -112,7 +116,9 @@ def execute_field_standardization(
                 "apply_synonyms": apply_synonyms,
                 "synonym_mappings": synonym_mappings,
                 "unit_standardization": unit_standardization,
-                "unit_mappings": unit_mappings
+                "unit_mappings": unit_mappings,
+                "standardize_dates": standardize_dates,
+                "date_columns": date_columns
             }
         )
         
@@ -722,6 +728,8 @@ def _apply_standardization(
     synonym_mappings = config.get("synonym_mappings", {})
     unit_standardization = config.get("unit_standardization", False)
     unit_mappings = config.get("unit_mappings", {})
+    standardize_dates = config.get("standardize_dates", True)
+    date_columns = config.get("date_columns", [])
     
     for col in columns:
         if col not in df_standardized.columns:
@@ -784,7 +792,7 @@ def _apply_standardization(
                 pl.col(col).map_elements(apply_synonyms_func, return_dtype=pl.Utf8).alias(col)
             )
             
-        # 5. Apply unit standardization
+            # 5. Apply unit standardization
         if unit_standardization and col in unit_mappings:
             unit_config = unit_mappings[col]
             
@@ -795,42 +803,94 @@ def _apply_standardization(
             df_standardized = df_standardized.with_columns(
                 pl.col(col).map_elements(apply_unit_func, return_dtype=pl.Utf8).alias(col)
             )
+    # 6. Standardize date columns
+    if standardize_dates:
+        for col in date_columns:
+            if col not in df_standardized.columns:
+                continue
+
+            original_col = df_standardized[col].clone()
+
+            # Only process string columns
+            if df_standardized[col].dtype != pl.Utf8:
+                continue
+
+            # Multi-step cleaning and parsing approach
+            def standardize_date_value(date_str):
+                """Standardize a single date string to DD-MM-YYYY format."""
+                if date_str is None or date_str == "":
+                    return None
+                
+                import re
+                from datetime import datetime
+                
+                # Clean the input
+                date_str = str(date_str).strip()
+                
+                # Remove any time components (HH:MM:SS, HH.MM.SS, etc.)
+                date_str = re.sub(r'\s+\d{1,2}[:.]\d{2}[:.]\d{2}(\s*(AM|PM))?', '', date_str, flags=re.IGNORECASE)
+                date_str = date_str.strip()
+                
+                # Try different parsing formats
+                formats_to_try = [
+                    "%d-%m-%Y",      # 01-01-2025
+                    "%d/%m/%Y",      # 01/01/2025
+                    "%d-%b-%y",      # 02-Jan-25
+                    "%d-%b-%Y",      # 02-Jan-2025
+                    "%d/%m/%y",      # 01/01/25
+                    "%Y-%m-%d",      # 2025-01-01
+                    "%m/%d/%Y",      # 01/01/2025 (US format)
+                    "%d %b %Y",      # 01 Jan 2025
+                    "%d %B %Y",      # 01 January 2025
+                ]
+                
+                for fmt in formats_to_try:
+                    try:
+                        parsed_date = datetime.strptime(date_str, fmt)
+                        return parsed_date.strftime("%d-%m-%Y")
+                    except (ValueError, TypeError):
+                        continue
+                
+                # If nothing worked, return None
+                return None
             
-        # Detect changes and log
-        # We need to compare original_col with new col
-        # Since we modified df_standardized in place (conceptually), we can compare.
-        
-        # Find changed rows
-        changed_mask = (original_col != df_standardized[col]) & (original_col.is_not_null())
-        changes_count = df_standardized.filter(changed_mask).height
-        
-        if changes_count > 0:
-            log.append(
-                f"Standardized {changes_count} values in column '{col}' "
-                f"({(changes_count / df_standardized.height * 100):.1f}% of rows)"
+            # Apply the standardization function
+            standardized_series = df_standardized[col].map_elements(
+                standardize_date_value, 
+                return_dtype=pl.Utf8
             )
             
-            # Collect row issues (limit to 100 per column to avoid explosion)
-            changed_rows = df.select([
-                pl.col(col).alias("original_value"),
-                pl.arange(0, pl.count()).alias("row_index")
-            ]).with_columns(
-                df_standardized[col].alias("standardized_value")
-            ).filter(changed_mask).head(100)
-            
-            for row in changed_rows.iter_rows(named=True):
-                if len(row_issues) < 100:
-                    row_issues.append({
-                        "row_index": row["row_index"],
-                        "column": col,
-                        "issue_type": "field_standardized",
-                        "original_value": str(row["original_value"]),
-                        "standardized_value": str(row["standardized_value"]),
-                        "severity": "info"
-                    })
+            df_standardized = df_standardized.with_columns(standardized_series.alias(col))
 
-    return df_standardized, log, row_issues
+            # Detect changes and log
+            changed_mask = (
+                (original_col != df_standardized[col]) & 
+                (original_col.is_not_null()) & 
+                (df_standardized[col].is_not_null())
+            )
+            changes_count = df_standardized.filter(changed_mask).height
 
+            if changes_count > 0:
+                log.append(
+                    f"Standardized {changes_count} date values in column '{col}' to DD-MM-YYYY format"
+                )
+                
+                # Collect sample changes for logging
+                changed_rows = original_col.to_frame("original_value").with_columns([
+                    pl.arange(0, pl.count()).alias("row_index"),
+                    df_standardized[col].alias("standardized_value")
+                ]).filter(changed_mask).head(100)
+
+                for row in changed_rows.iter_rows(named=True):
+                    if len(row_issues) < 1000:
+                        row_issues.append({
+                            "row_index": row["row_index"],
+                            "column": col,
+                            "issue_type": "date_format_standardized",
+                            "original_value": str(row["original_value"]),
+                            "standardized_value": str(row["standardized_value"]),
+                            "severity": "info"
+                        })
 
 def _apply_unit_conversion(value: str, unit_config: Dict[str, Any]) -> str:
     """Apply unit conversion to a value string."""
@@ -996,6 +1056,41 @@ def _calculate_standardization_score(
             "standardized_columns": len(standardized_df.columns)
         }
     }
+
+
+def _is_likely_date_column(series: pl.Series, threshold: float = 0.7) -> bool:
+    """Check if a series is likely to contain dates."""
+    if series.dtype != pl.Utf8:
+        return False
+    
+    sample_size = min(100, series.len())
+    if sample_size == 0:
+        return False
+        
+    sample = series.sample(n=sample_size, with_replacement=False).drop_nulls()
+    
+    date_pattern = re.compile(
+        r"""(?x)
+        ^(
+        # DD-MM-YYYY, DD/MM/YYYY, YYYY-MM-DD, MM/DD/YYYY
+        (\d{1,2}[-/]\d{1,2}[-/]\d{2,4})|
+        (\d{4}[-/]\d{1,2}[-/]\d{1,2})|
+        
+        # DD-Mon-YYYY e.g., 31-Jan-2025, 02-Jan-2025
+        (\d{1,2}-[A-Za-z]{3}-\d{4})|
+        
+        # DD Mon YYYY e.g., 31 Jan 2025
+        (\d{1,2}\s+[A-Za-z]{3,}\s+\d{4})|
+        
+        # Optional time part
+        (\s+\d{1,2}:\d{2}(?::\d{2})?(\s*(AM|PM))?)?
+        )$
+        """,
+        re.IGNORECASE
+    )
+    matches = sample.str.contains(date_pattern.pattern).sum()
+    
+    return (matches / sample.len()) >= threshold if sample.len() > 0 else False
 
 
 def _generate_cleaned_file(df: pl.DataFrame, original_filename: str) -> bytes:
