@@ -2,17 +2,16 @@
 Governance Checker Agent
 
 Validates data governance compliance including lineage, consent, and classification.
-Input: CSV/JSON/XLSX file (primary)
+Input: CSV file (primary)
 Output: Standardized governance validation results
 """
 
-import pandas as pd
+import polars as pl
 import numpy as np
 import io
 import time
 import re
-from typing import Dict, Any, Optional
-
+from typing import Dict, Any, Optional, List
 
 def execute_governance(
     file_contents: bytes,
@@ -42,23 +41,27 @@ def execute_governance(
     needs_review_threshold = parameters.get("needs_review_threshold", 60)
 
     try:
-        # Read file based on format
-        if filename.endswith('.csv'):
-            df = pd.read_csv(io.BytesIO(file_contents), on_bad_lines='skip')
-        elif filename.endswith('.json'):
-            df = pd.read_json(io.BytesIO(file_contents))
-        elif filename.endswith(('.xlsx', '.xls')):
-            df = pd.read_excel(io.BytesIO(file_contents))
-        else:
+        # Read file based on format - Enforce CSV only
+        if not filename.endswith('.csv'):
             return {
                 "status": "error",
                 "agent_id": "governance-checker",
-                "error": f"Unsupported file format: {filename}",
+                "error": f"Unsupported file format: {filename}. Only CSV is supported.",
+                "execution_time_ms": int((time.time() - start_time) * 1000)
+            }
+
+        try:
+            df = pl.read_csv(io.BytesIO(file_contents), ignore_errors=True, infer_schema_length=10000)
+        except Exception as e:
+            return {
+                "status": "error",
+                "agent_id": "governance-checker",
+                "error": f"Failed to parse CSV: {str(e)}",
                 "execution_time_ms": int((time.time() - start_time) * 1000)
             }
 
         # Validate data
-        if df.empty:
+        if df.height == 0:
             return {
                 "status": "error",
                 "agent_id": "governance-checker",
@@ -100,39 +103,50 @@ def execute_governance(
         
         all_required_fields = required_lineage_fields + required_consent_fields + required_classification_fields
         
-        # Check each row for missing required governance data
-        for row_idx, row in df.iterrows():
-            if len(row_level_issues) >= 1000:
-                break
+        # Check for missing required fields efficiently
+        # We only check fields that actually exist in the dataframe to find nulls.
+        # If a field is completely missing from the dataframe, it's a schema issue (handled in governance_issues),
+        # but here we check for nulls in existing columns.
+        
+        existing_required_fields = [f for f in all_required_fields if f in df.columns]
+        
+        if existing_required_fields:
+            # Add row index
+            df_with_idx = df.with_row_index("row_index")
             
-            missing_fields = []
-            for field in all_required_fields:
-                if field in df.columns and pd.isna(row[field]):
-                    missing_fields.append(field)
+            # Find rows with any nulls in required fields
+            null_rows = df_with_idx.filter(
+                pl.any_horizontal([pl.col(f).is_null() for f in existing_required_fields])
+            ).head(1000)
             
-            if missing_fields:
-                # Categorize the issue
-                if any(f in required_lineage_fields for f in missing_fields):
-                    issue_type = "policy_violation"
-                    severity = "warning"
-                    field_category = "lineage"
-                elif any(f in required_consent_fields for f in missing_fields):
-                    issue_type = "compliance_issue"
-                    severity = "critical"
-                    field_category = "consent"
-                else:
-                    issue_type = "policy_violation"
-                    severity = "warning"
-                    field_category = "classification"
+            for row in null_rows.iter_rows(named=True):
+                if len(row_level_issues) >= 1000: break
                 
-                row_level_issues.append({
-                    "row_index": int(row_idx),
-                    "column": "multiple",
-                    "issue_type": issue_type,
-                    "severity": severity,
-                    "message": f"Missing {field_category} fields: {', '.join(missing_fields)}",
-                    "missing_fields": missing_fields
-                })
+                missing_fields = [f for f in existing_required_fields if row[f] is None]
+                
+                if missing_fields:
+                    # Categorize the issue
+                    if any(f in required_lineage_fields for f in missing_fields):
+                        issue_type = "policy_violation"
+                        severity = "warning"
+                        field_category = "lineage"
+                    elif any(f in required_consent_fields for f in missing_fields):
+                        issue_type = "compliance_issue"
+                        severity = "critical"
+                        field_category = "consent"
+                    else:
+                        issue_type = "policy_violation"
+                        severity = "warning"
+                        field_category = "classification"
+                    
+                    row_level_issues.append({
+                        "row_index": row["row_index"],
+                        "column": "multiple",
+                        "issue_type": issue_type,
+                        "severity": severity,
+                        "message": f"Missing {field_category} fields: {', '.join(missing_fields)}",
+                        "missing_fields": missing_fields
+                    })
         
         # Add row-level issues for PII without proper classification
         pii_patterns = parameters.get('pii_patterns', {
@@ -143,40 +157,50 @@ def execute_governance(
         
         # Identify PII columns
         pii_columns = {}  # col -> pii_type
-        for col in df.select_dtypes(include=['object']).columns:
-            col_data = df[col].astype(str)
+        string_cols = [col for col in df.columns if df[col].dtype == pl.Utf8]
+        
+        for col in string_cols:
             for pii_type, pattern in pii_patterns.items():
-                if col_data.str.contains(pattern, regex=True, na=False).any():
+                # Check if any value matches
+                if df[col].str.contains(pattern).any():
                     pii_columns[col] = pii_type
                     break
         
         # Check if PII rows have proper classification
         if pii_columns and 'data_classification' in df.columns:
-            for row_idx, row in df.iterrows():
-                if len(row_level_issues) >= 1000:
-                    break
+            # We need to find rows where PII is present AND classification is bad
+            # Bad classification: null or 'public'
+            
+            # Construct filter condition
+            # For each PII column, if it has a value matching pattern, check classification
+            
+            # This is complex to do in one go for all columns. Let's iterate PII columns.
+            for pii_col, pii_type in pii_columns.items():
+                if len(row_level_issues) >= 1000: break
                 
-                # Check if row has PII data
-                has_pii = False
-                pii_cols_in_row = []
-                for pii_col, pii_type in pii_columns.items():
-                    if pii_col in row.index and pd.notna(row[pii_col]):
-                        has_pii = True
-                        pii_cols_in_row.append(pii_col)
+                pattern = pii_patterns[pii_type]
                 
-                if has_pii:
-                    # Check classification
-                    classification = row['data_classification'] if 'data_classification' in row.index else None
-                    if pd.isna(classification) or classification == 'public':
-                        row_level_issues.append({
-                            "row_index": int(row_idx),
-                            "column": ", ".join(pii_cols_in_row),
-                            "issue_type": "compliance_issue",
-                            "severity": "critical",
-                            "message": f"PII data detected in {', '.join(pii_cols_in_row)} without proper classification or incorrectly classified as public",
-                            "pii_columns": pii_cols_in_row
-                        })
-        
+                # Find violating rows
+                violating_rows = df.with_row_index("row_index").filter(
+                    (pl.col(pii_col).str.contains(pattern)) &
+                    (
+                        (pl.col('data_classification').is_null()) |
+                        (pl.col('data_classification') == 'public')
+                    )
+                ).head(1000 - len(row_level_issues))
+                
+                for row in violating_rows.iter_rows(named=True):
+                    if len(row_level_issues) >= 1000: break
+                    
+                    row_level_issues.append({
+                        "row_index": row["row_index"],
+                        "column": pii_col,
+                        "issue_type": "compliance_issue",
+                        "severity": "critical",
+                        "message": f"PII data detected in {pii_col} without proper classification or incorrectly classified as public",
+                        "pii_columns": [pii_col]
+                    })
+
         # Cap at 1000 issues
         row_level_issues = row_level_issues[:1000]
         
@@ -208,8 +232,8 @@ def execute_governance(
                 "classification": round(classification_score, 1)
             },
             "compliance_status": compliance_status,
-            "total_records": len(df),
-            "fields_analyzed": list(df.columns),
+            "total_records": df.height,
+            "fields_analyzed": df.columns,
             "governance_issues": governance_issues,
             "row_level_issues": row_level_issues[:100],
             "issue_summary": issue_summary,
@@ -496,7 +520,7 @@ def execute_governance(
                 "agent_id": "governance-checker",
                 "field_name": "all",
                 "priority": "critical",
-                "recommendation": f"Add {all_missing} required governance metadata fields: source_system, transformation_date, consent_status, data_classification, sensitivity_level, data_owner, business_unit. Update all {len(df)} records",
+                "recommendation": f"Add {all_missing} required governance metadata fields: source_system, transformation_date, consent_status, data_classification, sensitivity_level, data_owner, business_unit. Update all {df.height} records",
                 "timeline": "1 week"
             })
         
@@ -574,7 +598,7 @@ def execute_governance(
             "agent_name": "Governance Checker",
             "execution_time_ms": int((time.time() - start_time) * 1000),
             "summary_metrics": {
-                "total_records": len(df),
+                "total_records": df.height,
                 "total_fields": len(df.columns),
                 "governance_score": round(overall_score, 1),
                 "compliance_status": compliance_status,
@@ -600,7 +624,7 @@ def execute_governance(
         }
 
 
-def _validate_lineage(df: pd.DataFrame, config: Dict[str, Any]) -> float:
+def _validate_lineage(df: pl.DataFrame, config: Dict[str, Any]) -> float:
     """
     Validate data lineage requirements.
     """
@@ -615,14 +639,14 @@ def _validate_lineage(df: pd.DataFrame, config: Dict[str, Any]) -> float:
     # Check for high null percentages in lineage fields
     for field in required_fields:
         if field in df.columns:
-            null_pct = (df[field].isnull().sum() / len(df)) * 100
+            null_pct = (df[field].null_count() / df.height) * 100
             if null_pct > 5:
                 score -= min(15, null_pct / 10)
 
     return max(0, score)
 
 
-def _validate_consent(df: pd.DataFrame, config: Dict[str, Any]) -> float:
+def _validate_consent(df: pl.DataFrame, config: Dict[str, Any]) -> float:
     """
     Validate consent and privacy requirements.
     """
@@ -637,14 +661,22 @@ def _validate_consent(df: pd.DataFrame, config: Dict[str, Any]) -> float:
     # Validate consent status values
     if 'consent_status' in df.columns:
         valid_statuses = config.get('valid_consent_statuses', ['granted', 'denied', 'withdrawn', 'pending'])
-        invalid_count = (~df['consent_status'].isin(valid_statuses + [None])).sum()
+        # Count invalid statuses (not in valid list AND not null)
+        # Note: Original code treated None as valid (or at least didn't penalize it if not in list + [None])
+        # (~df['consent_status'].isin(valid_statuses + [None])).sum()
+        
+        invalid_count = df.filter(
+            pl.col('consent_status').is_not_null() &
+            ~pl.col('consent_status').is_in(valid_statuses)
+        ).height
+        
         if invalid_count > 0:
             score -= 15
 
     return max(0, score)
 
 
-def _validate_classification(df: pd.DataFrame, config: Dict[str, Any]) -> float:
+def _validate_classification(df: pl.DataFrame, config: Dict[str, Any]) -> float:
     """
     Validate data classification and tagging requirements.
     """
@@ -663,25 +695,80 @@ def _validate_classification(df: pd.DataFrame, config: Dict[str, Any]) -> float:
     })
 
     pii_columns = []
-    for col in df.select_dtypes(include=['object']).columns:
-        col_data = df[col].astype(str)
+    string_cols = [col for col in df.columns if df[col].dtype == pl.Utf8]
+    
+    for col in string_cols:
         for pii_type, pattern in pii_patterns.items():
-            if col_data.str.contains(pattern, regex=True, na=False).any():
+            if df[col].str.contains(pattern).any():
                 pii_columns.append(col)
                 break
 
     # If PII found, check if classified appropriately
     if pii_columns and 'data_classification' in df.columns:
-        public_pii = ((df['data_classification'] == 'public') & df.index.isin(
-            [idx for col in pii_columns for idx in df.index if df.loc[idx, col]]
-        )).sum()
-        if public_pii > 0:
-            score -= 20
+        # Count rows where classification is public AND PII is present in any PII column
+        # This is slightly different from original which checked each column separately?
+        # Original: public_pii = ((df['data_classification'] == 'public') & df.index.isin(...)).sum()
+        # It sums rows that have public classification AND have PII in ANY of the pii_columns.
+        
+        # In Polars:
+        # Filter rows where classification is public
+        public_rows = df.filter(pl.col('data_classification') == 'public')
+        
+        if public_rows.height > 0:
+            # Check if any PII column has PII in these rows
+            has_pii_expr = pl.any_horizontal([
+                pl.col(col).str.contains(pii_patterns.get('email') if 'email' in pii_patterns else r'.*') # Simplified logic, need correct pattern per column
+                for col in pii_columns
+            ])
+            
+            # Re-do loop to be precise
+            public_pii_count = 0
+            # We need to check if ANY pii column has pii in a public row.
+            # But pii_columns list doesn't store which type/pattern matched.
+            # Let's re-detect per column.
+            
+            for col in pii_columns:
+                # Find pattern for this column (we just know it matched ONE of them)
+                # This is inefficient. Let's just check all patterns again or store it.
+                # Optimization: In _validate_classification we just need count.
+                
+                # Let's iterate patterns again
+                for pii_type, pattern in pii_patterns.items():
+                     count = df.filter(
+                         (pl.col('data_classification') == 'public') &
+                         (pl.col(col).str.contains(pattern))
+                     ).height
+                     if count > 0:
+                         public_pii_count += count
+                         break # Counted this column's contribution (wait, original counts ROWS, not instances)
+            
+            # Correct logic: Count ROWS that are public AND have PII in ANY pii column.
+            # We need an expression: (public) & ( (col1 has pii) OR (col2 has pii) ... )
+            
+            # We need to know which pattern applies to which column.
+            # Let's map col -> pattern first
+            col_patterns = {}
+            for col in string_cols:
+                for pii_type, pattern in pii_patterns.items():
+                    if df[col].str.contains(pattern).any():
+                        col_patterns[col] = pattern
+                        break
+            
+            if col_patterns:
+                public_pii_rows = df.filter(
+                    (pl.col('data_classification') == 'public') &
+                    (pl.any_horizontal([
+                        pl.col(c).str.contains(p) for c, p in col_patterns.items()
+                    ]))
+                ).height
+                
+                if public_pii_rows > 0:
+                    score -= 20
 
     return max(0, score)
 
 
-def _identify_governance_issues(df: pd.DataFrame, config: Dict[str, Any]) -> list:
+def _identify_governance_issues(df: pl.DataFrame, config: Dict[str, Any]) -> list:
     """
     Identify specific governance issues in the data.
     """
@@ -727,10 +814,10 @@ def _identify_governance_issues(df: pd.DataFrame, config: Dict[str, Any]) -> lis
         'ssn': r'\b\d{3}-\d{2}-\d{4}\b'
     })
 
-    for col in df.select_dtypes(include=['object']).columns:
-        col_data = df[col].astype(str)
+    string_cols = [col for col in df.columns if df[col].dtype == pl.Utf8]
+    for col in string_cols:
         for pii_type, pattern in pii_patterns.items():
-            if col_data.str.contains(pattern, regex=True, na=False).any():
+            if df[col].str.contains(pattern).any():
                 issues.append({
                     "type": "pii_detected",
                     "field": col,

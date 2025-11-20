@@ -3,7 +3,7 @@
     "id": "clean-my-data",
     "name": "Clean My Data",
     "description": "Comprehensive data cleaning and validation tool. Handle missing values, detect and remove outliers, validate governance compliance, and ensure test coverage requirements. Clean your data with configurable strategies while maintaining data integrity.",
-    "icon": "🧹",
+    "icon": "✨",
     "category": "shape",
     "isAvailable": true,
     "version": "1.0.0",
@@ -153,7 +153,7 @@
       "id": "quarantine-agent",
       "name": "Quarantine Agent",
       "description": "Identifies, isolates, and manages bad, invalid, or suspicious data to prevent corruption of the main processing pipeline. Detects missing required fields, type mismatches, out-of-range values, invalid formats, broken records, and schema mismatches.",
-      "icon": "🚫",
+      "icon": "☣️",
       "category": "Data Quality & Security",
       "accuracy": "98%",
       "features": [
@@ -279,12 +279,6 @@
           "content": "string (base64)",
           "size_bytes": "integer",
           "format": "string"
-        },
-        "quarantine_file": {
-          "filename": "string",
-          "content": "string (base64)",
-          "size_bytes": "integer",
-          "format": "string"
         }
       }
     },
@@ -292,7 +286,7 @@
       "id": "type-fixer",
       "name": "Type Fixer",
       "description": "Detects and fixes data type inconsistencies in columns. Analyzes column types and applies configurable type conversion strategies to ensure proper data types (numeric, integer, datetime, string, category).",
-      "icon": "🔤",
+      "icon": "🏷️",
       "category": "Data Cleaning",
       "accuracy": "96%",
       "features": [
@@ -386,7 +380,7 @@
       "id": "field-standardization",
       "name": "Field Standardization",
       "description": "Standardizes field values across datasets with comprehensive normalization strategies. Handles case normalization, whitespace trimming, synonym replacement, and unit alignment to ensure data consistency and uniformity.",
-      "icon": "✨",
+      "icon": "📏",
       "category": "Data Cleaning",
       "accuracy": "98%",
       "features": [
@@ -516,7 +510,7 @@
       "id": "duplicate-resolver",
       "name": "Duplicate Resolver",
       "description": "Detects and resolves duplicate records with comprehensive duplicate detection strategies. Handles exact duplicates, case/whitespace variations, email case-insensitivity, missing value duplicates, and conflicting duplicates with configurable merge strategies.",
-      "icon": "🔗",
+      "icon": "�️",
       "category": "Data Cleaning",
       "accuracy": "99%",
       "features": [
@@ -643,7 +637,7 @@
       "id": "null-handler",
       "name": "Null Handler",
       "description": "Detects and handles missing values in data. Analyzes null patterns and applies configurable imputation strategies including mean, median, mode, forward fill, backward fill, KNN imputation, and row/column removal.",
-      "icon": "🔧",
+      "icon": "🧩",
       "category": "Data Cleaning",
       "accuracy": "98%",
       "features": [
@@ -740,7 +734,7 @@
       "id": "outlier-remover",
       "name": "Outlier Remover",
       "description": "Detects and handles outliers in numeric data. Uses configurable detection methods (Z-score, IQR, Percentile) and removal/imputation strategies to clean data while maintaining integrity.",
-      "icon": "📍",
+      "icon": "✂️",
       "category": "Data Cleaning",
       "accuracy": "97%",
       "features": [
@@ -854,7 +848,7 @@
       "id": "governance-checker",
       "name": "Governance Checker",
       "description": "Validates data governance compliance including lineage, consent, and classification requirements. Ensures data meets governance standards and compliance frameworks.",
-      "icon": "📋",
+      "icon": "🏛️",
       "category": "Governance",
       "accuracy": "95%",
       "features": [
@@ -1036,7 +1030,7 @@
       "id": "cleanse-writeback",
       "name": "Cleanse Writeback",
       "description": "Final quality assurance and documentation step that guarantees the dataset leaving the 'Cleanse My Data' tool is not only fixed but also perfectly documented and ready for the next tool. Performs integrity verification, finalizes comprehensive manifest of all cleaning operations, and packages data with complete audit log for chain integrity and auditability.",
-      "icon": "✅",
+      "icon": "💾",
       "category": "Data Quality Assurance",
       "accuracy": "99%",
       "features": [

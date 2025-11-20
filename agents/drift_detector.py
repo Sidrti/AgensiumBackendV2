@@ -1,18 +1,17 @@
 """
-Drift Detector Agent
+Drift Detector Agent (Optimized)
 
 Detects changes (drift) between baseline and current datasets.
 Input: Baseline file and primary file
 Output: Uniform drift detection structure matching API specification
 """
 
-import pandas as pd
+import polars as pl
 import numpy as np
 import io
 import time
 from typing import Dict, Any, Optional
-from scipy.stats import ks_2samp, chi2_contingency, wasserstein_distance
-
+from scipy.stats import ks_2samp, wasserstein_distance
 
 def detect_drift(
     baseline_contents: bytes,
@@ -44,19 +43,22 @@ def detect_drift(
     min_sample_size = parameters.get("min_sample_size", 100)
     
     try:
-        # Read files
+        # Read files - CSV only
         def read_file(contents, filename):
-            if filename.endswith('.csv'):
-                return pd.read_csv(io.BytesIO(contents))
-            elif filename.endswith('.json'):
-                return pd.read_json(io.BytesIO(contents))
-            elif filename.endswith(('.xlsx', '.xls')):
-                return pd.read_excel(io.BytesIO(contents))
-            else:
-                raise ValueError(f"Unsupported file format: {filename}")
+            if not filename.endswith('.csv'):
+                 raise ValueError(f"Unsupported file format: {filename}. Only CSV is supported.")
+            return pl.read_csv(io.BytesIO(contents), ignore_errors=True)
         
-        baseline_df = read_file(baseline_contents, baseline_filename)
-        current_df = read_file(current_contents, current_filename)
+        try:
+            baseline_df = read_file(baseline_contents, baseline_filename)
+            current_df = read_file(current_contents, current_filename)
+        except Exception as e:
+             return {
+                "status": "error",
+                "agent_id": "drift-detector",
+                "error": f"Failed to parse CSV: {str(e)}",
+                "execution_time_ms": int((time.time() - start_time) * 1000)
+            }
         
         # Detect column-level drift
         field_drift_details = []
@@ -76,15 +78,16 @@ def detect_drift(
         common_cols = baseline_cols & current_cols
         
         for col in common_cols:
-            baseline_col = baseline_df[col].dropna()
-            current_col = current_df[col].dropna()
+            # Drop nulls for analysis
+            baseline_col = baseline_df[col].drop_nulls()
+            current_col = current_df[col].drop_nulls()
             
             # Skip if insufficient sample size
             if len(baseline_col) < min_sample_size or len(current_col) < min_sample_size:
                 continue
             
             # Get statistics
-            if baseline_col.dtype in ['int64', 'float64', 'int32', 'float32']:
+            if baseline_col.dtype in [pl.Float64, pl.Int64, pl.Float32, pl.Int32]:
                 # Numeric field drift detection
                 baseline_mean = float(baseline_col.mean())
                 baseline_median = float(baseline_col.median())
@@ -107,22 +110,26 @@ def detect_drift(
                 drift_score = 0
                 p_value = 1.0
                 
+                # Convert to numpy for scipy stats
+                baseline_np = baseline_col.to_numpy()
+                current_np = current_col.to_numpy()
+                
                 if statistical_test == "kolmogorov_smirnov":
-                    statistic, p_value = ks_2samp(baseline_col, current_col)
+                    statistic, p_value = ks_2samp(baseline_np, current_np)
                     drift_score = float(statistic)
                 elif statistical_test == "wasserstein":
-                    drift_score = float(wasserstein_distance(baseline_col, current_col))
+                    drift_score = float(wasserstein_distance(baseline_np, current_np))
                     p_value = 0.01 if drift_score > 0.3 else 0.99
                 
                 # Calculate PSI (Population Stability Index)
-                psi_score = _calculate_psi(baseline_col, current_col)
+                psi_score = _calculate_psi(baseline_np, current_np)
                 psi_scores.append(psi_score)
                 
                 # JS Divergence approximation
-                js_divergence = _calculate_js_divergence(baseline_col, current_col)
+                js_divergence = _calculate_js_divergence(baseline_np, current_np)
                 
                 # Wasserstein distance
-                wasserstein_dist = float(wasserstein_distance(baseline_col, current_col)) if len(baseline_col) > 0 and len(current_col) > 0 else 0
+                wasserstein_dist = float(wasserstein_distance(baseline_np, current_np)) if len(baseline_np) > 0 and len(current_np) > 0 else 0
                 
                 drift_detected = p_value < significance_level or psi_score > 0.1
                 severity = "high" if psi_score > 0.25 else "medium" if psi_score > 0.1 else "low"
@@ -177,8 +184,17 @@ def detect_drift(
                 })
             else:
                 # Categorical field drift detection
-                baseline_dist = baseline_col.value_counts(normalize=True)
-                current_dist = current_col.value_counts(normalize=True)
+                # Polars value_counts
+                baseline_counts = baseline_col.value_counts()
+                current_counts = current_col.value_counts()
+                
+                # Normalize
+                baseline_total = baseline_col.len()
+                current_total = current_col.len()
+                
+                # Convert to dict for PSI calculation
+                baseline_dist = {row[col]: row['count']/baseline_total for row in baseline_counts.to_dicts()}
+                current_dist = {row[col]: row['count']/current_total for row in current_counts.to_dicts()}
                 
                 # PSI for categorical
                 psi_score = _calculate_psi_categorical(baseline_dist, current_dist)
@@ -232,8 +248,8 @@ def detect_drift(
         row_level_issues = []
         
         for col in common_cols:
-            baseline_col = baseline_df[col].dropna()
-            current_col = current_df[col].dropna()
+            baseline_col = baseline_df[col].drop_nulls()
+            current_col = current_df[col].drop_nulls()
             
             # Skip if insufficient data
             if len(baseline_col) < min_sample_size or len(current_col) < min_sample_size:
@@ -245,7 +261,7 @@ def detect_drift(
                 continue
             
             # For numeric columns: identify rows with values outside baseline range
-            if baseline_col.dtype in ['int64', 'float64', 'int32', 'float32']:
+            if baseline_col.dtype in [pl.Float64, pl.Int64, pl.Float32, pl.Int32]:
                 baseline_mean = baseline_col.mean()
                 baseline_std = baseline_col.std()
                 baseline_min = baseline_col.quantile(0.05)  # 5th percentile
@@ -254,25 +270,28 @@ def detect_drift(
                 current_std = current_col.std()
                 
                 # Calculate z-scores based on baseline distribution
-                current_z_scores = (current_df[col] - baseline_mean) / (baseline_std + 1e-10)
+                # Polars expression
+                z_score_expr = (pl.col(col) - baseline_mean) / (baseline_std + 1e-10)
                 
                 # Issue 1: Values far outside baseline range (z-score > 2)
-                outlier_mask = (np.abs(current_z_scores) > 2) & (current_df[col].notna())
-                for row_idx in current_df[outlier_mask].index:
-                    row_value = current_df.loc[row_idx, col]
-                    z_score = (row_value - baseline_mean) / (baseline_std + 1e-10)
+                outlier_df = current_df.with_columns(z_score=z_score_expr).filter(
+                    (pl.col("z_score").abs() > 2) & (pl.col(col).is_not_null())
+                ).with_row_count("row_idx")
+                
+                # Limit to 50 per column to avoid explosion
+                for row in outlier_df.head(50).to_dicts():
                     row_level_issues.append({
-                        "row_index": int(row_idx),
+                        "row_index": int(row["row_idx"]),
                         "column": col,
                         "issue_type": "distribution_shift",
                         "severity": "warning",
-                        "message": f"Value {row_value} is outside baseline distribution range (z-score: {z_score:.2f}). Baseline mean: {baseline_mean:.2f}",
-                        "value": float(row_value),
+                        "message": f"Value {row[col]} is outside baseline distribution range (z-score: {row['z_score']:.2f}). Baseline mean: {baseline_mean:.2f}",
+                        "value": float(row[col]),
                         "bounds": {
                             "lower": float(baseline_min),
                             "upper": float(baseline_max)
                         },
-                        "z_score": float(z_score)
+                        "z_score": float(row['z_score'])
                     })
                 
                 # Issue 2: Values from shifted distribution (different mean/std)
@@ -281,32 +300,33 @@ def detect_drift(
                 if mean_shift_significant:
                     # Flag rows that align more with current distribution (far from baseline)
                     shift_threshold = baseline_mean + (1.5 * baseline_std)
-                    shifted_mask = (current_df[col] > shift_threshold) & (current_df[col].notna())
+                    shifted_df = current_df.filter(
+                        (pl.col(col) > shift_threshold) & (pl.col(col).is_not_null())
+                    ).with_row_count("row_idx")
                     
-                    for row_idx in current_df[shifted_mask].index:
-                        row_value = current_df.loc[row_idx, col]
+                    for row in shifted_df.head(50).to_dicts():
                         row_level_issues.append({
-                            "row_index": int(row_idx),
+                            "row_index": int(row["row_idx"]),
                             "column": col,
                             "issue_type": "value_range_change",
                             "severity": "info",
-                            "message": f"Value {row_value} consistent with shifted distribution (baseline mean: {baseline_mean:.2f}, current mean: {current_mean:.2f})",
-                            "value": float(row_value),
+                            "message": f"Value {row[col]} consistent with shifted distribution (baseline mean: {baseline_mean:.2f}, current mean: {current_mean:.2f})",
+                            "value": float(row[col]),
                             "baseline_mean": float(baseline_mean),
                             "current_mean": float(current_mean)
                         })
             else:
                 # For categorical columns: identify rows with values not in baseline
-                baseline_categories = set(baseline_col.unique())
-                current_categories = set(current_df[col].dropna().unique())
+                baseline_categories = set(baseline_col.unique().to_list())
+                current_categories = set(current_df[col].drop_nulls().unique().to_list())
                 new_categories = current_categories - baseline_categories
                 
                 if new_categories:
                     for category in new_categories:
-                        category_mask = (current_df[col] == category) & (current_df[col].notna())
-                        for row_idx in current_df[category_mask].index:
+                        category_df = current_df.filter(pl.col(col) == category).with_row_count("row_idx")
+                        for row in category_df.head(50).to_dicts():
                             row_level_issues.append({
-                                "row_index": int(row_idx),
+                                "row_index": int(row["row_idx"]),
                                 "column": col,
                                 "issue_type": "distribution_shift",
                                 "severity": "warning",
@@ -732,7 +752,6 @@ def detect_drift(
             "execution_time_ms": int((time.time() - start_time) * 1000)
         }
 
-
 def _calculate_psi(baseline, current, bins=10):
     """Calculate Population Stability Index"""
     def _psi_bin(baseline_bin, current_bin):
@@ -742,17 +761,23 @@ def _calculate_psi(baseline, current, bins=10):
             baseline_bin = 0.0001
         return (current_bin - baseline_bin) * np.log(current_bin / baseline_bin)
     
-    baseline_counts = pd.cut(baseline, bins=bins, duplicates='drop').value_counts(normalize=True).sort_index()
-    current_counts = pd.cut(current, bins=bins, duplicates='drop').value_counts(normalize=True).sort_index()
-    
-    psi = 0
-    for i in range(len(baseline_counts)):
-        baseline_bin = baseline_counts.iloc[i]
-        current_bin = current_counts.iloc[i] if i < len(current_counts) else 0
-        psi += _psi_bin(baseline_bin, current_bin)
-    
-    return abs(psi)
-
+    # Use numpy histogram
+    # Determine bin edges from baseline
+    try:
+        hist_baseline, bin_edges = np.histogram(baseline, bins=bins)
+        hist_current, _ = np.histogram(current, bins=bin_edges)
+        
+        # Normalize
+        baseline_counts = hist_baseline / len(baseline)
+        current_counts = hist_current / len(current)
+        
+        psi = 0
+        for i in range(len(baseline_counts)):
+            psi += _psi_bin(baseline_counts[i], current_counts[i])
+        
+        return abs(psi)
+    except:
+        return 0.0
 
 def _calculate_psi_categorical(baseline_dist, current_dist):
     """Calculate PSI for categorical distributions"""
@@ -764,7 +789,7 @@ def _calculate_psi_categorical(baseline_dist, current_dist):
         return (current_bin - baseline_bin) * np.log(current_bin / baseline_bin)
     
     psi = 0
-    all_categories = set(baseline_dist.index) | set(current_dist.index)
+    all_categories = set(baseline_dist.keys()) | set(current_dist.keys())
     
     for cat in all_categories:
         baseline_bin = baseline_dist.get(cat, 0)
@@ -773,11 +798,10 @@ def _calculate_psi_categorical(baseline_dist, current_dist):
     
     return abs(psi)
 
-
 def _calculate_js_divergence(baseline, current):
     """Calculate Jensen-Shannon divergence"""
     # Create bins for both distributions
-    all_data = pd.concat([baseline, current])
+    all_data = np.concatenate([baseline, current])
     
     if len(all_data) == 0:
         return 0.0

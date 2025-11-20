@@ -19,7 +19,11 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from api import router
+from auth.router import router as auth_router
+from db import models, database
 
+# Create database tables
+models.Base.metadata.create_all(bind=database.engine)
 
 # ============================================================================
 # INITIALIZE APP
@@ -84,6 +88,7 @@ if not TOOL_DEFINITIONS:
 
 # Include API routes
 app.include_router(router)
+app.include_router(auth_router)
 
 
 # ============================================================================

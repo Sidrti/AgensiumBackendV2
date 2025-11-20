@@ -2,15 +2,15 @@
 Readiness Rater Agent
 
 Rates data readiness for analysis based on quality metrics and component scoring.
-Input: CSV/JSON/XLSX file (primary)
+Input: CSV file (primary)
 Output: Uniform readiness rating structure matching API specification
 """
 
-import pandas as pd
+import polars as pl
 import io
 import time
+import numpy as np
 from typing import Dict, Any, Optional
-
 
 def rate_readiness(
     file_contents: bytes,
@@ -40,44 +40,83 @@ def rate_readiness(
     schema_health_weight = parameters.get("schema_health_weight", 0.4)
     
     try:
-        # Read file
-        if filename.endswith('.csv'):
-            df = pd.read_csv(io.BytesIO(file_contents))
-        elif filename.endswith('.json'):
-            df = pd.read_json(io.BytesIO(file_contents))
-        elif filename.endswith(('.xlsx', '.xls')):
-            df = pd.read_excel(io.BytesIO(file_contents))
-        else:
+        # Read file - CSV only
+        if not filename.lower().endswith('.csv'):
             return {
                 "status": "error",
-                "error": f"Unsupported file format: {filename}",
+                "error": f"Unsupported file format: {filename}. Only CSV files are supported.",
                 "execution_time_ms": int((time.time() - start_time) * 1000)
             }
+            
+        try:
+            df = pl.read_csv(io.BytesIO(file_contents), ignore_errors=True, infer_schema_length=10000)
+        except Exception as e:
+             return {
+                "status": "error",
+                "error": f"Failed to parse CSV: {str(e)}",
+                "execution_time_ms": int((time.time() - start_time) * 1000)
+            }
+
+        row_count = df.height
+        col_count = df.width
         
+        if row_count == 0 or col_count == 0:
+             return {
+                "status": "error",
+                "error": "Empty dataset",
+                "execution_time_ms": int((time.time() - start_time) * 1000)
+            }
+
         # Calculate completeness score
-        total_cells = len(df) * len(df.columns)
-        missing_cells = df.isna().sum().sum()
+        total_cells = row_count * col_count
+        # Calculate total nulls across all columns
+        # df.null_count() returns a 1-row DataFrame with null counts per column
+        # We sum these horizontally to get the total count
+        try:
+            missing_cells = df.select(pl.sum_horizontal(pl.all().null_count())).item()
+        except:
+            # Fallback
+            missing_cells = df.null_count().transpose().sum().item()
+            
         completeness_score = ((total_cells - missing_cells) / total_cells * 100) if total_cells > 0 else 0
         
         # Calculate consistency score
         # Check for data type consistency within columns
         consistency_issues = 0
-        for col in df.columns:
-            col_data = df[col].dropna()
-            if len(col_data) > 0:
-                # Check if numeric column has non-numeric values (simple check)
-                try:
-                    pd.to_numeric(col_data)
-                except:
-                    # Mixed types in numeric-looking column
-                    if any(c.isdigit() for c in str(col_data.iloc[0])):
-                        consistency_issues += 1
         
-        consistency_score = 100 - (consistency_issues / max(len(df.columns), 1) * 20)
+        # For consistency, we'll check if string columns look like numbers but weren't inferred as such
+        # Or if we have mixed types (Polars handles this by making it Utf8 or nulling out bad values if schema is enforced)
+        # Since we used ignore_errors=True, bad values might be null or the column might be Utf8.
+        
+        # Let's try to detect "numeric-looking" string columns that have non-numeric values
+        for col in df.columns:
+            if df[col].dtype == pl.Utf8:
+                # Check if it looks numeric (regex check on a sample or try cast)
+                # We'll try to cast to float. If success rate is high but not 100%, it might be inconsistent.
+                # But if it's 0% success, it's just a string column.
+                
+                non_null_count = df[col].drop_nulls().len()
+                if non_null_count > 0:
+                    # Try casting to float
+                    # Use replace_all for regex replacement in newer Polars versions
+                    # Or replace with literal=False if supported, but replace_all is safer for "remove all non-digits"
+                    numeric_cast = df[col].str.replace_all(r"[^\d\.-]", "").cast(pl.Float64, strict=False)
+                    numeric_count = numeric_cast.drop_nulls().len()
+                    
+                    # If it has some numbers but also some non-numbers (and it's not just a few, but not all)
+                    # Heuristic: if > 0% and < 100% are numeric, and the column isn't just IDs or something.
+                    # The original code checked: if any digit in first value, and pd.to_numeric fails.
+                    
+                    first_val = df[col].drop_nulls().head(1)[0]
+                    has_digit = any(c.isdigit() for c in str(first_val))
+                    
+                    if has_digit and numeric_count < non_null_count:
+                         consistency_issues += 1
+
+        consistency_score = 100 - (consistency_issues / max(col_count, 1) * 20)
         consistency_score = max(0, min(100, consistency_score))
         
         # Calculate schema health
-        # Check for missing column names, unexpected nulls, etc.
         schema_health = 100
         
         # Count problematic columns
@@ -85,28 +124,31 @@ def rate_readiness(
         unnamed_columns = 0
         inconsistent_columns = 0
         
+        null_counts = df.null_count()
+        
         for col in df.columns:
-            # Deduct for columns with all nulls (completely unusable)
-            if df[col].isna().all():
+            # Deduct for columns with all nulls
+            if null_counts[col][0] == row_count:
                 null_columns += 1
-                schema_health -= 15  # Significant deduction for unusable column
+                schema_health -= 15
             
             # Deduct for unnamed/auto-generated columns
             if str(col).startswith('Unnamed'):
                 unnamed_columns += 1
-                schema_health -= 8  # Moderate deduction for unnamed columns
+                schema_health -= 8
             
-            # Check for inconsistent data types within column
-            if df[col].dtype == 'object':
-                non_null = df[col].dropna().astype(str)
+            # Check for inconsistent data types within column (similar to consistency check above)
+            if df[col].dtype == pl.Utf8:
+                non_null = df[col].drop_nulls()
                 if len(non_null) > 0:
-                    # Try to detect mixed types (e.g., some numeric-looking, some text)
-                    numeric_like = non_null.str.match(r'^-?\d+\.?\d*$').sum()
-                    if 0 < numeric_like < len(non_null) * 0.3:
+                    # Try to detect mixed types
+                    # Using regex to match numeric-like strings
+                    numeric_like_count = non_null.str.contains(r"^-?\d+\.?\d*$").sum()
+                    
+                    if 0 < numeric_like_count < len(non_null) * 0.3:
                         inconsistent_columns += 1
-                        schema_health -= 5  # Minor deduction for mixed types
+                        schema_health -= 5
         
-        # Cap schema health at 0
         schema_health = max(0, min(100, schema_health))
         
         # Calculate weighted readiness score
@@ -131,13 +173,11 @@ def rate_readiness(
         # Find issues (deductions)
         deductions = []
         
-        # Check for missing values - calculate actual impact
+        # Check for missing values
         for col in df.columns:
-            missing_pct = (df[col].isna().sum() / len(df) * 100) if len(df) > 0 else 0
+            missing_pct = (null_counts[col][0] / row_count * 100) if row_count > 0 else 0
             if missing_pct > 10:
-                # Impact calculation: higher missing % = higher deduction
-                deduction_amount = min(missing_pct / 5, 25)  # Max 25 point deduction
-                
+                deduction_amount = min(missing_pct / 5, 25)
                 deductions.append({
                     "deduction_reason": "missing_values",
                     "fields_affected": [col],
@@ -146,51 +186,81 @@ def rate_readiness(
                     "remediation": "Impute missing values using domain knowledge, statistical methods, or remove records"
                 })
         
-        # Check for format inconsistencies (e.g., date formats)
+        # Check for format inconsistencies (date formats)
         date_patterns = ['date', 'time', 'created', 'updated', 'timestamp', 'datetime']
         for col in df.columns:
             col_lower = col.lower()
             if any(x in col_lower for x in date_patterns):
-                try:
-                    # Try to parse as datetime
-                    pd.to_datetime(df[col].dropna())
-                except:
-                    # Failed to parse all values as datetime
-                    unparseable_count = 0
-                    for val in df[col].dropna():
-                        try:
-                            pd.to_datetime(val)
-                        except:
-                            unparseable_count += 1
-                    
-                    unparseable_pct = (unparseable_count / len(df[col].dropna()) * 100) if len(df[col].dropna()) > 0 else 0
-                    
-                    if unparseable_pct > 0:
-                        deduction_amount = min(unparseable_pct / 10, 12)  # Max 12 point deduction
+                # Try to parse as datetime
+                if df[col].dtype != pl.Date and df[col].dtype != pl.Datetime:
+                    # It's likely a string or mixed
+                    try:
+                        # Try strict casting first
+                        df.select(pl.col(col).str.to_datetime(strict=True))
+                    except:
+                        # Failed strict parsing
+                        # Count unparseable
+                        # We can try to cast with strict=False and count nulls that weren't null before
                         
-                        deductions.append({
-                            "deduction_reason": "format_inconsistency",
-                            "fields_affected": [col],
-                            "deduction_amount": round(deduction_amount, 2),
-                            "severity": "high" if unparseable_pct > 25 else "medium" if unparseable_pct > 10 else "low",
-                            "remediation": f"Standardize date/time format. {unparseable_pct:.1f}% of values have inconsistent format"
-                        })
+                        # Note: str.to_datetime requires a format or it tries to infer. 
+                        # Polars doesn't have a generic "guess format" like pandas to_datetime without arguments for mixed formats easily.
+                        # We'll use a heuristic: try to cast to datetime, count nulls.
+                        
+                        # If it's already string, we can try `str.to_datetime` with strict=False.
+                        # If it fails, it returns null.
+                        
+                        # However, Polars `str.to_datetime` usually needs a format string if it's not standard.
+                        # Let's assume standard ISO or common formats.
+                        
+                        # A better approach for "inconsistency" is checking if we can parse SOME but not ALL.
+                        
+                        non_null_original = df[col].drop_nulls()
+                        if len(non_null_original) > 0:
+                            # Try a few common formats
+                            formats = ["%Y-%m-%d", "%Y-%m-%d %H:%M:%S", "%m/%d/%Y", "%d/%m/%Y"]
+                            best_match_count = 0
+                            
+                            # This is expensive to try all, let's just try a generic cast if possible or check for mixed patterns
+                            # For simplicity and speed, we'll check if it's Utf8 and has mixed patterns
+                            
+                            if df[col].dtype == pl.Utf8:
+                                # Check if we can cast to datetime
+                                parsed = df[col].str.to_datetime(strict=False)
+                                parsed_count = parsed.drop_nulls().len()
+                                
+                                unparseable_count = len(non_null_original) - parsed_count
+                                unparseable_pct = (unparseable_count / len(non_null_original) * 100)
+                                
+                                if unparseable_pct > 0:
+                                    deduction_amount = min(unparseable_pct / 10, 12)
+                                    deductions.append({
+                                        "deduction_reason": "format_inconsistency",
+                                        "fields_affected": [col],
+                                        "deduction_amount": round(deduction_amount, 2),
+                                        "severity": "high" if unparseable_pct > 25 else "medium" if unparseable_pct > 10 else "low",
+                                        "remediation": f"Standardize date/time format. {unparseable_pct:.1f}% of values have inconsistent format"
+                                    })
+
+        # Check for outliers
+        numeric_cols = [col for col in df.columns if df[col].dtype in [pl.Int8, pl.Int16, pl.Int32, pl.Int64, pl.Float32, pl.Float64]]
         
-        # Check for outliers (data quality indicator)
-        for col in df.columns:
-            if df[col].dtype in ['int64', 'float64']:
-                col_data = df[col].dropna()
-                if len(col_data) > 0:
-                    Q1 = col_data.quantile(0.25)
-                    Q3 = col_data.quantile(0.75)
-                    IQR = Q3 - Q1
+        for col in numeric_cols:
+            col_data = df[col].drop_nulls()
+            if len(col_data) > 0:
+                q1 = col_data.quantile(0.25)
+                q3 = col_data.quantile(0.75)
+                iqr = q3 - q1
+                
+                if iqr > 0:
+                    lower_bound = q1 - 1.5 * iqr
+                    upper_bound = q3 + 1.5 * iqr
                     
-                    outliers = col_data[(col_data < (Q1 - 1.5 * IQR)) | (col_data > (Q3 + 1.5 * IQR))]
-                    outlier_pct = (len(outliers) / len(col_data) * 100) if len(col_data) > 0 else 0
+                    # Use Series comparison directly instead of pl.col() expression on Series
+                    outlier_count = ((col_data < lower_bound) | (col_data > upper_bound)).sum()
+                    outlier_pct = (outlier_count / len(col_data) * 100)
                     
                     if outlier_pct > 5:
-                        deduction_amount = min(outlier_pct / 20, 8)  # Max 8 point deduction
-                        
+                        deduction_amount = min(outlier_pct / 20, 8)
                         deductions.append({
                             "deduction_reason": "potential_outliers",
                             "fields_affected": [col],
@@ -198,14 +268,13 @@ def rate_readiness(
                             "severity": "medium" if outlier_pct > 15 else "low",
                             "remediation": f"Review {outlier_pct:.1f}% of values as potential outliers. Validate or clean as needed"
                         })
-        
+
         # Check for duplicate rows
-        duplicate_count = len(df[df.duplicated()])
-        duplicate_pct = (duplicate_count / len(df) * 100) if len(df) > 0 else 0
+        duplicate_count = df.is_duplicated().sum()
+        duplicate_pct = (duplicate_count / row_count * 100) if row_count > 0 else 0
         
         if duplicate_pct > 0:
-            deduction_amount = min(duplicate_pct / 10, 15)  # Max 15 point deduction
-            
+            deduction_amount = min(duplicate_pct / 10, 15)
             deductions.append({
                 "deduction_reason": "duplicate_rows",
                 "fields_affected": [],
@@ -213,7 +282,7 @@ def rate_readiness(
                 "severity": "high" if duplicate_pct > 10 else "medium" if duplicate_pct > 5 else "low",
                 "remediation": f"{duplicate_count} duplicate rows ({duplicate_pct:.1f}%) detected. Remove or consolidate duplicates"
             })
-        
+            
         # Component scores
         component_scores = [
             {
@@ -270,7 +339,7 @@ def rate_readiness(
                 "affected_fields_count": 0,
                 "recommendation": "Dataset meets quality standards. Proceed with analysis."
             })
-        
+            
         # Completeness alerts
         if completeness_score < 60:
             alerts.append({
@@ -278,7 +347,7 @@ def rate_readiness(
                 "severity": "critical",
                 "category": "data_completeness",
                 "message": f"LOW COMPLETENESS SCORE: {completeness_score:.1f}/100 - Dataset has excessive missing data",
-                "affected_fields_count": len([f for f in df.columns if (df[f].isna().sum() / len(df) * 100) > 10]),
+                "affected_fields_count": len([f for f in df.columns if (null_counts[f][0] / row_count * 100) > 10]),
                 "recommendation": "Implement imputation strategy or remove incomplete records. Consider data source quality."
             })
         elif completeness_score < 80:
@@ -287,10 +356,10 @@ def rate_readiness(
                 "severity": "high",
                 "category": "data_completeness",
                 "message": f"MODERATE COMPLETENESS ISSUES: {completeness_score:.1f}/100 - Some columns have significant missing data",
-                "affected_fields_count": len([f for f in df.columns if (df[f].isna().sum() / len(df) * 100) > 10]),
+                "affected_fields_count": len([f for f in df.columns if (null_counts[f][0] / row_count * 100) > 10]),
                 "recommendation": "Investigate missing value patterns and apply targeted remediation."
             })
-        
+            
         # Consistency alerts
         if consistency_score < 70:
             alerts.append({
@@ -301,7 +370,7 @@ def rate_readiness(
                 "affected_fields_count": consistency_issues,
                 "recommendation": "Standardize data types and formats. Validate type casting rules."
             })
-        
+            
         # Schema health alerts
         if schema_health < 60:
             alerts.append({
@@ -321,7 +390,7 @@ def rate_readiness(
                 "affected_fields_count": null_columns + unnamed_columns,
                 "recommendation": "Review and fix schema issues: unnamed columns, empty columns, or type inconsistencies."
             })
-        
+            
         # Duplicate rows alerts
         if duplicate_pct > 20:
             alerts.append({
@@ -341,18 +410,18 @@ def rate_readiness(
                 "affected_fields_count": duplicate_count,
                 "recommendation": "Remove duplicate rows to ensure data integrity and prevent bias in analysis."
             })
-        
+            
         # Insufficient sample size alert
-        if len(df) < 100:
+        if row_count < 100:
             alerts.append({
                 "alert_id": "alert_readiness_sample_size",
                 "severity": "medium",
                 "category": "data_volume",
-                "message": f"INSUFFICIENT SAMPLE SIZE: Only {len(df)} records (< 100 recommended)",
+                "message": f"INSUFFICIENT SAMPLE SIZE: Only {row_count} records (< 100 recommended)",
                 "affected_fields_count": 0,
                 "recommendation": "Gather more data. Statistical analysis and ML models perform better with larger datasets."
             })
-        
+            
         # Format inconsistency alerts
         format_issues = len([d for d in deductions if d.get('deduction_reason') == 'format_inconsistency'])
         if format_issues > 0:
@@ -364,7 +433,7 @@ def rate_readiness(
                 "affected_fields_count": format_issues,
                 "recommendation": "Standardize date, time, and other format-specific fields using consistent parsing rules."
             })
-        
+            
         # Outlier detection alert
         outlier_issues = len([d for d in deductions if d.get('deduction_reason') == 'potential_outliers'])
         if outlier_issues > 0:
@@ -376,7 +445,7 @@ def rate_readiness(
                 "affected_fields_count": outlier_issues,
                 "recommendation": "Review and validate outlier values. Determine if they are errors or legitimate extreme values."
             })
-        
+            
         # ==================== GENERATE ISSUES ====================
         issues = []
         
@@ -412,13 +481,13 @@ def rate_readiness(
                     "message": deduction.get("remediation", f"Field '{field}' has {issue_type.replace('_', ' ')} issues")
                 })
                 issue_count += 1
-        
+                
         # Add schema-related issues
         if null_columns > 0:
             for col in df.columns:
                 if issue_count >= 100:
                     break
-                if df[col].isna().all():
+                if null_counts[col][0] == row_count:
                     issues.append({
                         "issue_id": f"issue_readiness_{len(issues)}_{col}_null",
                         "agent_id": "readiness-rater",
@@ -428,7 +497,7 @@ def rate_readiness(
                         "message": f"Column '{col}' is completely empty (100% null) and should be removed"
                     })
                     issue_count += 1
-        
+                    
         if unnamed_columns > 0:
             for col in df.columns:
                 if issue_count >= 100:
@@ -443,22 +512,19 @@ def rate_readiness(
                         "message": f"Column '{col}' is unnamed or auto-generated. Provide meaningful column name for clarity."
                     })
                     issue_count += 1
-        
+                    
         # Add consistency issues
         for col in df.columns:
             if issue_count >= 100:
                 break
             col_lower = col.lower()
             if any(x in col_lower for x in ['date', 'time', 'created', 'updated', 'timestamp', 'datetime']):
-                try:
-                    pd.to_datetime(df[col].dropna())
-                except:
-                    unparseable_count = 0
-                    for val in df[col].dropna():
-                        try:
-                            pd.to_datetime(val)
-                        except:
-                            unparseable_count += 1
+                if df[col].dtype == pl.Utf8:
+                    parsed = df[col].str.to_datetime(strict=False)
+                    parsed_count = parsed.drop_nulls().len()
+                    non_null_count = df[col].drop_nulls().len()
+                    
+                    unparseable_count = non_null_count - parsed_count
                     
                     if unparseable_count > 0:
                         issues.append({
@@ -466,14 +532,20 @@ def rate_readiness(
                             "agent_id": "readiness-rater",
                             "field_name": col,
                             "issue_type": "invalid_format",
-                            "severity": "high" if unparseable_count > len(df[col].dropna()) * 0.25 else "medium",
+                            "severity": "high" if unparseable_count > non_null_count * 0.25 else "medium",
                             "message": f"Column '{col}' has {unparseable_count} inconsistent date/time formats"
                         })
                         issue_count += 1
-        
+                        
         # Add duplicate record issues (sample)
         if duplicate_count > 0 and issue_count < 100:
-            dup_indices = df[df.duplicated(keep=False)].index[:min(10, len(df[df.duplicated(keep=False)]))]
+            # Finding duplicate indices in Polars is a bit different.
+            # We can use is_duplicated() to get a boolean mask
+            dup_mask = df.is_duplicated()
+            # Get indices where true
+            # Polars doesn't have a direct index like pandas, we can use with_row_count
+            dup_indices = df.with_row_count("row_nr").filter(dup_mask).head(10)["row_nr"].to_list()
+            
             for idx in dup_indices:
                 if issue_count >= 100:
                     break
@@ -486,11 +558,11 @@ def rate_readiness(
                     "message": f"Row {idx} is a duplicate of another record. Remove or consolidate before analysis."
                 })
                 issue_count += 1
-        
+                
         # ==================== GENERATE RECOMMENDATIONS ====================
         recommendations = []
         
-        # Overall readiness recommendation (critical priority)
+        # Overall readiness recommendation
         if status == "not_ready":
             recommendations.append({
                 "recommendation_id": "rec_readiness_001_overall_critical",
@@ -518,10 +590,10 @@ def rate_readiness(
                 "recommendation": f"Dataset is PRODUCTION-READY (score: {readiness_score:.1f}/100). Proceed with analysis and ML workflows. Continue monitoring data quality through regular profiling cycles.",
                 "timeline": "1 month"
             })
-        
+            
         # Completeness-specific recommendation
         if completeness_score < 95:
-            high_null_fields = [f for f in df.columns if (df[f].isna().sum() / len(df) * 100) > 10]
+            high_null_fields = [f for f in df.columns if (null_counts[f][0] / row_count * 100) > 10]
             field_count = len(high_null_fields)
             
             recommendations.append({
@@ -532,7 +604,7 @@ def rate_readiness(
                 "recommendation": f"Improve COMPLETENESS (current: {completeness_score:.1f}/100): {field_count} field(s) have >10% missing values. Implement missing value handling strategy: (1) Remove rows with critical nulls, (2) Impute using domain knowledge or statistical methods, or (3) Drop columns if >50% null.",
                 "timeline": "immediate" if completeness_score < 60 else "1-2 weeks"
             })
-        
+            
         # Consistency-specific recommendation
         if consistency_score < 95:
             recommendations.append({
@@ -543,7 +615,7 @@ def rate_readiness(
                 "recommendation": f"Improve DATA CONSISTENCY (current: {consistency_score:.1f}/100): Standardize data types and formats across fields. Use type validation rules, enforce schema constraints, and test type conversions before production. Ensure numeric fields contain only valid numbers, date fields follow ISO 8601 format, and categorical fields have defined allowed values.",
                 "timeline": "1-2 weeks"
             })
-        
+            
         # Schema health-specific recommendation
         if schema_health < 95:
             recommendations.append({
@@ -554,7 +626,7 @@ def rate_readiness(
                 "recommendation": f"Improve SCHEMA HEALTH (current: {schema_health:.1f}/100): (1) Rename {unnamed_columns} auto-generated column name(s) to meaningful names; (2) Remove {null_columns} completely empty columns; (3) Fix {inconsistent_columns} column(s) with mixed data types by applying consistent parsing and validation rules.",
                 "timeline": "1 week"
             })
-        
+            
         # Duplicate handling recommendation
         if duplicate_count > 0:
             recommendations.append({
@@ -565,9 +637,8 @@ def rate_readiness(
                 "recommendation": f"Remove/consolidate DUPLICATE RECORDS: {duplicate_count} rows ({duplicate_pct:.1f}%) are duplicates. Investigate source of duplicates (data loading, ETL errors, or legitimate records). Apply deduplication strategy: exact match removal, fuzzy matching, or business rule-based consolidation. This is critical as duplicates skew analysis and bias ML models.",
                 "timeline": "1 week"
             })
-        
+            
         # Format standardization recommendation
-        format_issues = len([d for d in deductions if d.get('deduction_reason') == 'format_inconsistency'])
         if format_issues > 0:
             recommendations.append({
                 "recommendation_id": "rec_readiness_formats",
@@ -577,9 +648,8 @@ def rate_readiness(
                 "recommendation": f"Standardize FIELD FORMATS: {format_issues} field(s) have inconsistent formats. For date/time fields, enforce single format (e.g., YYYY-MM-DD HH:MM:SS). Use validation rules and data transformation pipelines to ensure all values conform to expected format before storing.",
                 "timeline": "1 week"
             })
-        
+            
         # Outlier handling recommendation
-        outlier_issues = len([d for d in deductions if d.get('deduction_reason') == 'potential_outliers'])
         if outlier_issues > 0:
             recommendations.append({
                 "recommendation_id": "rec_readiness_outliers",
@@ -589,24 +659,24 @@ def rate_readiness(
                 "recommendation": f"Review and validate OUTLIERS: {outlier_issues} numeric field(s) contain potential outliers (beyond 1.5*IQR). Determine if outliers are errors or legitimate extreme values. Action: (1) Investigate root cause, (2) Fix errors if data quality issues, (3) Keep and flag if legitimate, or (4) Apply appropriate outlier treatment (capping, transformation, removal).",
                 "timeline": "2-3 weeks"
             })
-        
+            
         # Sample size recommendation
-        if len(df) < 100:
+        if row_count < 100:
             recommendations.append({
                 "recommendation_id": "rec_readiness_sample_size",
                 "agent_id": "readiness-rater",
                 "field_name": "entire dataset",
                 "priority": "medium",
-                "recommendation": f"Increase SAMPLE SIZE: Current dataset has only {len(df)} records. Recommended minimum is 100-1000 records depending on use case. Larger samples improve statistical reliability and ML model performance. Consider combining data sources or extending collection period to gather more data.",
+                "recommendation": f"Increase SAMPLE SIZE: Current dataset has only {row_count} records. Recommended minimum is 100-1000 records depending on use case. Larger samples improve statistical reliability and ML model performance. Consider combining data sources or extending collection period to gather more data.",
                 "timeline": "2-4 weeks"
             })
-        
+            
         # Top deductions as recommendations
         if status != "ready" and len(deductions) > 0:
             sorted_deductions = sorted(deductions, key=lambda x: x.get("deduction_amount", 0), reverse=True)[:2]
             
             for idx, deduction in enumerate(sorted_deductions):
-                if idx >= 2:  # Limit to top 2
+                if idx >= 2:
                     break
                 
                 deduction_reason = deduction.get('deduction_reason', '').replace('_', ' ').title()
@@ -622,7 +692,7 @@ def rate_readiness(
                     "recommendation": f"{deduction_reason} ({deduction_amount:.1f} point impact): {deduction.get('remediation', 'Remediation details available in data assessment')}",
                     "timeline": "1-2 weeks" if deduction.get("severity") in ["critical", "high"] else "2-3 weeks"
                 })
-        
+                
         # ==================== GENERATE EXECUTIVE SUMMARY ====================
         executive_summary = []
         
@@ -660,120 +730,147 @@ def rate_readiness(
         # ==================== GENERATE ROW-LEVEL-ISSUES ====================
         row_level_issues = []
         
-        # Extract row-level issues from identified problems
-        
         # 1. Add issues for rows with high null percentages
-        for idx in df.index:
-            row_null_count = df.loc[idx].isna().sum()
-            row_null_pct = (row_null_count / len(df.columns) * 100) if len(df.columns) > 0 else 0
+        # Polars efficient way: calculate null count per row
+        # null_count(axis=1) is not supported in Polars, use sum_horizontal(is_null())
+        null_counts_per_row = df.select(pl.sum_horizontal(pl.all().is_null())).to_series()
+        
+        # Filter rows where null % > 30
+        # We need indices.
+        
+        # Create a temporary dataframe with row index and null count
+        df_with_idx = df.with_row_count("row_nr")
+        
+        # Calculate null percentage
+        # Note: null_count(axis=1) returns a Series
+        null_pcts = (null_counts_per_row / col_count * 100)
+        
+        # Filter indices
+        high_null_indices = df_with_idx.filter(null_pcts > 30).select("row_nr").to_series().to_list()
+        
+        for idx in high_null_indices[:100]: # Limit to 100
+            row_null_count = null_counts_per_row[idx]
+            row_null_pct = null_pcts[idx]
             
-            if row_null_pct > 30:
-                row_level_issues.append({
-                    "row_index": int(idx),
-                    "column": "global",
-                    "issue_type": "readiness_low",
-                    "severity": "critical" if row_null_pct > 50 else "warning",
-                    "message": f"Row {idx} has {row_null_pct:.1f}% null values ({int(row_null_count)} of {len(df.columns)} columns) - exceeds 30% threshold",
-                    "value": None,
-                    "null_percentage": round(row_null_pct, 2)
-                })
-        
-        # 2. Add issues for rows with outlier values
-        for col in df.columns:
-            if df[col].dtype in ['int64', 'float64']:
-                col_data = df[col].dropna()
-                if len(col_data) > 0:
-                    Q1 = col_data.quantile(0.25)
-                    Q3 = col_data.quantile(0.75)
-                    IQR = Q3 - Q1
-                    
-                    if IQR > 0:
-                        lower_bound = Q1 - 1.5 * IQR
-                        upper_bound = Q3 + 1.5 * IQR
-                        
-                        outlier_mask = (df[col] < lower_bound) | (df[col] > upper_bound)
-                        outlier_indices = df[outlier_mask].index.tolist()
-                        
-                        for idx in outlier_indices[:100]:
-                            row_level_issues.append({
-                                "row_index": int(idx),
-                                "column": col,
-                                "issue_type": "validation_failed",
-                                "severity": "warning",
-                                "message": f"Row {idx} has outlier value in '{col}': {df.loc[idx, col]}",
-                                "value": float(df.loc[idx, col]),
-                                "bounds": {
-                                    "lower": float(lower_bound),
-                                    "upper": float(upper_bound)
-                                }
-                            })
-        
-        # 3. Add issues for duplicate rows
-        dup_mask = df.duplicated(keep=False)
-        dup_indices = df[dup_mask].index.tolist()
-        
-        for idx in dup_indices[:100]:
             row_level_issues.append({
                 "row_index": int(idx),
                 "column": "global",
-                "issue_type": "quality_gate_failed",
-                "severity": "high",
-                "message": f"Row {idx} is a duplicate record - affects data integrity and analysis results",
-                "value": None
+                "issue_type": "readiness_low",
+                "severity": "critical" if row_null_pct > 50 else "warning",
+                "message": f"Row {idx} has {row_null_pct:.1f}% null values ({int(row_null_count)} of {col_count} columns) - exceeds 30% threshold",
+                "value": None,
+                "null_percentage": round(row_null_pct, 2)
             })
-        
+            
+        # 2. Add issues for rows with outlier values
+        for col in numeric_cols:
+            col_data = df[col].drop_nulls()
+            if len(col_data) > 0:
+                q1 = col_data.quantile(0.25)
+                q3 = col_data.quantile(0.75)
+                iqr = q3 - q1
+                
+                if iqr > 0:
+                    lower_bound = q1 - 1.5 * iqr
+                    upper_bound = q3 + 1.5 * iqr
+                    
+                    # Get indices of outliers
+                    outlier_rows = df_with_idx.filter((pl.col(col) < lower_bound) | (pl.col(col) > upper_bound)).select(["row_nr", col]).head(100)
+                    
+                    for row in outlier_rows.iter_rows(named=True):
+                        idx = row["row_nr"]
+                        val = row[col]
+                        
+                        row_level_issues.append({
+                            "row_index": int(idx),
+                            "column": col,
+                            "issue_type": "validation_failed",
+                            "severity": "warning",
+                            "message": f"Row {idx} has outlier value in '{col}': {val}",
+                            "value": float(val) if val is not None else None,
+                            "bounds": {
+                                "lower": float(lower_bound),
+                                "upper": float(upper_bound)
+                            }
+                        })
+                        
+        # 3. Add issues for duplicate rows
+        if duplicate_count > 0:
+            dup_rows = df_with_idx.filter(df.is_duplicated()).head(100)
+            for row in dup_rows.iter_rows(named=True):
+                idx = row["row_nr"]
+                row_level_issues.append({
+                    "row_index": int(idx),
+                    "column": "global",
+                    "issue_type": "quality_gate_failed",
+                    "severity": "high",
+                    "message": f"Row {idx} is a duplicate record - affects data integrity and analysis results",
+                    "value": None
+                })
+                
         # 4. Add issues for rows with format inconsistencies
-        date_patterns = ['date', 'time', 'created', 'updated', 'timestamp', 'datetime']
         for col in df.columns:
             col_lower = col.lower()
             if any(x in col_lower for x in date_patterns):
-                for idx in df.index:
-                    try:
-                        pd.to_datetime(df.loc[idx, col])
-                    except:
-                        if pd.notna(df.loc[idx, col]):
-                            row_level_issues.append({
-                                "row_index": int(idx),
-                                "column": col,
-                                "issue_type": "validation_failed",
-                                "severity": "warning",
-                                "message": f"Row {idx} has invalid date/time format in '{col}': {df.loc[idx, col]}",
-                                "value": str(df.loc[idx, col])
-                            })
-                            
-                            if len(row_level_issues) >= 1000:
-                                break
-            
+                if df[col].dtype == pl.Utf8:
+                    # Find rows where date parsing fails
+                    # We can use str.to_datetime(strict=False) and check for nulls where original was not null
+                    
+                    # Filter rows where original is not null AND parsed is null
+                    bad_format_rows = df_with_idx.filter(
+                        pl.col(col).is_not_null() & 
+                        pl.col(col).str.to_datetime(strict=False).is_null()
+                    ).head(100)
+                    
+                    for row in bad_format_rows.iter_rows(named=True):
+                        idx = row["row_nr"]
+                        val = row[col]
+                        
+                        row_level_issues.append({
+                            "row_index": int(idx),
+                            "column": col,
+                            "issue_type": "validation_failed",
+                            "severity": "warning",
+                            "message": f"Row {idx} has invalid date/time format in '{col}': {val}",
+                            "value": str(val)
+                        })
+                        
+                        if len(row_level_issues) >= 1000:
+                            break
             if len(row_level_issues) >= 1000:
                 break
-        
+                
         # 5. Add issues for rows with type mismatches in numeric columns
+        # Check string columns that look like they should be numeric (based on name)
         for col in df.columns:
-            if df[col].dtype == 'object':
-                for idx in df.index:
-                    val = df.loc[idx, col]
-                    if pd.notna(val):
-                        try:
-                            float(val)
-                        except (ValueError, TypeError):
-                            # Check if this is supposed to be numeric based on column name
-                            col_lower = col.lower()
-                            if any(x in col_lower for x in ['price', 'amount', 'quantity', 'count', 'value', 'rate', 'score', 'id']):
-                                row_level_issues.append({
-                                    "row_index": int(idx),
-                                    "column": col,
-                                    "issue_type": "validation_failed",
-                                    "severity": "medium",
-                                    "message": f"Row {idx} has non-numeric value in numeric column '{col}': {val}",
-                                    "value": str(val)
-                                })
-                                
-                                if len(row_level_issues) >= 1000:
-                                    break
-            
+            if df[col].dtype == pl.Utf8:
+                col_lower = col.lower()
+                if any(x in col_lower for x in ['price', 'amount', 'quantity', 'count', 'value', 'rate', 'score', 'id']):
+                    # Check for non-numeric values
+                    # Filter rows where casting to float fails (is null) but original is not null
+                    bad_type_rows = df_with_idx.filter(
+                        pl.col(col).is_not_null() &
+                        pl.col(col).cast(pl.Float64, strict=False).is_null()
+                    ).head(100)
+                    
+                    for row in bad_type_rows.iter_rows(named=True):
+                        idx = row["row_nr"]
+                        val = row[col]
+                        
+                        row_level_issues.append({
+                            "row_index": int(idx),
+                            "column": col,
+                            "issue_type": "validation_failed",
+                            "severity": "medium",
+                            "message": f"Row {idx} has non-numeric value in numeric column '{col}': {val}",
+                            "value": str(val)
+                        })
+                        
+                        if len(row_level_issues) >= 1000:
+                            break
             if len(row_level_issues) >= 1000:
                 break
-        
+                
         # Cap at 1000 issues
         row_level_issues = row_level_issues[:1000]
         
@@ -800,7 +897,7 @@ def rate_readiness(
             
             if severity in issue_summary["by_severity"]:
                 issue_summary["by_severity"][severity] += 1
-        
+                
         return {
             "status": "success",
             "agent_id": "readiness-rater",
@@ -838,7 +935,7 @@ def rate_readiness(
             "row_level_issues": row_level_issues,
             "issue_summary": issue_summary
         }
-    
+        
     except Exception as e:
         return {
             "status": "error",

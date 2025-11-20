@@ -120,7 +120,7 @@
       "id": "drift-detector",
       "name": "Drift Detector",
       "description": "Detects changes (drift) between baseline and current datasets. Identifies statistical shifts, distribution changes, and anomalies using multiple statistical tests.",
-      "icon": "📊",
+      "icon": "�",
       "category": "Comparison",
       "accuracy": "97%",
       "features": [
@@ -270,7 +270,7 @@
       "id": "governance-checker",
       "name": "Governance Checker",
       "description": "Validates data governance compliance including lineage, consent, and classification requirements. Ensures data meets governance standards and compliance frameworks.",
-      "icon": "📋",
+      "icon": "🏛️",
       "category": "Governance",
       "accuracy": "95%",
       "features": [
@@ -452,7 +452,7 @@
       "id": "readiness-rater",
       "name": "Readiness Rater",
       "description": "Rates data readiness for analysis based on quality metrics. Evaluates completeness, consistency, and schema health to determine if data is production-ready.",
-      "icon": "✅",
+      "icon": "🚦",
       "category": "Quality Assessment",
       "accuracy": "98%",
       "features": [

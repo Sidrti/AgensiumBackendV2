@@ -3,18 +3,16 @@ Outlier Remover Agent
 
 Detects and handles outliers in numeric data.
 Uses configurable detection methods (Z-score, IQR, Percentile) and removal/imputation strategies.
-Input: CSV/JSON/XLSX file (primary)
+Input: CSV file (primary)
 Output: Standardized outlier handling results with cleaning effectiveness scores
 """
 
-import pandas as pd
+import polars as pl
 import numpy as np
 import io
 import time
 import base64
 from typing import Dict, Any, Optional, List
-from scipy import stats
-
 
 def execute_outlier_remover(
     file_contents: bytes,
@@ -50,23 +48,27 @@ def execute_outlier_remover(
     good_threshold = parameters.get("good_threshold", 75)
 
     try:
-        # Read file based on format
-        if filename.endswith('.csv'):
-            df = pd.read_csv(io.BytesIO(file_contents), on_bad_lines='skip')
-        elif filename.endswith('.json'):
-            df = pd.read_json(io.BytesIO(file_contents))
-        elif filename.endswith(('.xlsx', '.xls')):
-            df = pd.read_excel(io.BytesIO(file_contents))
-        else:
-            return {
+        # Read file based on format - CSV ONLY
+        if not filename.endswith('.csv'):
+             return {
                 "status": "error",
                 "agent_id": "outlier-remover",
-                "error": f"Unsupported file format: {filename}",
+                "error": f"Unsupported file format: {filename}. Only CSV is supported.",
+                "execution_time_ms": int((time.time() - start_time) * 1000)
+            }
+
+        try:
+            df = pl.read_csv(io.BytesIO(file_contents), ignore_errors=True)
+        except Exception as e:
+             return {
+                "status": "error",
+                "agent_id": "outlier-remover",
+                "error": f"Failed to parse CSV: {str(e)}",
                 "execution_time_ms": int((time.time() - start_time) * 1000)
             }
 
         # Validate data
-        if df.empty:
+        if df.height == 0:
             return {
                 "status": "error",
                 "agent_id": "outlier-remover",
@@ -75,8 +77,9 @@ def execute_outlier_remover(
                 "execution_time_ms": int((time.time() - start_time) * 1000)
             }
 
-        # Store original data for comparison
-        original_df = df.copy()
+        # Add row index for tracking
+        df = df.with_row_index("row_index")
+        original_df = df.clone()
         
         # Analyze outliers
         outlier_analysis = _analyze_outliers(df, {
@@ -152,6 +155,7 @@ def execute_outlier_remover(
         
         # Calculate cleaning effectiveness
         total_outliers = sum(col_data["outlier_count"] for col_data in outlier_analysis["outlier_summary"].values())
+        
         cleaning_score = _calculate_cleaning_score(original_df, df_cleaned, total_outliers, {
             "outlier_reduction_weight": outlier_reduction_weight,
             "data_retention_weight": data_retention_weight,
@@ -174,7 +178,7 @@ def execute_outlier_remover(
             "quality_status": quality_status,
             "outlier_analysis": outlier_analysis,
             "removal_log": removal_log,
-            "summary": f"Outlier removal completed. Quality: {quality_status}. Processed {len(original_df)} rows, handled {total_outliers} outliers.",
+            "summary": f"Outlier removal completed. Quality: {quality_status}. Processed {original_df.height} rows, handled {total_outliers} outliers.",
             "row_level_issues": outlier_issues[:100],  # Limit to first 100
             "overrides": {
                 "detection_method": detection_method,
@@ -216,13 +220,11 @@ def execute_outlier_remover(
         
         ai_analysis_text = "\n".join(ai_analysis_parts)
         
-        
-        
         # ==================== GENERATE ALERTS ====================
         alerts = []
         
         # High outlier volume alert
-        outlier_pct = (total_outliers / (len(original_df) * len(numeric_cols)) * 100) if len(numeric_cols) > 0 else 0
+        outlier_pct = (total_outliers / (original_df.height * len(numeric_cols)) * 100) if len(numeric_cols) > 0 and original_df.height > 0 else 0
         if outlier_pct > 20:
             alerts.append({
                 "alert_id": "alert_outliers_high_volume",
@@ -262,7 +264,7 @@ def execute_outlier_remover(
                 "severity": "high",
                 "category": "data_retention",
                 "message": f"Data retention: {cleaning_score['metrics']['data_retention_rate']:.1f}% rows retained (below 90% threshold)",
-                "affected_fields_count": len(original_df) - len(df_cleaned),
+                "affected_fields_count": original_df.height - df_cleaned.height,
                 "recommendation": "Review outlier removal strategy to minimize data loss. Consider outlier imputation instead of removal."
             })
         
@@ -292,7 +294,12 @@ def execute_outlier_remover(
                 })
         
         # Distribution skewness alert
-        skewed_columns = [col for col in numeric_cols if abs(original_df[col].dropna().skew()) > 2 if len(original_df[col].dropna()) > 0]
+        skewed_columns = []
+        for col in numeric_cols:
+             skew_val = original_df.select(pl.col(col).skew()).item()
+             if skew_val is not None and abs(skew_val) > 2:
+                 skewed_columns.append(col)
+
         if len(skewed_columns) > 0:
             alerts.append({
                 "alert_id": "alert_outliers_skewed_distribution",
@@ -310,7 +317,7 @@ def execute_outlier_remover(
                 "severity": "high",
                 "category": "data_retention",
                 "message": f"Excessive data removal: {100 - cleaning_score['metrics']['data_retention_rate']:.1f}% of data lost",
-                "affected_fields_count": len(original_df) - len(df_cleaned),
+                "affected_fields_count": original_df.height - df_cleaned.height,
                 "recommendation": "Switch to imputation strategy to preserve more data while handling outliers."
             })
         
@@ -354,15 +361,15 @@ def execute_outlier_remover(
                 })
         
         # Add data retention issue if significant data loss
-        rows_removed = len(original_df) - len(df_cleaned)
-        if rows_removed > len(original_df) * 0.1:
+        rows_removed = original_df.height - df_cleaned.height
+        if rows_removed > original_df.height * 0.1:
             issues.append({
                 "issue_id": "issue_outliers_data_loss",
                 "agent_id": "outlier-remover",
                 "field_name": "dataset",
                 "issue_type": "data_retention",
                 "severity": "critical",
-                "message": f"Significant data loss: {rows_removed} rows ({(rows_removed/len(original_df)*100):.1f}%) removed during outlier handling"
+                "message": f"Significant data loss: {rows_removed} rows ({(rows_removed/original_df.height*100):.1f}%) removed during outlier handling"
             })
         
         # ==================== GENERATE RECOMMENDATIONS ====================
@@ -401,7 +408,7 @@ def execute_outlier_remover(
             })
         
         # Recommendation 4: Alternative strategy
-        if removal_strategy == 'remove' and len(df_cleaned) < len(original_df) * 0.9:
+        if removal_strategy == 'remove' and df_cleaned.height < original_df.height * 0.9:
             agent_recommendations.append({
                 "recommendation_id": "rec_outliers_imputation",
                 "agent_id": "outlier-remover",
@@ -473,13 +480,17 @@ def execute_outlier_remover(
             "timeline": "3 weeks"
         })
 
+        # Remove row_index before export
+        if "row_index" in df_cleaned.columns:
+            df_cleaned = df_cleaned.drop("row_index")
+
         return {
             "status": "success",
             "agent_id": "outlier-remover",
             "agent_name": "Outlier Remover",
             "execution_time_ms": int((time.time() - start_time) * 1000),
             "summary_metrics": {
-                "total_rows_processed": len(df_cleaned),
+                "total_rows_processed": df_cleaned.height,
                 "outliers_handled": cleaning_score["metrics"]["original_outliers"],
                 "original_outliers": cleaning_score["metrics"]["original_outliers"],
                 "remaining_outliers": 0,  # Depends on strategy
@@ -502,6 +513,8 @@ def execute_outlier_remover(
         }
 
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         return {
             "status": "error",
             "agent_id": "outlier-remover",
@@ -510,98 +523,12 @@ def execute_outlier_remover(
             "execution_time_ms": int((time.time() - start_time) * 1000)
         }
 
-
-def _detect_outliers_zscore(series: pd.Series, threshold: float = 3.0) -> List[Dict[str, Any]]:
-    """Detect outliers using Z-score method."""
-    outliers = []
-    if len(series.dropna()) < 3:
-        return outliers
-    
-    z_scores = np.abs(stats.zscore(series.dropna()))
-    outlier_indices = series.dropna().index[z_scores > threshold]
-    
-    for idx in outlier_indices:
-        z_val = z_scores[series.dropna().index.get_loc(idx)]
-        severity = "critical" if z_val > 4.0 else "warning"
-        outliers.append({
-            "row_index": int(idx),
-            "value": float(series.loc[idx]),
-            "z_score": float(z_val),
-            "severity": severity,
-            "method": "z_score"
-        })
-    
-    return outliers
-
-
-def _detect_outliers_iqr(series: pd.Series, multiplier: float = 1.5) -> List[Dict[str, Any]]:
-    """Detect outliers using IQR method."""
-    outliers = []
-    clean_series = series.dropna()
-    
-    if len(clean_series) < 4:
-        return outliers
-    
-    Q1 = clean_series.quantile(0.25)
-    Q3 = clean_series.quantile(0.75)
-    IQR = Q3 - Q1
-    
-    lower_bound = Q1 - multiplier * IQR
-    upper_bound = Q3 + multiplier * IQR
-    
-    for idx, value in clean_series.items():
-        if value < lower_bound or value > upper_bound:
-            distance = max(abs(value - lower_bound), abs(value - upper_bound))
-            extreme_multiplier = 3.0
-            severity = "critical" if distance > extreme_multiplier * IQR else "warning"
-            
-            outliers.append({
-                "row_index": int(idx),
-                "value": float(value),
-                "lower_bound": float(lower_bound),
-                "upper_bound": float(upper_bound),
-                "severity": severity,
-                "method": "iqr"
-            })
-    
-    return outliers
-
-
-def _detect_outliers_percentile(series: pd.Series, lower_pct: float = 1.0, upper_pct: float = 99.0) -> List[Dict[str, Any]]:
-    """Detect outliers using percentile method."""
-    outliers = []
-    clean_series = series.dropna()
-    
-    if len(clean_series) < 10:
-        return outliers
-    
-    lower_bound = clean_series.quantile(lower_pct / 100)
-    upper_bound = clean_series.quantile(upper_pct / 100)
-    
-    for idx, value in clean_series.items():
-        if value < lower_bound or value > upper_bound:
-            extreme_lower = clean_series.quantile(0.001)
-            extreme_upper = clean_series.quantile(0.999)
-            severity = "critical" if (value < extreme_lower or value > extreme_upper) else "warning"
-            
-            outliers.append({
-                "row_index": int(idx),
-                "value": float(value),
-                "lower_bound": float(lower_bound),
-                "upper_bound": float(upper_bound),
-                "severity": severity,
-                "method": "percentile"
-            })
-    
-    return outliers
-
-
-def _analyze_outliers(df: pd.DataFrame, config: Dict[str, Any]) -> Dict[str, Any]:
+def _analyze_outliers(df: pl.DataFrame, config: Dict[str, Any]) -> Dict[str, Any]:
     """Analyze outliers in all numeric columns."""
-    numeric_cols = df.select_dtypes(include=[np.number]).columns.tolist()
+    numeric_cols = [col for col, dtype in zip(df.columns, df.dtypes) if dtype in [pl.Int8, pl.Int16, pl.Int32, pl.Int64, pl.Float32, pl.Float64] and col != "row_index"]
     
     analysis = {
-        "total_rows": len(df),
+        "total_rows": df.height,
         "numeric_columns": numeric_cols,
         "outlier_summary": {},
         "recommendations": []
@@ -610,28 +537,108 @@ def _analyze_outliers(df: pd.DataFrame, config: Dict[str, Any]) -> Dict[str, Any
     detection_method = config.get('detection_method', 'iqr')
     
     for col in numeric_cols:
-        series = df[col]
+        # We need to get outliers for this column
+        # We can use filter
+        
+        col_series = df.select(pl.col(col)).to_series()
+        
+        outliers = []
         
         if detection_method == 'z_score':
             threshold = config.get('z_threshold', 3.0)
-            outliers = _detect_outliers_zscore(series, threshold)
+            # Calculate Z-score
+            mean = col_series.mean()
+            std = col_series.std()
+            
+            if mean is not None and std is not None and std != 0:
+                # Filter rows where abs(z_score) > threshold
+                # We need row_index
+                
+                outlier_df = df.select(["row_index", col]).filter(
+                    (pl.col(col) - mean).abs() / std > threshold
+                )
+                
+                for row in outlier_df.iter_rows(named=True):
+                    val = row[col]
+                    if val is None: continue
+                    z_val = abs((val - mean) / std)
+                    severity = "critical" if z_val > 4.0 else "warning"
+                    outliers.append({
+                        "row_index": int(row["row_index"]),
+                        "value": float(val),
+                        "z_score": float(z_val),
+                        "severity": severity,
+                        "method": "z_score"
+                    })
+
         elif detection_method == 'percentile':
             lower_pct = config.get('lower_percentile', 1.0)
             upper_pct = config.get('upper_percentile', 99.0)
-            outliers = _detect_outliers_percentile(series, lower_pct, upper_pct)
+            
+            lower_bound = col_series.quantile(lower_pct / 100)
+            upper_bound = col_series.quantile(upper_pct / 100)
+            
+            if lower_bound is not None and upper_bound is not None:
+                outlier_df = df.select(["row_index", col]).filter(
+                    (pl.col(col) < lower_bound) | (pl.col(col) > upper_bound)
+                )
+                
+                extreme_lower = col_series.quantile(0.001)
+                extreme_upper = col_series.quantile(0.999)
+                
+                for row in outlier_df.iter_rows(named=True):
+                    val = row[col]
+                    if val is None: continue
+                    severity = "critical" if (extreme_lower is not None and val < extreme_lower) or (extreme_upper is not None and val > extreme_upper) else "warning"
+                    
+                    outliers.append({
+                        "row_index": int(row["row_index"]),
+                        "value": float(val),
+                        "lower_bound": float(lower_bound),
+                        "upper_bound": float(upper_bound),
+                        "severity": severity,
+                        "method": "percentile"
+                    })
+
         else:  # Default to IQR
             multiplier = config.get('iqr_multiplier', 1.5)
-            outliers = _detect_outliers_iqr(series, multiplier)
+            q1 = col_series.quantile(0.25)
+            q3 = col_series.quantile(0.75)
+            
+            if q1 is not None and q3 is not None:
+                iqr = q3 - q1
+                lower_bound = q1 - multiplier * iqr
+                upper_bound = q3 + multiplier * iqr
+                
+                outlier_df = df.select(["row_index", col]).filter(
+                    (pl.col(col) < lower_bound) | (pl.col(col) > upper_bound)
+                )
+                
+                for row in outlier_df.iter_rows(named=True):
+                    val = row[col]
+                    if val is None: continue
+                    distance = max(abs(val - lower_bound), abs(val - upper_bound))
+                    extreme_multiplier = 3.0
+                    severity = "critical" if distance > extreme_multiplier * iqr else "warning"
+                    
+                    outliers.append({
+                        "row_index": int(row["row_index"]),
+                        "value": float(val),
+                        "lower_bound": float(lower_bound),
+                        "upper_bound": float(upper_bound),
+                        "severity": severity,
+                        "method": "iqr"
+                    })
         
         outlier_count = len(outliers)
-        outlier_percentage = (outlier_count / len(series) * 100) if len(series) > 0 else 0
+        outlier_percentage = (outlier_count / df.height * 100) if df.height > 0 else 0
         
         if outlier_count > 0:
             analysis["outlier_summary"][str(col)] = {
                 "outlier_count": outlier_count,
                 "outlier_percentage": round(outlier_percentage, 2),
-                "data_type": str(series.dtype),
-                "total_values": len(series),
+                "data_type": str(col_series.dtype),
+                "total_values": df.height,
                 "method_used": detection_method,
                 "outliers": outliers[:50]  # Limit for performance
             }
@@ -661,20 +668,26 @@ def _analyze_outliers(df: pd.DataFrame, config: Dict[str, Any]) -> Dict[str, Any
     
     return analysis
 
-
 def _remove_outliers(
-    df: pd.DataFrame,
+    df: pl.DataFrame,
     outlier_analysis: Dict[str, Any],
     removal_strategy: str
 ) -> tuple:
     """Remove or impute outliers based on strategy."""
-    df_cleaned = df.copy()
+    df_cleaned = df.clone()
     removal_log = []
     row_level_issues = []
+    
+    # Collect all row indices to remove if strategy is remove
+    rows_to_remove = set()
+    
+    # For imputation, we need to update values
+    # We can do this column by column
     
     for col, col_analysis in outlier_analysis["outlier_summary"].items():
         outliers = col_analysis["outliers"]
         
+        # Prepare issues
         for outlier in outliers:
             row_idx = outlier["row_index"]
             original_value = outlier["value"]
@@ -689,36 +702,59 @@ def _remove_outliers(
             }
             
             if removal_strategy == 'remove':
-                if row_idx in df_cleaned.index:
-                    df_cleaned = df_cleaned.drop(row_idx)
-                    issue["action_taken"] = "removed"
-                    issue["issue_type"] = "outlier_removed"
-                    removal_log.append(f"Removed row {row_idx} from column '{col}' (value: {original_value})")
+                rows_to_remove.add(row_idx)
+                issue["action_taken"] = "removed"
+                issue["issue_type"] = "outlier_removed"
+                removal_log.append(f"Removed row {row_idx} from column '{col}' (value: {original_value})")
             
             elif removal_strategy == 'impute_mean':
-                if col in df_cleaned.columns and row_idx in df_cleaned.index:
-                    mean_val = df_cleaned[col].mean()
-                    df_cleaned.loc[row_idx, col] = mean_val
-                    issue["action_taken"] = f"imputed_mean ({mean_val:.2f})"
-                    issue["issue_type"] = "outlier_imputed"
-                    removal_log.append(f"Imputed row {row_idx} in column '{col}' with mean ({mean_val:.2f})")
+                # We will handle imputation in bulk below
+                issue["action_taken"] = "imputed_mean"
+                issue["issue_type"] = "outlier_imputed"
+                removal_log.append(f"Imputed row {row_idx} in column '{col}' with mean")
             
             elif removal_strategy == 'impute_median':
-                if col in df_cleaned.columns and row_idx in df_cleaned.index:
-                    median_val = df_cleaned[col].median()
-                    df_cleaned.loc[row_idx, col] = median_val
-                    issue["action_taken"] = f"imputed_median ({median_val:.2f})"
-                    issue["issue_type"] = "outlier_imputed"
-                    removal_log.append(f"Imputed row {row_idx} in column '{col}' with median ({median_val:.2f})")
+                # We will handle imputation in bulk below
+                issue["action_taken"] = "imputed_median"
+                issue["issue_type"] = "outlier_imputed"
+                removal_log.append(f"Imputed row {row_idx} in column '{col}' with median")
             
             row_level_issues.append(issue)
+        
+        # Apply imputation if needed
+        if removal_strategy == 'impute_mean':
+            mean_val = df.select(pl.col(col).mean()).item()
+            if mean_val is not None:
+                # Get row indices for this column's outliers
+                outlier_indices = [o["row_index"] for o in outliers]
+                if outlier_indices:
+                    df_cleaned = df_cleaned.with_columns(
+                        pl.when(pl.col("row_index").is_in(outlier_indices))
+                        .then(mean_val)
+                        .otherwise(pl.col(col))
+                        .alias(col)
+                    )
+        
+        elif removal_strategy == 'impute_median':
+            median_val = df.select(pl.col(col).median()).item()
+            if median_val is not None:
+                outlier_indices = [o["row_index"] for o in outliers]
+                if outlier_indices:
+                    df_cleaned = df_cleaned.with_columns(
+                        pl.when(pl.col("row_index").is_in(outlier_indices))
+                        .then(median_val)
+                        .otherwise(pl.col(col))
+                        .alias(col)
+                    )
+
+    if removal_strategy == 'remove' and rows_to_remove:
+        df_cleaned = df_cleaned.filter(~pl.col("row_index").is_in(rows_to_remove))
     
     return df_cleaned, removal_log, row_level_issues
 
-
 def _calculate_cleaning_score(
-    original_df: pd.DataFrame,
-    cleaned_df: pd.DataFrame,
+    original_df: pl.DataFrame,
+    cleaned_df: pl.DataFrame,
     total_outliers: int,
     config: Dict[str, Any]
 ) -> Dict[str, Any]:
@@ -726,7 +762,7 @@ def _calculate_cleaning_score(
     
     # Calculate metrics
     outlier_reduction_rate = 100.0  # Assume all detected outliers were handled
-    data_retention_rate = (len(cleaned_df) / len(original_df) * 100) if len(original_df) > 0 else 0
+    data_retention_rate = (cleaned_df.height / original_df.height * 100) if original_df.height > 0 else 0
     column_retention_rate = (len(cleaned_df.columns) / len(original_df.columns) * 100) if len(original_df.columns) > 0 else 0
     
     # Calculate weighted score
@@ -747,15 +783,14 @@ def _calculate_cleaning_score(
             "data_retention_rate": round(data_retention_rate, 1),
             "column_retention_rate": round(column_retention_rate, 1),
             "original_outliers": total_outliers,
-            "original_rows": len(original_df),
-            "cleaned_rows": len(cleaned_df),
+            "original_rows": original_df.height,
+            "cleaned_rows": cleaned_df.height,
             "original_columns": len(original_df.columns),
             "cleaned_columns": len(cleaned_df.columns)
         }
     }
 
-
-def _generate_cleaned_file(df: pd.DataFrame, original_filename: str) -> bytes:
+def _generate_cleaned_file(df: pl.DataFrame, original_filename: str) -> bytes:
     """
     Generate cleaned data file in CSV format.
     
@@ -768,5 +803,5 @@ def _generate_cleaned_file(df: pd.DataFrame, original_filename: str) -> bytes:
     """
     # Always export as CSV for consistency and compatibility
     output = io.BytesIO()
-    df.to_csv(output, index=False)
+    df.write_csv(output)
     return output.getvalue()

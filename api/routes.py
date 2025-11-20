@@ -8,8 +8,11 @@ Supports flexible file handling based on tool definitions.
 import json
 import uuid
 import time
+import base64
 from datetime import datetime
 from typing import Dict, Any, Optional, List
+import io
+import pandas as pd
 from fastapi import APIRouter, HTTPException, File, UploadFile, Form
 
 from agents import readiness_rater, unified_profiler, drift_detector, score_risk, governance_checker, test_coverage_agent, null_handler, outlier_remover, type_fixer, duplicate_resolver, quarantine_agent, cleanse_writeback, field_standardization, cleanse_previewer
@@ -134,6 +137,41 @@ def build_agent_input(
         "files": agent_files,
         "parameters": agent_params
     }
+
+
+def update_files_from_result(
+    files_map: Dict[str, tuple],
+    result: Dict[str, Any]
+) -> None:
+    """
+    Update files map with cleaned file from agent result.
+    Modifies files_map in place to chain agent outputs.
+    
+    Args:
+        files_map: Current files map (file_key -> (bytes, filename))
+        result: Result from previous agent execution
+    """
+    agent_id = result.get("agent_id", "unknown_agent")
+    
+    if result.get("status") == "success" and "cleaned_file" in result:
+        cleaned_file = result["cleaned_file"]
+        if cleaned_file and "content" in cleaned_file:
+            try:
+                # Decode base64 content
+                new_content = base64.b64decode(cleaned_file["content"])
+                new_filename = cleaned_file.get("filename", "cleaned_data.csv")
+                
+                # Update primary file for next agent
+                # This enables the chaining of data cleaning operations
+                files_map["primary"] = (new_content, new_filename)
+                print(f"[{agent_id}] Successfully updated primary file: {new_filename}. New size: {len(new_content)} bytes")
+            except Exception as e:
+                # If decoding fails, we keep the previous file
+                # This prevents the chain from breaking completely on a bad output
+                print(f"[{agent_id}] Error updating file from result: {str(e)}")
+                pass
+    else:
+        print(f"[{agent_id}] No cleaned file produced. Continuing with previous file.")
 
 
 # ============================================================================
@@ -271,6 +309,70 @@ async def analyze(
                 file_contents = await file_obj.read()
                 files_map[file_key] = (file_contents, file_obj.filename)
         
+        # Convert input files to CSV for all tools to ensure consistent processing
+        for file_key, (content, filename) in list(files_map.items()):
+            try:
+                file_ext = filename.split(".")[-1].lower() if "." in filename else ""
+                
+                # Skip if already CSV
+                if file_ext == "csv":
+                    continue
+                    
+                df = None
+                # Handle Excel files
+                if file_ext in ["xlsx", "xls"]:
+                    try:
+                        engine = "openpyxl" if file_ext == "xlsx" else "xlrd"
+                        df = pd.read_excel(io.BytesIO(content), engine=engine)
+                    except Exception as first_error:
+                        print(f"Primary engine {engine} failed for {filename}: {first_error}")
+                        # Fallback strategies
+                        success = False
+                        
+                        # Strategy 1: Try the other Excel engine (e.g. xls renamed to xlsx)
+                        if not success:
+                            try:
+                                fallback_engine = "xlrd" if engine == "openpyxl" else "openpyxl"
+                                df = pd.read_excel(io.BytesIO(content), engine=fallback_engine)
+                                success = True
+                                print(f"Fallback to {fallback_engine} successful")
+                            except Exception:
+                                pass
+                        
+                        # Strategy 2: Try reading as CSV (sometimes files are misnamed)
+                        if not success:
+                            try:
+                                # Try with default encoding
+                                df = pd.read_csv(io.BytesIO(content))
+                                success = True
+                                print(f"Fallback to CSV reader successful")
+                            except Exception:
+                                pass
+                                
+                        if not success:
+                            raise first_error
+                # Handle JSON files
+                elif file_ext == "json":
+                    df = pd.read_json(io.BytesIO(content))
+                
+                # If conversion was successful, update the file in memory
+                if df is not None:
+                    # Convert to CSV string then bytes
+                    csv_buffer = io.StringIO()
+                    df.to_csv(csv_buffer, index=False)
+                    new_content = csv_buffer.getvalue().encode('utf-8')
+                    
+                    # Update filename
+                    base_name = ".".join(filename.split(".")[:-1]) if "." in filename else filename
+                    new_filename = f"{base_name}.csv"
+                    
+                    # Update map
+                    files_map[file_key] = (new_content, new_filename)
+            except Exception as e:
+                # Log error and fail because agents only support CSV
+                print(f"Error: Failed to convert {filename} to CSV: {str(e)}")
+                raise HTTPException(status_code=400, detail=f"Failed to convert {filename} to CSV: {str(e)}")
+
         # Parse parameters
         parameters = {}
         if parameters_json:
@@ -294,6 +396,10 @@ async def analyze(
                 )
                 
                 agent_results[agent_id] = result
+                
+                # Update files map for next agent (only for clean-my-data)
+                if tool_id == "clean-my-data":
+                    update_files_from_result(files_map, result)
             except Exception as e:
                 agent_results[agent_id] = {
                     "status": "error",
@@ -695,4 +801,7 @@ async def chat(
             status_code=500,
             detail=f"Chat processing failed: {str(e)}"
         )
+
+
+
 
