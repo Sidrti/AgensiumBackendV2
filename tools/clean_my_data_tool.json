@@ -15,15 +15,13 @@
       "duplicate-resolver",
       "null-handler",
       "outlier-remover",
-      "governance-checker",
-      "test-coverage-agent",
       "cleanse-writeback"
     ],
     "files": {
       "primary": {
         "description": "Data file to clean and validate",
         "required": true,
-        "formats": ["csv", "json", "xlsx"],
+        "formats": ["csv", "xlsx"],
         "max_size_mb": 500
       }
     }
@@ -44,7 +42,7 @@
         "Statistical Confidence Scoring",
         "Safety Validation"
       ],
-      "input": { "type": "CSV, JSON, XLSX + cleaning rules" },
+      "input": { "type": "CSV, XLSX + cleaning rules" },
       "version": "1.0.0",
       "required_files": ["primary"],
       "parameters": {
