@@ -704,11 +704,39 @@ def _apply_type_fixes(df: pl.DataFrame, fix_config: Dict[str, Any]) -> tuple:
                 fix_log.append(f"Converted '{col}' from {original_type} to integer")
                 
             elif target_type == 'datetime':
-                # Try to cast to datetime
-                # str.to_datetime without format tries strict ISO.
-                # We might need to try parsing.
-                # For now, let's use strict=False which produces nulls on failure
-                df_fixed = df_fixed.with_columns(pl.col(col).str.to_datetime(strict=False))
+                # Try to cast to datetime with flexible parsing
+                # We use map_elements to handle multiple formats
+                def parse_date(val):
+                    if val is None: return None
+                    val_str = str(val).strip()
+                    if not val_str: return None
+                    
+                    from datetime import datetime
+                    formats = [
+                        "%Y-%m-%d", "%Y-%m-%d %H:%M:%S",
+                        "%d-%m-%Y", "%d-%m-%Y %H:%M:%S",
+                        "%d/%m/%Y", "%d/%m/%Y %H:%M:%S",
+                        "%m/%d/%Y", "%m/%d/%Y %H:%M:%S",
+                        "%d-%b-%y", "%d-%b-%Y",  # 02-Jan-25
+                        "%Y/%m/%d", "%d.%m.%Y"
+                    ]
+                    
+                    for fmt in formats:
+                        try:
+                            return datetime.strptime(val_str, fmt)
+                        except ValueError:
+                            continue
+                    return None
+
+                # First try standard polars conversion (fast)
+                # If that fails (nulls), we might want to try custom parsing?
+                # But strict=False returns nulls.
+                # Better to just use custom parsing for the whole column if we suspect mixed formats,
+                # or just use it. map_elements is slower but safer for "fixing".
+                
+                df_fixed = df_fixed.with_columns(
+                    pl.col(col).map_elements(parse_date, return_dtype=pl.Datetime).alias(col)
+                )
                 fix_log.append(f"Converted '{col}' from {original_type} to datetime")
                 
             elif target_type == 'string':
