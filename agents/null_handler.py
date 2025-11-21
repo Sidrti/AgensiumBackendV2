@@ -85,6 +85,9 @@ def execute_null_handler(
         # Store original data for comparison
         original_df = df.clone()
         
+        # Standardize null representations (handle "NULL", "nan", "N/A", etc.)
+        df = _standardize_null_representations(df)
+        
         # Analyze null patterns
         null_analysis = _analyze_null_patterns(df)
         
@@ -598,6 +601,37 @@ def execute_null_handler(
             "error": str(e),
             "execution_time_ms": int((time.time() - start_time) * 1000)
         }
+
+
+def _standardize_null_representations(df: pl.DataFrame) -> pl.DataFrame:
+    """
+    Standardize various null representations to actual null values.
+    Handles: 'NULL', 'null', 'NaN', 'nan', 'None', 'none', 'N/A', 'n/a', '', ' '
+    """
+    null_strings = [
+        "NULL", "null", "NaN", "nan", "None", "none", "N/A", "n/a", "", " ",
+        "?", "-", "missing", "MISSING", "undefined", "UNDEFINED"
+    ]
+    
+    # We only need to do this for String (Utf8) columns
+    string_cols = [col for col in df.columns if df[col].dtype == pl.Utf8]
+    
+    if not string_cols:
+        return df
+        
+    df_std = df.clone()
+    
+    for col in string_cols:
+        # Replace null strings with actual null
+        # We strip whitespace first to catch " N/A "
+        df_std = df_std.with_columns(
+            pl.when(pl.col(col).str.strip_chars().is_in(null_strings))
+            .then(None)
+            .otherwise(pl.col(col))
+            .alias(col)
+        )
+        
+    return df_std
 
 
 def _analyze_null_patterns(df: pl.DataFrame) -> Dict[str, Any]:

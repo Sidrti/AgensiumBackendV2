@@ -45,6 +45,8 @@ def execute_field_standardization(
     synonym_mappings = parameters.get("synonym_mappings", {})  # Dict of column -> {synonym -> standard}
     unit_standardization = parameters.get("unit_standardization", False)
     unit_mappings = parameters.get("unit_mappings", {})  # Dict of column -> {unit -> standard_unit, conversion_factor}
+    date_standardization = parameters.get("date_standardization", True)
+    target_date_format = parameters.get("target_date_format", "%Y-%m-%d")
     target_columns = parameters.get("target_columns", [])  # Columns to standardize (all if empty)
     preserve_columns = parameters.get("preserve_columns", [])  # Columns to preserve from standardization
     
@@ -112,7 +114,9 @@ def execute_field_standardization(
                 "apply_synonyms": apply_synonyms,
                 "synonym_mappings": synonym_mappings,
                 "unit_standardization": unit_standardization,
-                "unit_mappings": unit_mappings
+                "unit_mappings": unit_mappings,
+                "date_standardization": date_standardization,
+                "target_date_format": target_date_format
             }
         )
         
@@ -256,7 +260,8 @@ def execute_field_standardization(
                 "whitespace_trimming": trim_whitespace,
                 "internal_spacing_normalized": normalize_internal_spacing,
                 "synonyms_applied": apply_synonyms and bool(synonym_mappings),
-                "units_aligned": unit_standardization and bool(unit_mappings)
+                "units_aligned": unit_standardization and bool(unit_mappings),
+                "dates_standardized": date_standardization
             },
             "improvements": _calculate_improvements(pre_analysis, post_analysis),
             "recommendations": _generate_recommendations(
@@ -281,6 +286,8 @@ def execute_field_standardization(
                 "synonym_mappings": synonym_mappings,
                 "unit_standardization": unit_standardization,
                 "unit_mappings": unit_mappings,
+                "date_standardization": date_standardization,
+                "target_date_format": target_date_format,
                 "target_columns": target_columns,
                 "preserve_columns": preserve_columns,
                 "standardization_effectiveness_weight": standardization_effectiveness_weight,
@@ -722,6 +729,8 @@ def _apply_standardization(
     synonym_mappings = config.get("synonym_mappings", {})
     unit_standardization = config.get("unit_standardization", False)
     unit_mappings = config.get("unit_mappings", {})
+    date_standardization = config.get("date_standardization", True)
+    target_date_format = config.get("target_date_format", "%Y-%m-%d")
     
     for col in columns:
         if col not in df_standardized.columns:
@@ -795,6 +804,17 @@ def _apply_standardization(
             df_standardized = df_standardized.with_columns(
                 pl.col(col).map_elements(apply_unit_func, return_dtype=pl.Utf8).alias(col)
             )
+
+        # 6. Apply date standardization
+        if date_standardization:
+            # Check if column is likely a date column
+            if _is_likely_date_column(df_standardized[col]):
+                df_standardized = df_standardized.with_columns(
+                    pl.col(col).map_elements(
+                        lambda x: _standardize_date_string(x, target_date_format), 
+                        return_dtype=pl.Utf8
+                    ).alias(col)
+                )
             
         # Detect changes and log
         # We need to compare original_col with new col
@@ -849,6 +869,68 @@ def _apply_unit_conversion(value: str, unit_config: Dict[str, Any]) -> str:
             return f"{converted_value} {target_unit}"
     
     return value
+
+
+def _is_likely_date_column(series: pl.Series) -> bool:
+    """Check if a string series likely contains dates."""
+    # Check non-null values
+    sample = series.drop_nulls().head(50)
+    if sample.len() == 0:
+        return False
+    
+    # Count how many look like dates
+    date_patterns = [
+        r'\d{1,2}-\d{1,2}-\d{4}',      # DD-MM-YYYY or MM-DD-YYYY
+        r'\d{4}-\d{1,2}-\d{1,2}',      # YYYY-MM-DD
+        r'\d{1,2}/\d{1,2}/\d{4}',      # DD/MM/YYYY
+        r'\d{1,2}-[A-Za-z]{3}-\d{2,4}' # DD-Mon-YY or DD-Mon-YYYY
+    ]
+    
+    match_count = 0
+    for val in sample:
+        val_str = str(val).strip()
+        if any(re.match(p, val_str) for p in date_patterns):
+            match_count += 1
+            
+    return (match_count / sample.len()) > 0.5
+
+
+def _standardize_date_string(value: Optional[str], target_format: str = "%Y-%m-%d") -> Optional[str]:
+    """
+    Parse and standardize a date string.
+    Handles formats: 01-01-2025, 02-Jan-25, 14-01-2025, 24-Jan-25
+    """
+    if value is None:
+        return None
+        
+    value = str(value).strip()
+    if not value:
+        return None
+        
+    from datetime import datetime
+    
+    # List of formats to try
+    formats = [
+        "%d-%m-%Y",       # 01-01-2025
+        "%d-%b-%y",       # 02-Jan-25
+        "%d-%b-%Y",       # 02-Jan-2025
+        "%Y-%m-%d",       # 2025-01-01
+        "%m/%d/%Y",       # 01/01/2025
+        "%d/%m/%Y",       # 14/01/2025
+        "%Y/%m/%d",       # 2025/01/01
+        "%d.%m.%Y",       # 01.01.2025
+        "%d %b %Y",       # 01 Jan 2025
+        "%d %B %Y",       # 01 January 2025
+    ]
+    
+    for fmt in formats:
+        try:
+            dt = datetime.strptime(value, fmt)
+            return dt.strftime(target_format)
+        except ValueError:
+            continue
+            
+    return value  # Return original if parsing fails
 
 
 def _calculate_improvements(pre_analysis: Dict[str, Any], post_analysis: Dict[str, Any]) -> Dict[str, Any]:

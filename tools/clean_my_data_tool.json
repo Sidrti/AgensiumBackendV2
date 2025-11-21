@@ -430,6 +430,16 @@
           "description": "Column-specific unit conversion mappings (column -> {unit_pattern -> {factor: number, target_unit: string}}). Example: {'height': {'ft': {'factor': 12, 'target_unit': 'inches'}}}",
           "default": {}
         },
+        "date_standardization": {
+          "type": "boolean",
+          "description": "Standardize date formats to a consistent target format",
+          "default": true
+        },
+        "target_date_format": {
+          "type": "string",
+          "description": "Target format for date standardization (e.g., %Y-%m-%d)",
+          "default": "%Y-%m-%d"
+        },
         "target_columns": {
           "type": "array",
           "description": "Specific columns to standardize (all columns if empty)",
