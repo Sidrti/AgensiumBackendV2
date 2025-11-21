@@ -5,6 +5,8 @@ from sqlalchemy.exc import IntegrityError
 from datetime import timedelta
 from db import database, models, schemas
 from . import utils, dependencies
+from typing import Annotated
+from fastapi import Form
 
 router = APIRouter(
     prefix="/auth",
@@ -61,46 +63,38 @@ def register_user(user: schemas.UserCreate, db: Session = Depends(database.get_d
         )
 
 @router.post("/token", response_model=schemas.Token)
-def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(database.get_db)):
+def login_for_access_token(
+    username: Annotated[str, Form()],
+    password: Annotated[str, Form()],
+    db: Session = Depends(database.get_db)
+):
     """
     Login to get an access token.
-    
-    - **username**: User's email address
-    - **password**: User's password
-    
-    Returns a JWT access token that expires in 30 minutes.
     """
+
     # Find user by email
-    user = db.query(models.User).filter(models.User.email == form_data.username).first()
-    
-    # Verify user exists and password is correct
-    if not user:
+    user = db.query(models.User).filter(models.User.email == username).first()
+
+    if not user or not utils.verify_password(password, user.hashed_password):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid email or password. Please check your credentials.",
             headers={"WWW-Authenticate": "Bearer"},
         )
-    
-    if not utils.verify_password(form_data.password, user.hashed_password):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid email or password. Please check your credentials.",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-    
-    # Check if user is active
+
     if not user.is_active:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="User account is inactive. Please contact support."
         )
-    
-    # Generate access token
+
     access_token_expires = timedelta(minutes=utils.ACCESS_TOKEN_EXPIRE_MINUTES)
+
     access_token = utils.create_access_token(
-        data={"sub": user.email}, expires_delta=access_token_expires
+        data={"sub": user.email},
+        expires_delta=access_token_expires
     )
-    
+
     return {
         "access_token": access_token,
         "token_type": "bearer",
