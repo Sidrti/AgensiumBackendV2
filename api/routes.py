@@ -15,8 +15,8 @@ import io
 import pandas as pd
 from fastapi import APIRouter, HTTPException, File, UploadFile, Form
 
-from agents import readiness_rater, unified_profiler, drift_detector, score_risk, governance_checker, test_coverage_agent, null_handler, outlier_remover, type_fixer, duplicate_resolver, quarantine_agent, cleanse_writeback, field_standardization, cleanse_previewer
-from transformers import profile_my_data_transformer, clean_my_data_transformer
+from agents import readiness_rater, unified_profiler, drift_detector, score_risk, governance_checker, test_coverage_agent, null_handler, outlier_remover, type_fixer, duplicate_resolver, quarantine_agent, cleanse_writeback, field_standardization, cleanse_previewer, key_identifier, contract_enforcer, semantic_mapper, lineage_tracer, golden_record_builder, survivorship_resolver, master_writeback_agent, stewardship_flagger
+from transformers import profile_my_data_transformer, clean_my_data_transformer, master_my_data_transformer
 from ai import ChatAgent
 from .dependencies import decode_base64_file
 
@@ -397,8 +397,8 @@ async def analyze(
                 
                 agent_results[agent_id] = result
                 
-                # Update files map for next agent (only for clean-my-data)
-                if tool_id == "clean-my-data":
+                # Update files map for next agent (for tools that chain agent outputs)
+                if tool_id in ["clean-my-data", "master-my-data"]:
                     update_files_from_result(files_map, result)
             except Exception as e:
                 agent_results[agent_id] = {
@@ -416,6 +416,12 @@ async def analyze(
             )
         elif tool_id == "clean-my-data":
             final_response = clean_my_data_transformer.transform_clean_my_data_response(
+                agent_results,
+                int((time.time() - start_time) * 1000),
+                analysis_id
+            )
+        elif tool_id == "master-my-data":
+            final_response = master_my_data_transformer.transform_master_my_data_response(
                 agent_results,
                 int((time.time() - start_time) * 1000),
                 analysis_id
@@ -683,6 +689,136 @@ def execute_agent_flexible(
         primary_bytes, primary_filename = files_map["primary"]
         
         return cleanse_previewer.execute_cleanse_previewer(
+            primary_bytes,
+            primary_filename,
+            parameters
+        )
+    
+    # ==================== MASTER MY DATA AGENTS ====================
+    
+    elif agent_id == "key-identifier":
+        if "primary" not in files_map:
+            return {
+                "status": "error",
+                "error": "Key identifier requires 'primary' file",
+                "execution_time_ms": 0
+            }
+        
+        primary_bytes, primary_filename = files_map["primary"]
+        
+        return key_identifier.execute_key_identifier(
+            primary_bytes,
+            primary_filename,
+            parameters
+        )
+    
+    elif agent_id == "contract-enforcer":
+        if "primary" not in files_map:
+            return {
+                "status": "error",
+                "error": "Contract enforcer requires 'primary' file",
+                "execution_time_ms": 0
+            }
+        
+        primary_bytes, primary_filename = files_map["primary"]
+        
+        return contract_enforcer.execute_contract_enforcer(
+            primary_bytes,
+            primary_filename,
+            parameters
+        )
+    
+    elif agent_id == "semantic-mapper":
+        if "primary" not in files_map:
+            return {
+                "status": "error",
+                "error": "Semantic mapper requires 'primary' file",
+                "execution_time_ms": 0
+            }
+        
+        primary_bytes, primary_filename = files_map["primary"]
+        
+        return semantic_mapper.execute_semantic_mapper(
+            primary_bytes,
+            primary_filename,
+            parameters
+        )
+    
+    elif agent_id == "lineage-tracer":
+        if "primary" not in files_map:
+            return {
+                "status": "error",
+                "error": "Lineage tracer requires 'primary' file",
+                "execution_time_ms": 0
+            }
+        
+        primary_bytes, primary_filename = files_map["primary"]
+        
+        return lineage_tracer.execute_lineage_tracer(
+            primary_bytes,
+            primary_filename,
+            parameters
+        )
+    
+    elif agent_id == "golden-record-builder":
+        if "primary" not in files_map:
+            return {
+                "status": "error",
+                "error": "Golden record builder requires 'primary' file",
+                "execution_time_ms": 0
+            }
+        
+        primary_bytes, primary_filename = files_map["primary"]
+        
+        return golden_record_builder.execute_golden_record_builder(
+            primary_bytes,
+            primary_filename,
+            parameters
+        )
+    
+    elif agent_id == "survivorship-resolver":
+        if "primary" not in files_map:
+            return {
+                "status": "error",
+                "error": "Survivorship resolver requires 'primary' file",
+                "execution_time_ms": 0
+            }
+        
+        primary_bytes, primary_filename = files_map["primary"]
+        
+        return survivorship_resolver.execute_survivorship_resolver(
+            primary_bytes,
+            primary_filename,
+            parameters
+        )
+    
+    elif agent_id == "master-writeback-agent":
+        if "primary" not in files_map:
+            return {
+                "status": "error",
+                "error": "Master writeback agent requires 'primary' file",
+                "execution_time_ms": 0
+            }
+        
+        primary_bytes, primary_filename = files_map["primary"]
+        
+        return master_writeback_agent.execute_master_writeback_agent(
+            primary_bytes,
+            primary_filename,
+            parameters
+        )
+    
+    elif agent_id == "stewardship-flagger":
+        if "primary" not in files_map:
+            return {
+                "status": "error",
+                "error": "Stewardship flagger requires 'primary' file",
+                "execution_time_ms": 0
+            }
+        
+        primary_bytes, primary_filename = files_map["primary"]
+        
+        return stewardship_flagger.execute_stewardship_flagger(
             primary_bytes,
             primary_filename,
             parameters

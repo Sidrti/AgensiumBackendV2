@@ -1,7 +1,7 @@
 """
-Clean My Data Transformer
+Master My Data Transformer
 
-Consolidates outputs from cleaning agents into unified response.
+Consolidates outputs from master data management agents into unified response.
 Agents generate their own alerts, issues, recommendations, executive summaries, and AI analysis.
 Transformer aggregates these outputs and generates downloads.
 """
@@ -9,10 +9,10 @@ Transformer aggregates these outputs and generates downloads.
 from typing import Dict, List, Any
 from datetime import datetime
 from ai.analysis_summary_ai import AnalysisSummaryAI
-from downloads.clean_my_data_downloads import CleanMyDataDownloads
+from downloads.master_my_data_downloads import MasterMyDataDownloads
 
 
-def transform_clean_my_data_response(
+def transform_master_my_data_response(
     agent_results: Dict[str, Any],
     execution_time_ms: int,
     analysis_id: str
@@ -121,14 +121,14 @@ def transform_clean_my_data_response(
         ai_generator = AnalysisSummaryAI()
         summary_result = ai_generator.generate_summary(
             analysis_text=complete_analysis_text,
-            dataset_name="Data Cleaning Analysis"
+            dataset_name="Master Data Management Analysis"
         )
         analysis_summary = summary_result
     except Exception as e:
         print(f"Warning: OpenAI summary generation failed: {str(e)}. Using fallback summary.")
         analysis_summary = {
             "status": "success",
-            "summary": f"Data cleaning analysis completed with {len(all_alerts)} alerts and {len(all_recommendations)} recommendations. " +
+            "summary": f"Master data management analysis completed with {len(all_alerts)} alerts and {len(all_recommendations)} recommendations. " +
                       f"Key actions: {', '.join([rec.get('recommendation', '')[:50] for rec in all_recommendations[:2]])}.",
             "execution_time_ms": 0,
             "model_used": "fallback-rule-based"
@@ -141,7 +141,7 @@ def transform_clean_my_data_response(
         
         routing_ai = RoutingDecisionAI()
         routing_decisions = routing_ai.get_routing_decisions(
-            current_tool="clean-my-data",
+            current_tool="master-my-data",
             agent_results=agent_results,
             primary_filename="data.csv",
             baseline_filename=None,
@@ -181,61 +181,56 @@ def transform_clean_my_data_response(
     all_row_level_issues = all_row_level_issues[:1000]
     
     # ==================== DOWNLOADS ====================
-    # Collect cleaned files from agents
-    cleaned_files_list = []
-    for agent_id in ["null-handler", "outlier-remover", "type-fixer", "duplicate-resolver", "field-standardization", "quarantine-agent"]:
+    # Collect mastered files from agents
+    mastered_files_list = []
+    for agent_id in ["key-identifier", "contract-enforcer", "semantic-mapper", "survivorship-resolver", "golden-record-builder", "stewardship-flagger"]:
         agent_output = agent_results.get(agent_id, {})
         if agent_output.get("status") == "success":
             if "cleaned_file" in agent_output:
                 cleaned_file = agent_output["cleaned_file"]
                 filename = cleaned_file.get("filename", "unknown.csv")
                 
-                # Count number of "cleaned_" prefixes in filename
-                cleaned_count = filename.count("cleaned_")
+                # Count number of "mastered_" prefixes in filename
+                mastered_count = filename.count("mastered_")
                 
-                cleaned_files_list.append({
+                mastered_files_list.append({
                     "agent_id": agent_id,
                     "cleaned_file": cleaned_file,
                     "filename": filename,
-                    "cleaned_count": cleaned_count
+                    "mastered_count": mastered_count
                 })
-                print(f"[{agent_id}] Collected cleaned file: {filename} (cleaned count: {cleaned_count})")
+                print(f"[{agent_id}] Collected mastered file: {filename} (mastered count: {mastered_count})")
     
-    # Sort by cleaned_count in ascending order (least cleaned to most cleaned)
-    cleaned_files_list.sort(key=lambda x: x["cleaned_count"])
+    # Sort by mastered_count in ascending order (least processed to most processed)
+    mastered_files_list.sort(key=lambda x: x["mastered_count"])
     
-    # # Convert to dictionary with agent_id as key
-    # cleaned_files = {}
-    # for item in cleaned_files_list:
-    #     cleaned_files[item["agent_id"]] = item["cleaned_file"]
-
-    # Only use the file with the maximum cleaned count (most processed)
+    # Only use the file with the maximum mastered count (most processed)
     cleaned_files = {}
-    if cleaned_files_list:
-        most_cleaned_item = cleaned_files_list[-1]  # Last item after sorting (highest count)
-        cleaned_file_data = most_cleaned_item["cleaned_file"]
+    if mastered_files_list:
+        most_mastered_item = mastered_files_list[-1]  # Last item after sorting (highest count)
+        mastered_file_data = most_mastered_item["cleaned_file"]
         
-        # Extract base filename and remove all "cleaned_" prefixes
-        original_filename = most_cleaned_item["filename"]
-        # Remove all "cleaned_" occurrences from the filename
-        base_filename = original_filename.replace("cleaned_", "")
+        # Extract base filename and remove all "mastered_" prefixes
+        original_filename = most_mastered_item["filename"]
+        # Remove all "mastered_" occurrences from the filename
+        base_filename = original_filename.replace("mastered_", "")
         
         # Add datetime suffix to the filename
         from datetime import datetime as dt
         datetime_suffix = dt.utcnow().strftime("%Y%m%d_%H%M%S")
         name_parts = base_filename.rsplit('.', 1)
         if len(name_parts) == 2:
-            cleaned_filename = f"{name_parts[0]}_cleaned_{datetime_suffix}.{name_parts[1]}"
+            mastered_filename = f"{name_parts[0]}_mastered_{datetime_suffix}.{name_parts[1]}"
         else:
-            cleaned_filename = f"{base_filename}_cleaned_{datetime_suffix}"
+            mastered_filename = f"{base_filename}_mastered_{datetime_suffix}"
         
-        # Update the filename in the cleaned file metadata
-        cleaned_file_data["filename"] = cleaned_filename
+        # Update the filename in the mastered file metadata
+        mastered_file_data["filename"] = mastered_filename
         
-        cleaned_files[most_cleaned_item["agent_id"]] = cleaned_file_data
-        print(f"Using most processed file from [{most_cleaned_item['agent_id']}]: {most_cleaned_item['filename']} -> {cleaned_filename}")
+        cleaned_files[most_mastered_item["agent_id"]] = mastered_file_data
+        print(f"Using most processed file from [{most_mastered_item['agent_id']}]: {most_mastered_item['filename']} -> {mastered_filename}")
     
-    downloader = CleanMyDataDownloads()
+    downloader = MasterMyDataDownloads()
     downloads = downloader.generate_downloads(
         agent_results=agent_results,
         analysis_id=analysis_id,
@@ -261,7 +256,7 @@ def transform_clean_my_data_response(
     
     return {
         "analysis_id": analysis_id,
-        "tool": "clean-my-data",
+        "tool": "master-my-data",
         "status": "success",
         "timestamp": datetime.utcnow().isoformat() + 'Z',
         "execution_time_ms": execution_time_ms,
