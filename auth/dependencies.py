@@ -1,53 +1,76 @@
+"""
+FastAPI dependencies for authentication.
+"""
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
-from jose import JWTError, jwt
 from sqlalchemy.orm import Session
-from db import database, models, schemas
-from .utils import SECRET_KEY, ALGORITHM
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/token")
+from db.database import get_db
+from db import models
+from . import utils
+from .exceptions import InvalidTokenException, UserNotFoundException, UserInactiveException
 
-def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(database.get_db)):
+# OAuth2 scheme for token authentication
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
+
+
+async def get_current_user(
+    token: str = Depends(oauth2_scheme),
+    db: Session = Depends(get_db)
+) -> models.User:
     """
-    Dependency to get the current authenticated user from JWT token.
+    Dependency to get the current authenticated user.
+
+    Args:
+        token: JWT token from Authorization header
+        db: Database session
+
+    Returns:
+        The authenticated User object
+
+    Raises:
+        InvalidTokenException: If token is invalid or expired
+        UserNotFoundException: If user doesn't exist
+        UserInactiveException: If user account is inactive
     """
-    credentials_exception = HTTPException(
-        status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Invalid authentication credentials. Please login again.",
-        headers={"WWW-Authenticate": "Bearer"},
-    )
-    
-    try:
-        # Decode JWT token
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        email: str = payload.get("sub")
-        
-        if email is None:
-            raise credentials_exception
-            
-        token_data = schemas.TokenData(email=email)
-    except jwt.ExpiredSignatureError:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Token has expired. Please login again.",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-    except JWTError:
-        raise credentials_exception
-    
-    # Get user from database
-    user = db.query(models.User).filter(models.User.email == token_data.email).first()
-    
+    payload = utils.decode_access_token(token)
+
+    if payload is None:
+        raise InvalidTokenException()
+
+    email: str = payload.get("sub")
+    if email is None:
+        raise InvalidTokenException()
+
+    user = db.query(models.User).filter(models.User.email == email).first()
+
     if user is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="User not found. Please register or contact support."
-        )
-    
+        raise UserNotFoundException()
+
     if not user.is_active:
+        raise UserInactiveException()
+
+    return user
+
+
+async def get_current_active_verified_user(
+    current_user: models.User = Depends(get_current_user)
+) -> models.User:
+    """
+    Dependency to get current user who is both active and verified.
+
+    Args:
+        current_user: The authenticated user
+
+    Returns:
+        The verified User object
+
+    Raises:
+        HTTPException: If user is not verified
+    """
+    if not current_user.is_verified:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="User account is inactive. Please contact support."
+            detail="Email not verified"
         )
-    
-    return user
+    return current_user

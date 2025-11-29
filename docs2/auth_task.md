@@ -1671,15 +1671,15 @@ curl -X GET http://localhost:8000/auth/me \
   - [ ] Database and user created
   - [ ] `.env` file configured
 
-- [ ] **Core Implementation**
+- [x] **Core Implementation**
 
-  - [ ] `db/database.py` - MySQL connection
-  - [ ] `db/models.py` - User model with OTP fields
-  - [ ] `db/schemas.py` - Pydantic schemas with validators
-  - [ ] `auth/exceptions.py` - Custom exceptions
-  - [ ] `auth/utils.py` - Password, JWT, OTP utilities
-  - [ ] `auth/dependencies.py` - FastAPI dependencies
-  - [ ] `auth/router.py` - API endpoints
+  - [x] `db/database.py` - MySQL connection
+  - [x] `db/models.py` - User model with OTP fields
+  - [x] `db/schemas.py` - Pydantic schemas with validators
+  - [x] `auth/exceptions.py` - Custom exceptions
+  - [x] `auth/utils.py` - Password, JWT, OTP utilities
+  - [x] `auth/dependencies.py` - FastAPI dependencies
+  - [x] `auth/router.py` - API endpoints
 
 - [ ] **Testing**
 

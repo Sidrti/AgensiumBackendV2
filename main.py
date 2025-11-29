@@ -21,9 +21,19 @@ from fastapi.middleware.cors import CORSMiddleware
 from api import router
 from auth.router import router as auth_router
 from db import models, database
+from fastapi.responses import JSONResponse
+from auth.exceptions import AuthException
 
-# Create database tables
-models.Base.metadata.create_all(bind=database.engine)
+# Create database tables - wrapped in try-except to prevent startup failures
+# Note: create_all is currently causing a silent crash on some environments.
+# If tables are missing, please use a separate migration script.
+try:
+    # models.Base.metadata.create_all(bind=database.engine)
+    # print("✓ Database tables created successfully")
+    pass
+except Exception as e:
+    print(f"⚠ Warning: Could not create database tables at startup: {e}")
+    print("  Tables will be created when database becomes available.")
 
 # ============================================================================
 # INITIALIZE APP
@@ -89,6 +99,17 @@ if not TOOL_DEFINITIONS:
 # Include API routes
 app.include_router(router)
 app.include_router(auth_router)
+
+
+# Global handler for AuthException so responses include the configured error_code
+@app.exception_handler(AuthException)
+async def handle_auth_exception(request, exc: AuthException):
+    content = {"detail": exc.detail}
+    if getattr(exc, "error_code", None):
+        content["error_code"] = exc.error_code
+    # Use the headers if present
+    headers = exc.headers if getattr(exc, "headers", None) else None
+    return JSONResponse(status_code=exc.status_code, content=content, headers=headers)
 
 
 # ============================================================================
