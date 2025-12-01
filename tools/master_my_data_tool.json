@@ -1,0 +1,1006 @@
+{
+  "tool": {
+    "id": "master-my-data",
+    "name": "Master My Data",
+    "description": "Comprehensive Master Data Management (MDM) tool. Identify keys, enforce contracts, map semantics, trace lineage, build golden records, resolve survivorship, and manage stewardship tasks to ensure a single source of truth.",
+    "icon": "👑",
+    "category": "source",
+    "isAvailable": true,
+    "version": "1.0.0",
+    "available_agents": [
+      "key-identifier",
+      "contract-enforcer",
+      "semantic-mapper",
+      "survivorship-resolver",
+      "golden-record-builder",
+      "stewardship-flagger"
+    ],
+    "files": {
+      "primary": {
+        "description": "Data file to master",
+        "required": true,
+        "formats": ["csv", "json", "xlsx"],
+        "max_size_mb": 1000
+      },
+      "schema": {
+        "description": "Data contract or schema definition (optional)",
+        "required": false,
+        "formats": ["json", "yaml"],
+        "max_size_mb": 10
+      }
+    }
+  },
+  "agents": {
+    "key-identifier": {
+      "id": "key-identifier",
+      "name": "Key Identifier",
+      "description": "Analyzes the structural properties of a dataset and proposes candidate primary keys, foreign keys, and entity keys based on statistical inference and heuristics. Essential for uniquely identifying records before deduplication and entity resolution.",
+      "icon": "🔑",
+      "category": "Data Structure",
+      "accuracy": "99%",
+      "features": [
+        "Primary Key Detection",
+        "Composite Key Analysis",
+        "Foreign Key Identification",
+        "Entity Key Detection",
+        "Uniqueness Validation",
+        "Pattern Recognition (UUID, Auto-increment, Email, etc.)"
+      ],
+      "input": { "type": "CSV" },
+      "version": "1.0.0",
+      "required_files": ["primary"],
+      "parameters": {
+        "pk_uniqueness_threshold": {
+          "type": "float",
+          "description": "Percentage of unique values required to consider a column a primary key candidate",
+          "default": 99.0,
+          "min": 0,
+          "max": 100
+        },
+        "pk_null_threshold": {
+          "type": "float",
+          "description": "Maximum percentage of null values allowed for primary key candidates",
+          "default": 0.0,
+          "min": 0,
+          "max": 100
+        },
+        "entity_key_uniqueness_min": {
+          "type": "float",
+          "description": "Minimum uniqueness percentage for entity key candidates",
+          "default": 50.0,
+          "min": 0,
+          "max": 100
+        },
+        "entity_key_uniqueness_max": {
+          "type": "float",
+          "description": "Maximum uniqueness percentage for entity key candidates (above this becomes PK candidate)",
+          "default": 99.0,
+          "min": 0,
+          "max": 100
+        },
+        "fk_overlap_threshold": {
+          "type": "float",
+          "description": "Percentage of overlap required to identify a column as foreign key",
+          "default": 70.0,
+          "min": 0,
+          "max": 100
+        },
+        "reference_tables": {
+          "type": "object",
+          "description": "Dictionary of reference tables for FK detection (table_name -> {column: [values]})",
+          "default": {}
+        },
+        "analyze_composite_keys": {
+          "type": "boolean",
+          "description": "Whether to analyze composite key combinations when no single PK found",
+          "default": true
+        },
+        "max_composite_key_columns": {
+          "type": "integer",
+          "description": "Maximum number of columns to consider for a composite key",
+          "default": 3,
+          "min": 2,
+          "max": 10
+        },
+        "uniqueness_weight": {
+          "type": "float",
+          "description": "Weight for uniqueness score in key scoring",
+          "default": 0.4,
+          "min": 0,
+          "max": 1
+        },
+        "null_density_weight": {
+          "type": "float",
+          "description": "Weight for null density score in key scoring",
+          "default": 0.3,
+          "min": 0,
+          "max": 1
+        },
+        "pattern_weight": {
+          "type": "float",
+          "description": "Weight for pattern detection score in key scoring",
+          "default": 0.3,
+          "min": 0,
+          "max": 1
+        },
+        "excellent_threshold": {
+          "type": "integer",
+          "description": "Score threshold for excellent quality status",
+          "default": 90,
+          "min": 0,
+          "max": 100
+        },
+        "good_threshold": {
+          "type": "integer",
+          "description": "Score threshold for good quality status",
+          "default": 75,
+          "min": 0,
+          "max": 100
+        }
+      },
+      "output_structure": {
+        "agent_id": "string",
+        "agent_name": "string",
+        "status": "string",
+        "execution_time_ms": "integer",
+        "summary_metrics": {
+          "total_columns_analyzed": "integer",
+          "total_rows": "integer",
+          "primary_key_candidates": "integer",
+          "foreign_key_candidates": "integer",
+          "entity_key_candidates": "integer",
+          "composite_key_candidates": "integer",
+          "total_issues": "integer"
+        },
+        "data": {
+          "analysis_score": "number",
+          "quality_status": "string",
+          "column_analysis": "array",
+          "candidate_primary_keys": "array",
+          "candidate_foreign_keys": "array",
+          "candidate_entity_keys": "array",
+          "composite_key_candidates": "array"
+        }
+      }
+    },
+    "contract-enforcer": {
+      "id": "contract-enforcer",
+      "name": "Contract Enforcer",
+      "description": "Enforces predefined data contracts to ensure data is strictly compliant with external system requirements. Acts as a quality control gateway validating structural (schema) and value (content) constraints. Supports auto-transformation for compliance.",
+      "icon": "📜",
+      "category": "Governance",
+      "accuracy": "98%",
+      "features": [
+        "Schema Validation",
+        "Required Column Enforcement",
+        "Data Type Verification",
+        "Column Naming Enforcement",
+        "Value Set Validation",
+        "Range Constraint Enforcement",
+        "Regex/Format Validation",
+        "Uniqueness Constraint Checking",
+        "Auto-Transformation Mode"
+      ],
+      "input": { "type": "CSV + Contract (JSON)" },
+      "version": "1.0.0",
+      "required_files": ["primary"],
+      "parameters": {
+        "contract": {
+          "type": "object",
+          "description": "Contract definition containing required_columns, optional_columns, column_types, column_mappings, value_constraints, uniqueness_constraints",
+          "default": {}
+        },
+        "auto_transform": {
+          "type": "boolean",
+          "description": "Automatically apply transformations to achieve compliance",
+          "default": true
+        },
+        "strict_mode": {
+          "type": "boolean",
+          "description": "Fail immediately on first critical violation (stops workflow)",
+          "default": false
+        },
+        "drop_extra_columns": {
+          "type": "boolean",
+          "description": "Drop columns not specified in contract",
+          "default": true
+        },
+        "rename_columns": {
+          "type": "boolean",
+          "description": "Apply column name mappings from contract",
+          "default": true
+        },
+        "cast_types": {
+          "type": "boolean",
+          "description": "Attempt to cast columns to required types",
+          "default": true
+        },
+        "enforce_values": {
+          "type": "boolean",
+          "description": "Enforce value constraints (allowed values, ranges, patterns)",
+          "default": true
+        },
+        "default_value_strategy": {
+          "type": "string",
+          "description": "Strategy for handling invalid values: null, default, or drop",
+          "default": "null",
+          "allowed": ["null", "default", "drop"]
+        },
+        "structural_compliance_weight": {
+          "type": "float",
+          "description": "Weight for structural compliance in overall score",
+          "default": 0.4,
+          "min": 0,
+          "max": 1
+        },
+        "value_compliance_weight": {
+          "type": "float",
+          "description": "Weight for value compliance in overall score",
+          "default": 0.4,
+          "min": 0,
+          "max": 1
+        },
+        "transformation_success_weight": {
+          "type": "float",
+          "description": "Weight for transformation success in overall score",
+          "default": 0.2,
+          "min": 0,
+          "max": 1
+        },
+        "excellent_threshold": {
+          "type": "integer",
+          "description": "Score threshold for compliant status",
+          "default": 95,
+          "min": 0,
+          "max": 100
+        },
+        "good_threshold": {
+          "type": "integer",
+          "description": "Score threshold for partially compliant status",
+          "default": 80,
+          "min": 0,
+          "max": 100
+        }
+      },
+      "output_structure": {
+        "agent_id": "string",
+        "agent_name": "string",
+        "status": "string",
+        "execution_time_ms": "integer",
+        "summary_metrics": {
+          "total_rows_processed": "integer",
+          "original_columns": "integer",
+          "final_columns": "integer",
+          "violations_count": "integer",
+          "critical_violations": "integer",
+          "warnings_count": "integer",
+          "transformations_applied": "integer",
+          "total_issues": "integer"
+        },
+        "data": {
+          "compliance_score": "number",
+          "quality_status": "string",
+          "structural_compliance": "number",
+          "value_compliance": "number",
+          "transformation_success": "number",
+          "violations": "array",
+          "transformations": "array",
+          "contract_summary": "object"
+        },
+        "cleaned_file": {
+          "filename": "string",
+          "content": "string (base64)",
+          "size_bytes": "integer",
+          "format": "string"
+        }
+      }
+    },
+    "semantic-mapper": {
+      "id": "semantic-mapper",
+      "name": "Semantic Mapper",
+      "description": "Maps input column names, keywords, and values to a standardized semantic schema. Ensures data from different sources with inconsistent column names or terminology is unified into one consistent structure.",
+      "icon": "🗺️",
+      "category": "Data Standardization",
+      "accuracy": "95%",
+      "features": [
+        "Column Name Standardization",
+        "Value Normalization",
+        "Pattern-Based Semantic Detection",
+        "Custom Mapping Support",
+        "Confidence Scoring",
+        "Auto-Transformation Mode"
+      ],
+      "input": { "type": "CSV" },
+      "version": "1.0.0",
+      "required_files": ["primary"],
+      "parameters": {
+        "custom_column_mappings": {
+          "type": "object",
+          "description": "Custom column name mappings (raw_name -> standard_name)",
+          "default": {}
+        },
+        "custom_value_mappings": {
+          "type": "object",
+          "description": "Custom value mappings by column (column -> {raw_value -> standard_value})",
+          "default": {}
+        },
+        "confidence_threshold": {
+          "type": "float",
+          "description": "Minimum confidence score for automatic mapping",
+          "default": 0.7,
+          "min": 0,
+          "max": 1
+        },
+        "auto_detect_semantics": {
+          "type": "boolean",
+          "description": "Enable auto-detection of semantic patterns",
+          "default": true
+        },
+        "apply_mappings": {
+          "type": "boolean",
+          "description": "Apply mappings to transform the data",
+          "default": true
+        },
+        "name_similarity_weight": {
+          "type": "float",
+          "description": "Weight for name similarity in scoring",
+          "default": 0.4,
+          "min": 0,
+          "max": 1
+        },
+        "pattern_match_weight": {
+          "type": "float",
+          "description": "Weight for pattern matching in scoring",
+          "default": 0.3,
+          "min": 0,
+          "max": 1
+        },
+        "value_analysis_weight": {
+          "type": "float",
+          "description": "Weight for value analysis in scoring",
+          "default": 0.3,
+          "min": 0,
+          "max": 1
+        },
+        "excellent_threshold": {
+          "type": "integer",
+          "description": "Score threshold for excellent quality status",
+          "default": 90,
+          "min": 0,
+          "max": 100
+        },
+        "good_threshold": {
+          "type": "integer",
+          "description": "Score threshold for good quality status",
+          "default": 75,
+          "min": 0,
+          "max": 100
+        }
+      },
+      "output_structure": {
+        "agent_id": "string",
+        "agent_name": "string",
+        "status": "string",
+        "execution_time_ms": "integer",
+        "summary_metrics": {
+          "total_columns": "integer",
+          "mapped_columns": "integer",
+          "unmapped_columns": "integer",
+          "high_confidence_mappings": "integer",
+          "average_confidence": "number",
+          "total_value_mappings": "integer",
+          "total_transformations": "integer",
+          "total_issues": "integer"
+        },
+        "data": {
+          "mapping_score": "number",
+          "quality_status": "string",
+          "column_mappings": "array",
+          "value_mappings": "array",
+          "unmapped_columns": "array",
+          "unmapped_values": "array",
+          "transformations": "array",
+          "statistics": "object"
+        },
+        "cleaned_file": {
+          "filename": "string",
+          "content": "string (base64)",
+          "size_bytes": "integer",
+          "format": "string"
+        }
+      }
+    },
+    "survivorship-resolver": {
+      "id": "survivorship-resolver",
+      "name": "Survivorship Resolver",
+      "description": "Determines which field values should 'survive' when multiple sources provide different or conflicting values. Applies business rules, scoring logic, and priority models to pick the best possible value before the GoldenRecordBuilder constructs the final Golden Record.",
+      "icon": "⚔️",
+      "category": "Conflict Resolution",
+      "accuracy": "96%",
+      "features": [
+        "Conflict Detection",
+        "Hierarchical Rule Engine",
+        "Freshness/Timestamp Resolution",
+        "Data Quality Scoring",
+        "Value Length/Richness Analysis",
+        "Source Priority Resolution",
+        "Field-Level Custom Rules"
+      ],
+      "input": { "type": "CSV" },
+      "version": "1.0.0",
+      "required_files": ["primary"],
+      "parameters": {
+        "match_key_columns": {
+          "type": "array",
+          "description": "Columns to use for identifying related records",
+          "default": []
+        },
+        "survivorship_rules": {
+          "type": "object",
+          "description": "Column -> rule mapping (freshness, quality_score, completeness, source_priority, frequency, richness, validation, min, max, first, last)",
+          "default": {}
+        },
+        "source_priority": {
+          "type": "object",
+          "description": "Source -> priority mapping (lower = higher priority)",
+          "default": {}
+        },
+        "source_column": {
+          "type": "string",
+          "description": "Column identifying the record source",
+          "default": null
+        },
+        "timestamp_column": {
+          "type": "string",
+          "description": "Column for freshness-based resolution",
+          "default": null
+        },
+        "default_rule": {
+          "type": "string",
+          "description": "Default rule when no specific rule is defined",
+          "default": "quality_score",
+          "allowed": [
+            "freshness",
+            "quality_score",
+            "completeness",
+            "source_priority",
+            "frequency",
+            "richness",
+            "validation",
+            "min",
+            "max",
+            "first",
+            "last"
+          ]
+        },
+        "min_confidence_threshold": {
+          "type": "float",
+          "description": "Minimum confidence for considering a resolution successful",
+          "default": 0.5,
+          "min": 0,
+          "max": 1
+        },
+        "field_validation_rules": {
+          "type": "object",
+          "description": "Field-specific validation rules (column -> {pattern, min_length, allowed_values})",
+          "default": {}
+        },
+        "excellent_threshold": {
+          "type": "integer",
+          "description": "Score threshold for excellent quality status",
+          "default": 90,
+          "min": 0,
+          "max": 100
+        },
+        "good_threshold": {
+          "type": "integer",
+          "description": "Score threshold for good quality status",
+          "default": 75,
+          "min": 0,
+          "max": 100
+        }
+      },
+      "output_structure": {
+        "agent_id": "string",
+        "agent_name": "string",
+        "status": "string",
+        "execution_time_ms": "integer",
+        "summary_metrics": {
+          "total_records": "integer",
+          "clusters_analyzed": "integer",
+          "conflicts_detected": "integer",
+          "conflicts_resolved": "integer",
+          "values_survived": "integer",
+          "unresolved_conflicts": "integer",
+          "resolution_rate": "number",
+          "average_confidence": "number",
+          "total_issues": "integer"
+        },
+        "data": {
+          "survivorship_score": "number",
+          "quality_status": "string",
+          "resolved_fields": "array",
+          "resolution_log": "array",
+          "rules_applied": "object",
+          "resolution_by_field": "object",
+          "statistics": "object"
+        },
+        "cleaned_file": {
+          "filename": "string",
+          "content": "string (base64)",
+          "size_bytes": "integer",
+          "format": "string"
+        }
+      }
+    },
+    "golden-record-builder": {
+      "id": "golden-record-builder",
+      "name": "Golden Record Builder",
+      "description": "Creates the final unified, conflict-resolved, highest-quality version of a record (Golden Record). Merges records from multiple sources using survivorship rules to create a single source of truth.",
+      "icon": "🏆",
+      "category": "Master Data",
+      "accuracy": "97%",
+      "features": [
+        "Record Clustering",
+        "Survivorship Rule Application",
+        "Conflict Resolution",
+        "Trust Score Calculation",
+        "Source Attribution",
+        "Compression Ratio Tracking"
+      ],
+      "input": { "type": "CSV" },
+      "version": "1.0.0",
+      "required_files": ["primary"],
+      "parameters": {
+        "match_key_columns": {
+          "type": "array",
+          "description": "Columns to use for identifying related records",
+          "default": []
+        },
+        "survivorship_rules": {
+          "type": "object",
+          "description": "Column -> rule mapping (most_complete, most_recent, source_priority, most_frequent, min, max, first, last)",
+          "default": {}
+        },
+        "source_priority": {
+          "type": "object",
+          "description": "Source -> priority mapping for source_priority rule",
+          "default": {}
+        },
+        "source_column": {
+          "type": "string",
+          "description": "Column identifying the record source",
+          "default": null
+        },
+        "timestamp_column": {
+          "type": "string",
+          "description": "Column for recency-based survivorship rules",
+          "default": null
+        },
+        "default_survivorship_rule": {
+          "type": "string",
+          "description": "Default rule when no specific rule is defined",
+          "default": "most_complete",
+          "allowed": [
+            "most_complete",
+            "most_recent",
+            "source_priority",
+            "most_frequent",
+            "min",
+            "max",
+            "first",
+            "last"
+          ]
+        },
+        "min_trust_score": {
+          "type": "float",
+          "description": "Minimum trust score threshold for flagging records",
+          "default": 0.5,
+          "min": 0,
+          "max": 1
+        },
+        "excellent_threshold": {
+          "type": "integer",
+          "description": "Score threshold for excellent quality status",
+          "default": 90,
+          "min": 0,
+          "max": 100
+        },
+        "good_threshold": {
+          "type": "integer",
+          "description": "Score threshold for good quality status",
+          "default": 75,
+          "min": 0,
+          "max": 100
+        }
+      },
+      "output_structure": {
+        "agent_id": "string",
+        "agent_name": "string",
+        "status": "string",
+        "execution_time_ms": "integer",
+        "summary_metrics": {
+          "input_records": "integer",
+          "golden_records_created": "integer",
+          "clusters_formed": "integer",
+          "compression_ratio": "number",
+          "conflicts_resolved": "integer",
+          "values_survived": "integer",
+          "average_trust_score": "number",
+          "total_issues": "integer"
+        },
+        "data": {
+          "golden_score": "number",
+          "quality_status": "string",
+          "golden_records": "array",
+          "field_resolutions": "array",
+          "statistics": "object",
+          "survivorship_rules_applied": "object"
+        },
+        "cleaned_file": {
+          "filename": "string",
+          "content": "string (base64)",
+          "size_bytes": "integer",
+          "format": "string"
+        }
+      }
+    },
+    "stewardship-flagger": {
+      "id": "stewardship-flagger",
+      "name": "Stewardship Flagger",
+      "description": "Identifies data issues that require human review or intervention. Automatically flags suspicious, incomplete, inconsistent, or low-confidence data so Data Stewards can take action. Acts as the quality gatekeeper of the entire data pipeline.",
+      "icon": "🚩",
+      "category": "Governance",
+      "accuracy": "95%",
+      "features": [
+        "Missing Required Field Detection",
+        "Format Validation",
+        "Low Confidence Detection",
+        "Outlier Detection",
+        "Duplicate Detection",
+        "Business Rule Validation",
+        "Stewardship Task Generation"
+      ],
+      "input": { "type": "CSV" },
+      "version": "1.0.0",
+      "required_files": ["primary"],
+      "parameters": {
+        "required_columns": {
+          "type": "array",
+          "description": "List of columns that must have values",
+          "default": []
+        },
+        "confidence_threshold": {
+          "type": "float",
+          "description": "Minimum confidence score threshold",
+          "default": 0.7,
+          "min": 0,
+          "max": 1
+        },
+        "confidence_columns": {
+          "type": "array",
+          "description": "Columns containing confidence scores to evaluate",
+          "default": []
+        },
+        "field_validation_rules": {
+          "type": "object",
+          "description": "Field-specific validation rules (column -> {pattern, min_length, allowed_values})",
+          "default": {}
+        },
+        "outlier_thresholds": {
+          "type": "object",
+          "description": "Field-specific outlier thresholds (field_type or column -> {min, max})",
+          "default": {
+            "age": { "min": 0, "max": 120 },
+            "percentage": { "min": 0, "max": 100 }
+          }
+        },
+        "duplicate_key_columns": {
+          "type": "array",
+          "description": "Columns to use for duplicate detection",
+          "default": []
+        },
+        "business_rules": {
+          "type": "array",
+          "description": "Custom business rules [{name, condition: {column, operator, value}, severity, action}]",
+          "default": []
+        },
+        "severity_weights": {
+          "type": "object",
+          "description": "Weights for severity levels in scoring",
+          "default": { "critical": 4, "high": 3, "medium": 2, "low": 1 }
+        },
+        "excellent_threshold": {
+          "type": "integer",
+          "description": "Score threshold for excellent quality status",
+          "default": 90,
+          "min": 0,
+          "max": 100
+        },
+        "good_threshold": {
+          "type": "integer",
+          "description": "Score threshold for good quality status",
+          "default": 75,
+          "min": 0,
+          "max": 100
+        }
+      },
+      "output_structure": {
+        "agent_id": "string",
+        "agent_name": "string",
+        "status": "string",
+        "execution_time_ms": "integer",
+        "summary_metrics": {
+          "total_records": "integer",
+          "total_issues": "integer",
+          "tasks_created": "integer",
+          "critical_issues": "integer",
+          "high_priority_tasks": "integer",
+          "records_flagged": "integer",
+          "clean_data_rate": "number",
+          "total_issues_count": "integer"
+        },
+        "data": {
+          "stewardship_score": "number",
+          "quality_status": "string",
+          "task_list": "array",
+          "issue_distribution": "object",
+          "issues_by_column": "object",
+          "issues_by_severity": "object",
+          "reason_distribution": "object",
+          "statistics": "object"
+        },
+        "cleaned_file": {
+          "filename": "string",
+          "content": "string (base64)",
+          "size_bytes": "integer",
+          "format": "string"
+        }
+      }
+    }
+  },
+  "response_structure": {
+    "status": "string",
+    "timestamp": "string (ISO 8601)",
+    "execution_time_ms": "integer",
+    "report": {
+      "common_arrays": {
+        "alerts": "array - Critical alerts regarding master data integrity",
+        "issues": "array - Detailed issues requiring attention",
+        "recommendations": "array - Suggestions for improving data mastery",
+        "executiveSummary": "array - High-level MDM metrics",
+        "visualizations": "array - Graph-ready data structures"
+      },
+      "agent_results": "object - Individual agent results keyed by agent_id",
+      "downloads": "array - Available downloadable reports (Excel, JSON, Mastered Data)"
+    }
+  },
+  "visualizations": {
+    "description": "Graph-ready visualizations that can be used directly by frontend charting libraries without transformation",
+    "structure": "Each visualization is a GraphReadyData object with chart_type, title, data, options, and insights",
+    "by_agent": {
+      "key-identifier": {
+        "graph_count": 3,
+        "visualizations": [
+          {
+            "graph_id": "key_uniqueness_dist",
+            "title": "Key Uniqueness Distribution",
+            "chart_type": "histogram",
+            "description": "Distribution of uniqueness percentages across columns"
+          },
+          {
+            "graph_id": "key_type_breakdown",
+            "title": "Key Types Identified",
+            "chart_type": "pie_chart",
+            "description": "Breakdown of Primary, Composite, Entity, and Foreign key candidates"
+          },
+          {
+            "graph_id": "key_confidence_scores",
+            "title": "Key Candidate Confidence Scores",
+            "chart_type": "bar_chart",
+            "description": "Confidence scores for top key candidates"
+          }
+        ]
+      },
+      "contract-enforcer": {
+        "graph_count": 4,
+        "visualizations": [
+          {
+            "graph_id": "compliance_scorecard",
+            "title": "Contract Compliance Score",
+            "chart_type": "gauge",
+            "description": "Overall compliance score against the data contract"
+          },
+          {
+            "graph_id": "violation_types",
+            "title": "Violation Types",
+            "chart_type": "bar_chart",
+            "description": "Count of violations by type (Type Mismatch, Missing Column, Value Violation, etc.)"
+          },
+          {
+            "graph_id": "violation_severity",
+            "title": "Violations by Severity",
+            "chart_type": "pie_chart",
+            "description": "Distribution of violations by severity level"
+          },
+          {
+            "graph_id": "transformations_applied",
+            "title": "Auto-Transformations Applied",
+            "chart_type": "bar_chart",
+            "description": "Count of transformations by type (rename, cast, drop, replace)"
+          }
+        ]
+      },
+      "semantic-mapper": {
+        "graph_count": 3,
+        "visualizations": [
+          {
+            "graph_id": "mapping_coverage",
+            "title": "Column Mapping Coverage",
+            "chart_type": "pie_chart",
+            "description": "Distribution of mapped vs unmapped columns"
+          },
+          {
+            "graph_id": "confidence_distribution",
+            "title": "Mapping Confidence Distribution",
+            "chart_type": "histogram",
+            "description": "Distribution of confidence scores across column mappings"
+          },
+          {
+            "graph_id": "value_standardizations",
+            "title": "Value Standardizations by Column",
+            "chart_type": "bar_chart",
+            "description": "Count of value standardizations applied per column"
+          }
+        ]
+      },
+      "lineage-tracer": {
+        "graph_count": 3,
+        "visualizations": [
+          {
+            "graph_id": "lineage_depth",
+            "title": "Pipeline Lineage Depth",
+            "chart_type": "gauge",
+            "description": "Number of processing steps in the data lineage"
+          },
+          {
+            "graph_id": "transformation_types",
+            "title": "Transformation Types Detected",
+            "chart_type": "bar_chart",
+            "description": "Count of transformations by type (column_added, column_removed, type_changed, etc.)"
+          },
+          {
+            "graph_id": "source_distribution",
+            "title": "Data Source Distribution",
+            "chart_type": "pie_chart",
+            "description": "Distribution of data across source systems"
+          }
+        ]
+      },
+      "golden-record-builder": {
+        "graph_count": 4,
+        "visualizations": [
+          {
+            "graph_id": "compression_ratio",
+            "title": "Record Compression Ratio",
+            "chart_type": "gauge",
+            "description": "Ratio of input records to golden records created"
+          },
+          {
+            "graph_id": "trust_score_distribution",
+            "title": "Trust Score Distribution",
+            "chart_type": "histogram",
+            "description": "Distribution of trust scores across golden records"
+          },
+          {
+            "graph_id": "conflicts_by_column",
+            "title": "Conflicts Resolved by Column",
+            "chart_type": "bar_chart",
+            "description": "Count of conflicts resolved per column"
+          },
+          {
+            "graph_id": "survivorship_rules_usage",
+            "title": "Survivorship Rules Applied",
+            "chart_type": "pie_chart",
+            "description": "Distribution of survivorship rules used for conflict resolution"
+          }
+        ]
+      },
+      "survivorship-resolver": {
+        "graph_count": 4,
+        "visualizations": [
+          {
+            "graph_id": "resolution_rate",
+            "title": "Conflict Resolution Rate",
+            "chart_type": "gauge",
+            "description": "Percentage of conflicts successfully resolved"
+          },
+          {
+            "graph_id": "rules_applied_distribution",
+            "title": "Rules Applied Distribution",
+            "chart_type": "pie_chart",
+            "description": "Distribution of survivorship rules used"
+          },
+          {
+            "graph_id": "confidence_by_field",
+            "title": "Resolution Confidence by Field",
+            "chart_type": "bar_chart",
+            "description": "Average confidence score per field"
+          },
+          {
+            "graph_id": "unresolved_conflicts",
+            "title": "Unresolved Conflicts by Field",
+            "chart_type": "bar_chart",
+            "description": "Count of unresolved conflicts per field"
+          }
+        ]
+      },
+      "master-writeback-agent": {
+        "graph_count": 3,
+        "visualizations": [
+          {
+            "graph_id": "write_success_rate",
+            "title": "Write Success Rate",
+            "chart_type": "gauge",
+            "description": "Percentage of records successfully written"
+          },
+          {
+            "graph_id": "data_integrity_score",
+            "title": "Data Integrity Score",
+            "chart_type": "gauge",
+            "description": "Overall data integrity score"
+          },
+          {
+            "graph_id": "exclusion_breakdown",
+            "title": "Record Exclusion Breakdown",
+            "chart_type": "pie_chart",
+            "description": "Distribution of excluded records by reason"
+          }
+        ]
+      },
+      "stewardship-flagger": {
+        "graph_count": 4,
+        "visualizations": [
+          {
+            "graph_id": "issue_type_distribution",
+            "title": "Issue Types Distribution",
+            "chart_type": "pie_chart",
+            "description": "Distribution of issues by type (MISSING_REQUIRED, INVALID_FORMAT, etc.)"
+          },
+          {
+            "graph_id": "severity_breakdown",
+            "title": "Issues by Severity",
+            "chart_type": "bar_chart",
+            "description": "Count of issues by severity level"
+          },
+          {
+            "graph_id": "issues_by_column",
+            "title": "Issues by Column",
+            "chart_type": "bar_chart",
+            "description": "Count of issues per column"
+          },
+          {
+            "graph_id": "clean_data_rate",
+            "title": "Clean Data Rate",
+            "chart_type": "gauge",
+            "description": "Percentage of data without quality issues"
+          }
+        ]
+      }
+    },
+    "total_possible_visualizations": 28,
+    "frontend_usage": {
+      "note": "Each visualization in report.visualizations is immediately ready for charting libraries",
+      "structure": {
+        "graph_id": "Unique identifier for the visualization",
+        "agent_id": "Which agent generated this",
+        "chart_type": "bar_chart | pie_chart | line_chart | gauge | heatmap | radar_chart | bubble_chart | histogram | progress_ring | status_grid | stacked_bar_chart | line_overlay",
+        "title": "Display title for the visualization",
+        "description": "What the visualization shows",
+        "data": "Chart-specific data structure",
+        "options": "Display hints",
+        "insights": "Array of key takeaways or findings"
+      }
+    }
+  }
+}

@@ -15,15 +15,13 @@
       "duplicate-resolver",
       "null-handler",
       "outlier-remover",
-      "governance-checker",
-      "test-coverage-agent",
       "cleanse-writeback"
     ],
     "files": {
       "primary": {
         "description": "Data file to clean and validate",
         "required": true,
-        "formats": ["csv", "json", "xlsx"],
+        "formats": ["csv", "xlsx"],
         "max_size_mb": 500
       }
     }
@@ -44,7 +42,7 @@
         "Statistical Confidence Scoring",
         "Safety Validation"
       ],
-      "input": { "type": "CSV, JSON, XLSX + cleaning rules" },
+      "input": { "type": "CSV, XLSX + cleaning rules" },
       "version": "1.0.0",
       "required_files": ["primary"],
       "parameters": {
@@ -429,6 +427,16 @@
           "type": "object",
           "description": "Column-specific unit conversion mappings (column -> {unit_pattern -> {factor: number, target_unit: string}}). Example: {'height': {'ft': {'factor': 12, 'target_unit': 'inches'}}}",
           "default": {}
+        },
+        "date_standardization": {
+          "type": "boolean",
+          "description": "Standardize date formats to a consistent target format",
+          "default": true
+        },
+        "target_date_format": {
+          "type": "string",
+          "description": "Target format for date standardization (e.g., %Y-%m-%d)",
+          "default": "%Y-%m-%d"
         },
         "target_columns": {
           "type": "array",
@@ -841,188 +849,6 @@
           "removal_log": "array",
           "summary": "string",
           "row_level_issues": "array"
-        }
-      }
-    },
-    "governance-checker": {
-      "id": "governance-checker",
-      "name": "Governance Checker",
-      "description": "Validates data governance compliance including lineage, consent, and classification requirements. Ensures data meets governance standards and compliance frameworks.",
-      "icon": "🏛️",
-      "category": "Governance",
-      "accuracy": "95%",
-      "features": [
-        "Lineage Validation",
-        "Consent Verification",
-        "Classification Check",
-        "PII Detection"
-      ],
-      "input": { "type": "CSV, JSON, XLSX" },
-      "version": "1.0.0",
-      "required_files": ["primary"],
-      "parameters": {
-        "lineage_weight": {
-          "type": "float",
-          "description": "Weight for lineage component",
-          "default": 0.3,
-          "min": 0,
-          "max": 1
-        },
-        "consent_weight": {
-          "type": "float",
-          "description": "Weight for consent component",
-          "default": 0.4,
-          "min": 0,
-          "max": 1
-        },
-        "classification_weight": {
-          "type": "float",
-          "description": "Weight for classification component",
-          "default": 0.3,
-          "min": 0,
-          "max": 1
-        },
-        "compliance_threshold": {
-          "type": "integer",
-          "description": "Score threshold for compliant status",
-          "default": 80,
-          "min": 0,
-          "max": 100
-        },
-        "needs_review_threshold": {
-          "type": "integer",
-          "description": "Score threshold for needs review status",
-          "default": 60,
-          "min": 0,
-          "max": 100
-        },
-        "required_lineage_fields": {
-          "type": "array",
-          "description": "List of required lineage fields",
-          "default": [],
-          "items": "string"
-        },
-        "required_consent_fields": {
-          "type": "array",
-          "description": "List of required consent fields",
-          "default": [],
-          "items": "string"
-        },
-        "required_classification_fields": {
-          "type": "array",
-          "description": "List of required classification fields",
-          "default": [],
-          "items": "string"
-        }
-      },
-      "output_structure": {
-        "agent_id": "string",
-        "agent_name": "string",
-        "status": "string",
-        "execution_time_ms": "integer",
-        "summary_metrics": {
-          "total_records": "integer",
-          "total_fields": "integer",
-          "governance_score": "number",
-          "compliance_status": "string",
-          "issues_found": "integer"
-        },
-        "data": {
-          "governance_scores": "object",
-          "compliance_status": "string",
-          "total_records": "integer",
-          "fields_analyzed": "array",
-          "governance_issues": "array"
-        }
-      }
-    },
-    "test-coverage-agent": {
-      "id": "test-coverage-agent",
-      "name": "Test Coverage Agent",
-      "description": "Validates data test coverage including uniqueness, range, and format constraints. Ensures data meets quality and validation requirements for testing.",
-      "icon": "🧪",
-      "category": "Testing",
-      "accuracy": "97%",
-      "features": [
-        "Uniqueness Testing",
-        "Range Validation",
-        "Format Validation",
-        "Coverage Scoring"
-      ],
-      "input": { "type": "CSV, JSON, XLSX" },
-      "version": "1.0.0",
-      "required_files": ["primary"],
-      "parameters": {
-        "uniqueness_weight": {
-          "type": "float",
-          "description": "Weight for uniqueness tests",
-          "default": 0.4,
-          "min": 0,
-          "max": 1
-        },
-        "range_weight": {
-          "type": "float",
-          "description": "Weight for range tests",
-          "default": 0.3,
-          "min": 0,
-          "max": 1
-        },
-        "format_weight": {
-          "type": "float",
-          "description": "Weight for format tests",
-          "default": 0.3,
-          "min": 0,
-          "max": 1
-        },
-        "excellent_threshold": {
-          "type": "integer",
-          "description": "Score threshold for excellent status",
-          "default": 90,
-          "min": 0,
-          "max": 100
-        },
-        "good_threshold": {
-          "type": "integer",
-          "description": "Score threshold for good status",
-          "default": 75,
-          "min": 0,
-          "max": 100
-        },
-        "unique_columns": {
-          "type": "array",
-          "description": "List of columns that should have unique values",
-          "default": [],
-          "items": "string"
-        },
-        "range_tests": {
-          "type": "object",
-          "description": "Range constraints for numeric columns (column -> {min, max})",
-          "default": {}
-        },
-        "format_tests": {
-          "type": "object",
-          "description": "Format constraints for columns (column -> pattern or {pattern, description})",
-          "default": {}
-        }
-      },
-      "output_structure": {
-        "agent_id": "string",
-        "agent_name": "string",
-        "status": "string",
-        "execution_time_ms": "integer",
-        "summary_metrics": {
-          "total_records": "integer",
-          "total_fields": "integer",
-          "test_coverage_score": "number",
-          "coverage_status": "string",
-          "issues_found": "integer"
-        },
-        "data": {
-          "test_coverage_scores": "object",
-          "coverage_status": "string",
-          "total_records": "integer",
-          "fields_analyzed": "array",
-          "test_coverage_issues": "array"
         }
       }
     },

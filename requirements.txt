@@ -1,4 +1,5 @@
-fastapi==0.104.1
+# FastAPI and server
+fastapi>=0.115.0
 uvicorn[standard]==0.24.0
 
 # Data processing
@@ -17,12 +18,17 @@ xlrd>=2.0.1
 # OpenAI API client
 openai>=1.0.0
 
-# Database
-sqlalchemy==2.0.23
+# Database - MySQL
+sqlalchemy>=2.0.0
+pymysql>=1.1.0
+cryptography>=41.0.0
 
 # Authentication
-passlib[argon2]==1.7.4
-python-jose[cryptography]==3.3.0
+python-jose[cryptography]>=3.3.0
+passlib[bcrypt]>=1.7.4
+bcrypt>=4.1.0
 
 # Validation
-email-validator==2.1.0.post1
+email-validator>=2.1.0
+pydantic[email]>=2.0.0
+
