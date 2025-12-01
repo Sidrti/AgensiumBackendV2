@@ -9,7 +9,8 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # MySQL connection - REQUIRED
-SQLALCHEMY_DATABASE_URL = os.getenv("DATABASE_URL")
+# SQLALCHEMY_DATABASE_URL = os.getenv("DATABASE_URL")
+SQLALCHEMY_DATABASE_URL = "mysql+pymysql://avnadmin:AVNS_L28H0U06v5Ky--zUw1T@mysql-1d10a985-vivekb379-a220.g.aivencloud.com:16218/defaultdb?charset=utf8mb4";
 
 if not SQLALCHEMY_DATABASE_URL:
     raise ValueError(
