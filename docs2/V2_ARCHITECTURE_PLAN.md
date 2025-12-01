@@ -1,71 +1,12 @@
-# V2 Architecture Plan: Asynchronous Processing & MySQL Migration
+# V2 Architecture Plan: Asynchronous Processing
 
-This document outlines the comprehensive plan to transition the Agensium Backend from a synchronous, SQLite-based architecture to a robust, asynchronous, MySQL-backed system suitable for production.
+This document describes the plan to transition the Agensium backend from synchronous blocking processing to an asynchronous architecture using background workers, a fast message broker, and shared object storage. It focuses on the components, rationale, and implementation steps for non-blocking processing using Celery + Redis, shared file storage, task wrappers around existing agent logic, async API routes, and deployment options.
 
-It includes definitions of key technologies to help developers understand _why_ these changes are being made.
-
----
-
-## Phase 1: Database Migration (MySQL)
-
-**Goal:** Replace SQLite with MySQL to handle concurrent writes and ensure data integrity.
-
-### 1.1. Concepts & Definitions
-
-- **MySQL:**
-  - _What is it?_ A powerful, open-source relational database system.
-  - _Why use it?_ Unlike SQLite, which is a simple file that locks up when one person writes to it, MySQL is a server designed to handle hundreds of users reading and writing simultaneously. It is the industry standard for production web applications.
-- **mysql-connector-python:**
-  - _What is it?_ A popular MySQL adapter for the Python programming language.
-  - _Usage:_ It acts as the translator, allowing your Python code (SQLAlchemy) to speak to the MySQL database server.
-- **Alembic:**
-  - _What is it?_ A lightweight database migration tool for usage with SQLAlchemy.
-  - _Usage:_ Think of it like "Git for your database." If you add a new column to a table, Alembic creates a script to apply that change safely without deleting your existing data.
-
-### 1.2. Implementation Steps
-
-1.  **Infrastructure Setup:**
-
-    - Provision a MySQL 8+ database (AWS RDS, Google Cloud SQL, or self-hosted).
-    - Create a database (e.g., `agensium_prod`) and a user with password authentication.
-
-2.  **Dependency Updates:**
-
-    - Add `mysql-connector-python` and `alembic` to `requirements.txt`.
-
-3.  **Code Configuration (`backend/db/database.py`):**
-
-    - Update the database connection string to look for an environment variable `DATABASE_URL`.
-    - Remove SQLite-specific flags like `check_same_thread`.
-
-    ```python
-    # ...existing code...
-    import os
-
-    # Use environment variable for flexibility (Dev vs Prod)
-    # Format: mysql+mysqlconnector://user:password@host:port/dbname
-    SQLALCHEMY_DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./agensium.db")
-
-    engine = create_engine(
-        SQLALCHEMY_DATABASE_URL
-        # connect_args={"check_same_thread": False}  <-- REMOVE THIS (SQLite only)
-    )
-    # ...existing code...
-    ```
-
-4.  **Initialize Migrations:**
-    - Run `alembic init alembic` in the terminal.
-    - Edit `alembic/env.py` to import your `Base` from `db.models` so Alembic can see your table definitions.
-    - Run `alembic revision --autogenerate -m "Initial migration"` to create the first table creation script.
-    - Run `alembic upgrade head` to apply it.
-
----
-
-## Phase 2: Asynchronous Infrastructure (Celery + Redis)
+## Phase 1: Asynchronous Infrastructure (Celery + Redis)
 
 **Goal:** Offload long-running data processing tasks to background workers to keep the API responsive.
 
-### 2.1. Concepts & Definitions
+### 1.1. Concepts & Definitions
 
 - **Celery:**
   - _What is it?_ A distributed task queue.
@@ -76,7 +17,7 @@ It includes definitions of key technologies to help developers understand _why_ 
     1.  **Message Broker:** The "mailbox" where the API puts tasks. The Workers check this mailbox to find work.
     2.  **Result Backend:** A place to store the final answer (e.g., the profile report) so the API can retrieve it later.
 
-### 2.2. Implementation Steps
+### 1.2. Implementation Steps
 
 1.  **Infrastructure Setup:**
 
@@ -115,11 +56,11 @@ It includes definitions of key technologies to help developers understand _why_ 
 
 ---
 
-## Phase 3: Shared File Storage (S3 / Blob Storage)
+## Phase 2: Shared File Storage (S3 / Blob Storage)
 
 **Goal:** Enable workers to access files uploaded via the API.
 
-### 3.1. Concepts & Definitions
+### 2.1. Concepts & Definitions
 
 - **Object Storage (S3/Blob):**
   - _What is it?_ A service for storing large amounts of unstructured data (files), accessible via HTTP.
@@ -128,7 +69,7 @@ It includes definitions of key technologies to help developers understand _why_ 
   - _What is it?_ The AWS SDK for Python.
   - _Usage:_ It provides easy Python functions to upload, download, and manage files on AWS S3.
 
-### 3.2. Implementation Steps
+### 2.2. Implementation Steps
 
 1.  **Infrastructure Setup:**
 
@@ -162,17 +103,17 @@ It includes definitions of key technologies to help developers understand _why_ 
 
 ---
 
-## Phase 4: Refactoring Agents to Tasks
+## Phase 3: Refactoring Agents to Tasks
 
 **Goal:** Wrap existing synchronous agent logic into Celery tasks.
 
-### 4.1. Concepts & Definitions
+### 3.1. Concepts & Definitions
 
 - **Task Wrapper:**
   - _What is it?_ A small function decorated with `@celery_app.task`.
   - _Usage:_ It handles the "plumbing" (downloading file, parsing params), calls your existing complex logic (the Agent), and returns the result. It keeps your core Agent logic pure and testable.
 
-### 4.2. Implementation Steps
+### 3.2. Implementation Steps
 
 1.  **Create Task File (`backend/tasks/profiling_tasks.py`):**
 
@@ -195,17 +136,17 @@ It includes definitions of key technologies to help developers understand _why_ 
 
 ---
 
-## Phase 5: API Updates
+## Phase 4: API Updates
 
 **Goal:** Change API endpoints to be non-blocking ("Fire and Forget").
 
-### 5.1. Concepts & Definitions
+### 4.1. Concepts & Definitions
 
 - **Asynchronous Request-Response Pattern:**
   - _What is it?_ Instead of the user waiting 30 seconds for a response, the server says "I accepted your request, here is a tracking ID." The user then asks "Is it done yet?" every few seconds until it is.
   - _Why use it?_ It prevents connection timeouts and allows the user to do other things while waiting.
 
-### 5.2. Implementation Steps
+### 4.2. Implementation Steps
 
 1.  **Update Routes (`backend/api/routes.py`):**
 
@@ -250,37 +191,26 @@ It includes definitions of key technologies to help developers understand _why_ 
 
 ---
 
-## Phase 6: Deployment Configuration
+## Phase 5: Deployment Configuration
 
 **Goal:** Orchestrate all these moving parts.
 
-### 6.1. Concepts & Definitions
+### 5.1. Concepts & Definitions
 
 - **Docker:**
   - _What is it?_ A platform that packages your application and all its dependencies (Python, libraries, OS settings) into a "container."
   - _Why use it?_ It ensures the app runs exactly the same on your laptop as it does on the production server.
 - **Docker Compose:**
   - _What is it?_ A tool for defining and running multi-container Docker applications.
-  - _Usage:_ It lets you start the API, the Worker, the Database, and Redis all with one command: `docker-compose up`.
+  - _Usage:_ It lets you start the API, the Worker, and Redis all with one command: `docker-compose up`.
 
-### 6.2. Implementation Steps
+### 5.2. Implementation Steps
 
 1.  **Create `docker-compose.yml`:**
 
     ```yaml
     version: "3.8"
     services:
-      # The Database Service
-      db:
-        image: mysql:8
-        environment:
-          MYSQL_USER: user
-          MYSQL_PASSWORD: password
-          MYSQL_DATABASE: agensium
-          MYSQL_ROOT_PASSWORD: rootpassword
-        ports:
-          - "3306:3306"
-
       # The Message Broker Service
       redis:
         image: redis:7
@@ -292,13 +222,12 @@ It includes definitions of key technologies to help developers understand _why_ 
         build: .
         command: uvicorn main:app --host 0.0.0.0 --port 8000
         environment:
-          - DATABASE_URL=mysql+mysqlconnector://user:password@db:3306/agensium
+          # DATABASE is managed separately; this doc focuses on async infra
           - REDIS_URL=redis://redis:6379/0
           - AWS_ACCESS_KEY_ID=...
         ports:
           - "8000:8000"
         depends_on:
-          - db
           - redis
 
       # The Worker Service (The Chef)
@@ -307,10 +236,9 @@ It includes definitions of key technologies to help developers understand _why_ 
         # Runs the Celery process instead of the Web Server
         command: celery -A worker.celery_app worker --loglevel=info
         environment:
-          - DATABASE_URL=mysql+mysqlconnector://user:password@db:3306/agensium
+          # DATABASE is managed separately; this doc focuses on async infra
           - REDIS_URL=redis://redis:6379/0
           - AWS_ACCESS_KEY_ID=...
         depends_on:
-          - db
           - redis
     ```

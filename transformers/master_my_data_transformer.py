@@ -231,8 +231,20 @@ def transform_master_my_data_response(
         print(f"Using most processed file from [{most_mastered_item['agent_id']}]: {most_mastered_item['filename']} -> {mastered_filename}")
     
     downloader = MasterMyDataDownloads()
+
+    # Sanitize agent_results for downloads: remove potentially large mastered/cleaned file contents
+    # The chosen mastered file(s) are already passed via cleaned_files, so we avoid duplicating
+    # potentially large payloads in the agent_results used by downloads.
+    sanitized_agent_results_for_downloads = {}
+    for aid, out in agent_results.items():
+        if isinstance(out, dict):
+            filtered = {k: v for k, v in out.items() if k != 'cleaned_file'}
+        else:
+            filtered = out
+        sanitized_agent_results_for_downloads[aid] = filtered
+
     downloads = downloader.generate_downloads(
-        agent_results=agent_results,
+        agent_results=sanitized_agent_results_for_downloads,
         analysis_id=analysis_id,
         execution_time_ms=execution_time_ms,
         alerts=all_alerts,
@@ -250,9 +262,13 @@ def transform_master_my_data_response(
     
     # Include all agent results (both success and error) in the report
     # This provides complete visibility into agent execution
+    # Build agent_outputs for final response but exclude raw cleaned_file/mastered file payloads
     agent_outputs = {}
     for agent_id, output in agent_results.items():
-        agent_outputs[agent_id] = output
+        if isinstance(output, dict):
+            agent_outputs[agent_id] = {k: v for k, v in output.items() if k != 'cleaned_file'}
+        else:
+            agent_outputs[agent_id] = output
     
     return {
         "analysis_id": analysis_id,

@@ -236,8 +236,21 @@ def transform_clean_my_data_response(
         print(f"Using most processed file from [{most_cleaned_item['agent_id']}]: {most_cleaned_item['filename']} -> {cleaned_filename}")
     
     downloader = CleanMyDataDownloads()
+
+    # Sanitize agent_results for downloads: remove potentially large cleaned_file contents
+    # cleaned files are passed explicitly via cleaned_files parameter so we don't need to include
+    # the full cleaned_file payload inside agent_results used for building the report/downloads.
+    sanitized_agent_results_for_downloads = {}
+    for aid, out in agent_results.items():
+        if isinstance(out, dict):
+            # shallow copy so we don't modify original
+            filtered = {k: v for k, v in out.items() if k != 'cleaned_file'}
+        else:
+            filtered = out
+        sanitized_agent_results_for_downloads[aid] = filtered
+
     downloads = downloader.generate_downloads(
-        agent_results=agent_results,
+        agent_results=sanitized_agent_results_for_downloads,
         analysis_id=analysis_id,
         execution_time_ms=execution_time_ms,
         alerts=all_alerts,
@@ -255,9 +268,13 @@ def transform_clean_my_data_response(
     
     # Include all agent results (both success and error) in the report
     # This provides complete visibility into agent execution
+    # Build agent_outputs for final response but exclude raw cleaned_file payloads
     agent_outputs = {}
     for agent_id, output in agent_results.items():
-        agent_outputs[agent_id] = output
+        if isinstance(output, dict):
+            agent_outputs[agent_id] = {k: v for k, v in output.items() if k != 'cleaned_file'}
+        else:
+            agent_outputs[agent_id] = output
     
     return {
         "analysis_id": analysis_id,
