@@ -1,0 +1,10 @@
+CustomerID,FName,E-mail,Phone,Country,LastUpdated,ExtraCol
+C001,John,john@example.com,555-0101,U.S.A,2023-01-01,IgnoreMe
+C001,J.,john.doe@example.com,555-0101,USA,2023-01-02,IgnoreMe
+C002,Jane,jane@promo.com,555-0102,Canada,2023-01-01,IgnoreMe
+C003,Bob,bob@example.com,555-0103,UK,2023-01-01,IgnoreMe
+C003,Robert,bob@example.com,555-0103,United Kingdom,2023-01-03,IgnoreMe
+C004,Alice,alice@example.com,555-0104,Spain,2023-01-01,IgnoreMe
+C005,Eve,eve@example.com,555-0105,China,2023-01-01,IgnoreMe
+C006,Mallory,mallory@example.com,555-0106,UAE,2023-01-01,IgnoreMe
+C007,Invalid,invalid@example.com,555-0107,Mars,2023-01-01,IgnoreMe

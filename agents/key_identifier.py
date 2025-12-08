@@ -70,7 +70,7 @@ def execute_key_identifier(
             }
 
         try:
-            df = pl.read_csv(io.BytesIO(file_contents), ignore_errors=True, infer_schema_length=10000)
+            df = pl.read_csv(io.BytesIO(file_contents), ignore_errors=True, infer_schema_length=10000, truncate_ragged_lines=True)
         except Exception as e:
             return {
                 "status": "error",

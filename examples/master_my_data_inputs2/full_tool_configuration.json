@@ -1,0 +1,304 @@
+{
+  "tool_id": "master-my-data",
+  "parameters": {
+    "key-identifier": {
+      "pk_uniqueness_threshold": 99.0,
+      "pk_null_threshold": 0.0,
+      "entity_key_uniqueness_min": 50.0,
+      "entity_key_uniqueness_max": 99.0,
+      "fk_overlap_threshold": 70.0,
+      "reference_tables": {},
+      "analyze_composite_keys": true,
+      "max_composite_key_columns": 3,
+      "uniqueness_weight": 0.4,
+      "null_density_weight": 0.3,
+      "pattern_weight": 0.3,
+      "excellent_threshold": 90,
+      "good_threshold": 75
+    },
+    "contract-enforcer": {
+      "contract": {
+        "required_columns": [
+          "CustomerID",
+          "SourceSystem",
+          "FirstName",
+          "LastName",
+          "Email",
+          "Country",
+          "LastUpdated"
+        ],
+        "optional_columns": ["Phone", "Address", "City", "State", "PostalCode"],
+        "column_types": {
+          "CustomerID": "string",
+          "SourceSystem": "string",
+          "FirstName": "string",
+          "LastName": "string",
+          "Email": "string",
+          "Phone": "string",
+          "Address": "string",
+          "City": "string",
+          "State": "string",
+          "PostalCode": "string",
+          "Country": "string",
+          "LastUpdated": "date"
+        },
+        "value_constraints": {
+          "SourceSystem": {
+            "allowed_values": [
+              "CRM",
+              "ERP",
+              "Support",
+              "Marketing",
+              "WebPortal"
+            ]
+          },
+          "Country": {
+            "allowed_values": ["USA", "UK", "Canada", "China", "Spain", "UAE"]
+          },
+          "Email": {
+            "pattern": "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$",
+            "pattern_name": "Email Address"
+          }
+        },
+        "uniqueness_constraints": []
+      },
+      "auto_transform": true,
+      "strict_mode": false,
+      "drop_extra_columns": false,
+      "rename_columns": true,
+      "cast_types": true,
+      "enforce_values": true,
+      "default_value_strategy": "null",
+      "structural_compliance_weight": 0.4,
+      "value_compliance_weight": 0.4,
+      "transformation_success_weight": 0.2,
+      "excellent_threshold": 95,
+      "good_threshold": 80
+    },
+    "semantic-mapper": {
+      "auto_detect_semantics": true,
+      "apply_mappings": true,
+      "custom_column_mappings": {
+        "CustomerID": "customer_id",
+        "SourceSystem": "source_system",
+        "FirstName": "first_name",
+        "LastName": "last_name",
+        "Email": "email",
+        "Phone": "phone",
+        "Address": "address",
+        "City": "city",
+        "State": "state",
+        "PostalCode": "postal_code",
+        "Country": "country",
+        "LastUpdated": "last_updated"
+      },
+      "custom_value_mappings": {
+        "Country": {
+          "U.S.A": "USA",
+          "United States": "USA",
+          "England": "UK",
+          "CN": "China",
+          "España": "Spain"
+        },
+        "State": {
+          "N.Y.": "NY",
+          "Calif.": "CA",
+          "Ont.": "ON",
+          "Tex.": "TX"
+        }
+      },
+      "confidence_threshold": 0.7,
+      "name_similarity_weight": 0.4,
+      "pattern_match_weight": 0.3,
+      "value_analysis_weight": 0.3,
+      "excellent_threshold": 90,
+      "good_threshold": 75
+    },
+    "survivorship-resolver": {
+      "match_key_columns": ["Email"],
+      "source_column": "SourceSystem",
+      "timestamp_column": "LastUpdated",
+      "source_priority": {
+        "ERP": 1,
+        "CRM": 2,
+        "Support": 3,
+        "Marketing": 4,
+        "WebPortal": 5
+      },
+      "survivorship_rules": {
+        "FirstName": "freshness",
+        "LastName": "freshness",
+        "Phone": "completeness",
+        "Address": "richness",
+        "City": "completeness",
+        "State": "completeness",
+        "PostalCode": "completeness",
+        "Country": "frequency"
+      },
+      "default_rule": "freshness",
+      "min_confidence_threshold": 0.5,
+      "quality_score_columns": {},
+      "field_validation_rules": {
+        "Email": {
+          "pattern": "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$"
+        },
+        "Country": {
+          "allowed_values": ["USA", "UK", "Canada", "China", "Spain", "UAE"]
+        },
+        "SourceSystem": {
+          "allowed_values": ["CRM", "ERP", "Support", "Marketing", "WebPortal"]
+        }
+      },
+      "excellent_threshold": 90,
+      "good_threshold": 75
+    },
+    "golden-record-builder": {
+      "match_key_columns": ["Email"],
+      "source_column": "SourceSystem",
+      "timestamp_column": "LastUpdated",
+      "source_priority": {
+        "ERP": 1,
+        "CRM": 2,
+        "Support": 3,
+        "Marketing": 4,
+        "WebPortal": 5
+      },
+      "survivorship_rules": {
+        "FirstName": "most_recent",
+        "LastName": "most_recent",
+        "Phone": "most_complete",
+        "Address": "most_complete",
+        "City": "most_complete",
+        "State": "most_complete",
+        "PostalCode": "most_complete",
+        "Country": "most_frequent"
+      },
+      "default_survivorship_rule": "most_complete",
+      "min_trust_score": 0.75,
+      "excellent_threshold": 90,
+      "good_threshold": 75
+    },
+    "stewardship-flagger": {
+      "required_columns": [
+        "CustomerID",
+        "SourceSystem",
+        "FirstName",
+        "LastName",
+        "Email",
+        "Country",
+        "LastUpdated"
+      ],
+      "confidence_threshold": 0.7,
+      "confidence_columns": [],
+      "duplicate_key_columns": ["Email"],
+      "field_validation_rules": {
+        "Email": {
+          "pattern": "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$",
+          "min_length": 5
+        },
+        "Phone": {
+          "pattern": "^[\\+]?[(]?[0-9]{1,4}[)]?[-\\s\\.]/0-9]{6,}$",
+          "min_length": 7
+        },
+        "CustomerID": {
+          "pattern": "^C[0-9]{3}$",
+          "min_length": 4
+        },
+        "Country": {
+          "allowed_values": ["USA", "UK", "Canada", "China", "Spain", "UAE"]
+        },
+        "SourceSystem": {
+          "allowed_values": ["CRM", "ERP", "Support", "Marketing", "WebPortal"]
+        }
+      },
+      "outlier_thresholds": {},
+      "business_rules": [
+        {
+          "name": "Promo Email Domain",
+          "column": "Email",
+          "condition": "contains",
+          "value": "promo.com",
+          "severity": "medium",
+          "action": "flag",
+          "message": "Email domain is promo.com, potential spam or temporary address."
+        },
+        {
+          "name": "Missing Phone",
+          "column": "Phone",
+          "condition": "is_null",
+          "severity": "medium",
+          "action": "flag",
+          "message": "Missing phone number."
+        },
+        {
+          "name": "Missing Address",
+          "column": "Address",
+          "condition": "is_null",
+          "severity": "low",
+          "action": "flag",
+          "message": "Missing address information."
+        },
+        {
+          "name": "Missing City",
+          "column": "City",
+          "condition": "is_null",
+          "severity": "low",
+          "action": "flag",
+          "message": "Missing city information."
+        },
+        {
+          "name": "Missing State",
+          "column": "State",
+          "condition": "is_null",
+          "severity": "low",
+          "action": "flag",
+          "message": "Missing state/province information."
+        },
+        {
+          "name": "Invalid Customer ID Format",
+          "column": "CustomerID",
+          "condition": "not_matches",
+          "value": "^C[0-9]{3}$",
+          "severity": "high",
+          "action": "flag",
+          "message": "CustomerID does not match expected format (C###)."
+        },
+        {
+          "name": "Invalid Email Format",
+          "column": "Email",
+          "condition": "not_matches",
+          "value": "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$",
+          "severity": "high",
+          "action": "flag",
+          "message": "Email format is invalid."
+        },
+        {
+          "name": "Invalid Country Code",
+          "column": "Country",
+          "condition": "not_in",
+          "value": ["USA", "UK", "Canada", "China", "Spain", "UAE"],
+          "severity": "high",
+          "action": "flag",
+          "message": "Country code is not in allowed list."
+        },
+        {
+          "name": "Invalid Source System",
+          "column": "SourceSystem",
+          "condition": "not_in",
+          "value": ["CRM", "ERP", "Support", "Marketing", "WebPortal"],
+          "severity": "high",
+          "action": "flag",
+          "message": "SourceSystem is not in allowed list."
+        }
+      ],
+      "severity_weights": {
+        "critical": 4,
+        "high": 3,
+        "medium": 2,
+        "low": 1
+      },
+      "excellent_threshold": 90,
+      "good_threshold": 75
+    }
+  }
+}

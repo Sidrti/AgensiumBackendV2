@@ -1,0 +1,39 @@
+{
+  "required_columns": [
+    "CustomerID",
+    "SourceSystem",
+    "FirstName",
+    "LastName",
+    "Email",
+    "Country",
+    "LastUpdated"
+  ],
+  "optional_columns": ["Phone", "Address", "City", "State", "PostalCode"],
+  "column_types": {
+    "CustomerID": "string",
+    "SourceSystem": "string",
+    "FirstName": "string",
+    "LastName": "string",
+    "Email": "string",
+    "Phone": "string",
+    "Address": "string",
+    "City": "string",
+    "State": "string",
+    "PostalCode": "string",
+    "Country": "string",
+    "LastUpdated": "date"
+  },
+  "value_constraints": {
+    "SourceSystem": {
+      "allowed_values": ["CRM", "ERP", "Support", "Marketing", "WebPortal"]
+    },
+    "Country": {
+      "allowed_values": ["USA", "UK", "Canada", "China", "Spain", "UAE"]
+    },
+    "Email": {
+      "pattern": "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$",
+      "pattern_name": "Email Address"
+    }
+  },
+  "uniqueness_constraints": []
+}

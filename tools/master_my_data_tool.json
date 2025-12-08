@@ -188,7 +188,23 @@
         "contract": {
           "type": "object",
           "description": "Contract definition containing required_columns, optional_columns, column_types, column_mappings, value_constraints, uniqueness_constraints",
-          "default": {}
+          "default": {},
+          "example": {
+            "required_columns": ["id", "name", "email"],
+            "optional_columns": ["phone", "address"],
+            "column_types": {
+              "id": "integer",
+              "name": "string",
+              "email": "string",
+              "phone": "string"
+            },
+            "value_constraints": {
+              "email": {
+                "pattern": "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$"
+              }
+            },
+            "uniqueness_constraints": ["id", "email"]
+          }
         },
         "auto_transform": {
           "type": "boolean",
@@ -317,12 +333,30 @@
         "custom_column_mappings": {
           "type": "object",
           "description": "Custom column name mappings (raw_name -> standard_name)",
-          "default": {}
+          "default": {},
+          "example": {
+            "CustomerID": "customer_id",
+            "SourceSystem": "source_system",
+            "FirstName": "first_name",
+            "LastName": "last_name",
+            "Email": "email"
+          }
         },
         "custom_value_mappings": {
           "type": "object",
           "description": "Custom value mappings by column (column -> {raw_value -> standard_value})",
-          "default": {}
+          "default": {},
+          "example": {
+            "Country": {
+              "U.S.A": "USA",
+              "United States": "USA",
+              "England": "UK"
+            },
+            "State": {
+              "N.Y.": "NY",
+              "Calif.": "CA"
+            }
+          }
         },
         "confidence_threshold": {
           "type": "float",

@@ -106,7 +106,7 @@ def execute_survivorship_resolver(
             }
 
         try:
-            df = pl.read_csv(io.BytesIO(file_contents), ignore_errors=True, infer_schema_length=10000)
+            df = pl.read_csv(io.BytesIO(file_contents), ignore_errors=True, infer_schema_length=10000, truncate_ragged_lines=True)
         except Exception as e:
             return {
                 "status": "error",
@@ -658,42 +658,52 @@ def _resolve_conflict(
         quality_scores.append(score)
     
     # Apply the specified rule
+    result = None
     if rule == "freshness" or rule == "most_recent" or rule == "recency":
-        return _apply_freshness_rule(values, cluster_data, column, timestamp_column, quality_scores)
+        result = _apply_freshness_rule(values, cluster_data, column, timestamp_column, quality_scores)
     
     elif rule == "quality_score" or rule == "quality":
-        return _apply_quality_score_rule(values, quality_scores)
+        result = _apply_quality_score_rule(values, quality_scores)
     
     elif rule == "completeness" or rule == "most_complete":
-        return _apply_completeness_rule(values, quality_scores)
+        result = _apply_completeness_rule(values, quality_scores)
     
     elif rule == "source_priority":
-        return _apply_source_priority_rule(values, cluster_data, source_column, source_priority, quality_scores)
+        result = _apply_source_priority_rule(values, cluster_data, source_column, source_priority, quality_scores)
     
     elif rule == "most_frequent" or rule == "frequency":
-        return _apply_frequency_rule(values, quality_scores)
+        result = _apply_frequency_rule(values, quality_scores)
     
     elif rule == "longest" or rule == "richness":
-        return _apply_richness_rule(values, quality_scores)
+        result = _apply_richness_rule(values, quality_scores)
     
     elif rule == "format_valid" or rule == "validation":
-        return _apply_validation_rule(values, field_type, quality_scores)
+        result = _apply_validation_rule(values, field_type, quality_scores)
     
     elif rule == "min":
-        return _apply_min_rule(values)
+        result = _apply_min_rule(values)
     
     elif rule == "max":
-        return _apply_max_rule(values)
+        result = _apply_max_rule(values)
     
     elif rule == "first":
-        return {"winner": non_null_values[0], "rule_applied": "first", "confidence": 0.6, "rationale": "First non-null value", "scores": {}}
+        result = {"winner": non_null_values[0], "rule_applied": "first", "confidence": 0.6, "rationale": "First non-null value", "scores": {}}
     
     elif rule == "last":
-        return {"winner": non_null_values[-1], "rule_applied": "last", "confidence": 0.6, "rationale": "Last non-null value", "scores": {}}
+        result = {"winner": non_null_values[-1], "rule_applied": "last", "confidence": 0.6, "rationale": "Last non-null value", "scores": {}}
     
     else:
         # Default: combined quality score
-        return _apply_quality_score_rule(values, quality_scores)
+        result = _apply_quality_score_rule(values, quality_scores)
+
+    # Fallback to Source Priority if primary rule fails or has low confidence
+    if (result["winner"] is None or result["confidence"] < 0.5) and rule != "source_priority" and source_priority and source_column:
+        fallback_result = _apply_source_priority_rule(values, cluster_data, source_column, source_priority, quality_scores)
+        if fallback_result["winner"] is not None:
+            fallback_result["rationale"] += f" (Fallback from {rule})"
+            return fallback_result
+
+    return result
 
 
 def _calculate_value_quality_score(

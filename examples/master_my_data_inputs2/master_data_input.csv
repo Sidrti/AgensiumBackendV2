@@ -1,0 +1,48 @@
+CustomerID,SourceSystem,FirstName,LastName,Email,Phone,Address,City,State,PostalCode,Country,LastUpdated
+C043,WebPortal,E.,Clark,eclark@gmail.com,555-6666,23 Thames St,London,N.Y.,EC1A1BC,United States,02-11-2025
+C017,ERP,Rob,Wang,rob.wang@work.com,555-5555,404 Cedar Street,San Francisco,Calif.,94102,U.S.A,20-11-2025
+C030,Support,Li,Wei,li.wei@helpdesk.com,555-8888,88 Nanjing Rd,Shanghai,,200001,CN,15-11-2025
+C005,Support,Johnathan,Smith,john.smith@helpdesk.com,555-0000,789 Broadway,New York,N.Y.,10002,United States,28-11-2025
+C036,CRM,Michael,Brown,michael.brown@email.com,555-3333,77 King St,Toronto,Ont.,M5H2N2,Canada,10-11-2025
+C024,Marketing,Ana,Garcia,ana.garcia@promo.com,555-6666,12 Calle Real,Madrid,,28001,España,05-11-2025
+C048,WebPortal,A.,Khan,akhan@gmail.com,555-8888,56 Souq Rd,Dubai,,1,UAE,22-11-2025
+C011,CRM,Fatima,Ali,fatima.ali@email.com,555-4444,202 Maple St,Houston,Tex.,77002,U.S.A,18-11-2025
+C045,Support,Emily,Clark,emily.clark@helpdesk.com,555-5555,22 River Rd,London,,EC1A1BB,England,25-11-2025
+C021,CRM,Ana,Garcia,ana.garcia@email.com,555-6666,12 Calle Real,Madrid,,28001,Spain,12-11-2025
+C003,WebPortal,Johnny,Smith,j.smith@gmail.com,555-5678,456 Elm St,Brooklyn,NY,11211,USA,08-11-2025
+C027,ERP,Lee,Wei,lee.wei@work.com,555-8888,88 Nanjing Road,Shanghai,,200001,China,14-11-2025
+C009,Marketing,Mary,Jons,mary.jons@promo.com,555-2222,789 Oak Av,Chicago,IL,60601,USA,03-11-2025
+C018,WebPortal,R.,Wang,rwang@gmail.com,555-8888,505 Spruce Ln,Oakland,CA,94607,USA,19-11-2025
+C033,WebPortal,S.,Connor,sconnor@gmail.com,555-2222,13 Past St,Los Angeles,CA,90002,USA,07-11-2025
+C014,Marketing,Fatema,Ali,fatema.ali@promo.com,555-4444,202 Maple St,Houston,TX,77002,USA,04-11-2025
+C042,ERP,Emilie,Clark,emilie.clark@work.com,555-5555,22 River Road,London,,EC1A1BB,UK,16-11-2025
+C007,ERP,Mary A.,Jones,mary.jones@work.com,555-2222,789 Oak Avenue,Chicago,IL,60601,USA,11-11-2025
+C025,Support,Ana,Garcia,ana.garcia@helpdesk.com,555-6666,12 Calle Real,Madrid,,28001,Spain,23-11-2025
+C035,Support,Sarah,Connor,sarah.connor@helpdesk.com,555-1111,12 Future Blvd,Los Angeles,CA,90001,USA,27-11-2025
+C001,CRM,John,Smith,john.smith@email.com,555-1234,123 Main St,New York,NY,10001,USA,01-11-2025
+C040,Support,Michael,Brown,michael.brown@helpdesk.com,555-3333,77 King St,Toronto,ON,M5H2N2,Canada,26-11-2025
+C019,Marketing,Robert,Wong,robert.wong@promo.com,555-5555,404 Cedar St,San Francisco,CA,94102,USA,09-11-2025
+C032,ERP,Sara,Connor,sara.connor@work.com,555-1111,12 Future Boulevard,Los Angeles,CA,90001,USA,13-11-2025
+C004,Marketing,J.,Smith,jsmith@promo.com,555-1234,123 Main St.,New York,NY,10001,USA,06-11-2025
+C046,CRM,Ahmed,Khan,ahmed.khan@email.com,555-7777,55 Market St,Dubai,,0,UAE,21-11-2025
+C020,Support,Robert,Wang,robert.wang@helpdesk.com,555-5555,404 Cedar St.,San Francisco,CA,94102,USA,17-11-2025
+C015,Support,Fatima,Ally,fatima.ally@helpdesk.com,555-4444,202 Maple St.,Houston,TX,77002,USA,24-11-2025
+C006,CRM,Mary,Jones,mary.jones@email.com,555-2222,789 Oak Ave,Chicago,IL,60601,USA,29-11-2025
+C026,CRM,Li,Wei,li.wei@email.com,555-8888,88 Nanjing Rd,Shanghai,,200001,China,30-11-2025
+C022,ERP,Anna,Garcia,anna.garcia@work.com,555-6666,12 C. Real,Madrid,,28001,Spain,26-11-2025
+C038,WebPortal,M.,Brown,mbrown@gmail.com,555-4444,78 Queen St,Toronto,ON,M5H2N3,Canada,18-11-2025
+C034,Marketing,Sarah,Conner,sarah.conner@promo.com,555-1111,12 Future Blvd,Los Angeles,CA,90001,USA,05-11-2025
+C023,WebPortal,A.,Garcia,agarcia@gmail.com,555-7777,13 Calle Mayor,Madrid,,28002,Spain,15-11-2025
+C012,ERP,Fatima,Ali,fatima.a@work.com,555-4444,202 Maple Street,Houston,TX,77002,USA,20-11-2025
+C028,WebPortal,L.,Wei,lwei@gmail.com,555-9999,89 Beijing Rd,Shanghai,,200002,China,22-11-2025
+C008,WebPortal,Maria,Jones,maria.jones@gmail.com,555-3333,101 Pine Rd,Evanston,IL,60201,USA,09-11-2025
+C037,ERP,Mike,Brown,mike.brown@work.com,555-3333,77 King Street,Toronto,ON,M5H2N2,Canada,14-11-2025
+C013,WebPortal,F.,Ali,fali@gmail.com,555-9999,303 Birch Blvd,Houston,TX,77005,USA,11-11-2025
+C047,ERP,Ahmad,Khan,ahmad.khan@work.com,555-7777,55 Market Street,Dubai,,0,UAE,16-11-2025
+C044,Marketing,Emily,Clarke,emily.clarke@promo.com,555-5555,22 River Rd,London,,EC1A1BB,UK,19-11-2025
+C029,Marketing,Li,Wei,li.wei@promo.com,555-8888,88 Nanjing Rd,Shanghai,,200001,China,25-11-2025
+C031,CRM,Sarah,Connor,sarah.connor@email.com,555-1111,12 Future Blvd,Los Angeles,CA,90001,USA,28-11-2025
+C002,ERP,Jon,Smith,jon.smith@work.com,555-1234,123 Main Street,New York,NY,10001,USA,07-11-2025
+C039,Marketing,Michael,Browne,michael.browne@promo.com,555-3333,77 King St,Toronto,ON,M5H2N2,Canada,12-11-2025
+C010,Support,M.,Jones,mjones@helpdesk.com,555-,,,,,
+C016,CRM,Robert,Wang,robert.wang@email.com,555-5555,404,,,,,

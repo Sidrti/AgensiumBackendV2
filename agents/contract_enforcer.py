@@ -27,6 +27,7 @@ import io
 import time
 import re
 import base64
+import json
 from typing import Dict, Any, Optional, List, Tuple
 from datetime import datetime
 
@@ -49,10 +50,36 @@ def execute_contract_enforcer(
     """
 
     start_time = time.time()
+    
+    # Handle parameters being a string (JSON)
+    if isinstance(parameters, str):
+        try:
+            parameters = json.loads(parameters)
+        except Exception as e:
+             return {
+                "status": "error",
+                "agent_id": "contract-enforcer",
+                "error": f"Parameters is a string but failed to parse as JSON: {str(e)}",
+                "execution_time_ms": int((time.time() - start_time) * 1000)
+            }
+
     parameters = parameters or {}
 
     # Extract contract and parameters
     contract = parameters.get("contract", {})
+    
+    # Handle contract being a string (JSON)
+    if isinstance(contract, str):
+        try:
+            contract = json.loads(contract)
+        except Exception as e:
+             return {
+                "status": "error",
+                "agent_id": "contract-enforcer",
+                "error": f"Contract parameter is a string but failed to parse as JSON: {str(e)}",
+                "execution_time_ms": int((time.time() - start_time) * 1000)
+            }
+
     auto_transform = parameters.get("auto_transform", True)
     strict_mode = parameters.get("strict_mode", False)  # If True, fail on first violation
     drop_extra_columns = parameters.get("drop_extra_columns", True)
@@ -79,7 +106,7 @@ def execute_contract_enforcer(
             }
 
         try:
-            df = pl.read_csv(io.BytesIO(file_contents), ignore_errors=True, infer_schema_length=10000)
+            df = pl.read_csv(io.BytesIO(file_contents), ignore_errors=True, infer_schema_length=10000, truncate_ragged_lines=True)
         except Exception as e:
             return {
                 "status": "error",
@@ -293,7 +320,7 @@ def execute_contract_enforcer(
                     invalid_rows = df.with_row_index("row_index").filter(invalid_mask)
                     
                     if invalid_rows.height > 0:
-                        default_value = constraints.get("default_value", "Unknown")
+                        default_value = constraints.get("default_value", None)
                         
                         violation = {
                             "violation_id": f"violation_values_{col}",

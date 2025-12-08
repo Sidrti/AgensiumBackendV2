@@ -41,11 +41,53 @@ def execute_semantic_mapper(
     """
 
     start_time = time.time()
+    
+    # Handle parameters being a string (JSON)
+    if isinstance(parameters, str):
+        try:
+            import json
+            parameters = json.loads(parameters)
+        except Exception as e:
+             return {
+                "status": "error",
+                "agent_id": "semantic-mapper",
+                "error": f"Parameters is a string but failed to parse as JSON: {str(e)}",
+                "execution_time_ms": int((time.time() - start_time) * 1000)
+            }
+
     parameters = parameters or {}
 
     # Extract parameters with defaults
     custom_column_mappings = parameters.get("custom_column_mappings", {})  # raw_name -> standard_name
+    
+    # Handle custom_column_mappings being a string (JSON)
+    if isinstance(custom_column_mappings, str):
+        try:
+            import json
+            custom_column_mappings = json.loads(custom_column_mappings)
+        except Exception as e:
+             return {
+                "status": "error",
+                "agent_id": "semantic-mapper",
+                "error": f"custom_column_mappings is a string but failed to parse as JSON: {str(e)}",
+                "execution_time_ms": int((time.time() - start_time) * 1000)
+            }
+
     custom_value_mappings = parameters.get("custom_value_mappings", {})  # column -> {raw_value -> standard_value}
+    
+    # Handle custom_value_mappings being a string (JSON)
+    if isinstance(custom_value_mappings, str):
+        try:
+            import json
+            custom_value_mappings = json.loads(custom_value_mappings)
+        except Exception as e:
+             return {
+                "status": "error",
+                "agent_id": "semantic-mapper",
+                "error": f"custom_value_mappings is a string but failed to parse as JSON: {str(e)}",
+                "execution_time_ms": int((time.time() - start_time) * 1000)
+            }
+
     confidence_threshold = parameters.get("confidence_threshold", 0.7)
     auto_detect_semantics = parameters.get("auto_detect_semantics", True)
     apply_mappings = parameters.get("apply_mappings", True)
@@ -68,7 +110,7 @@ def execute_semantic_mapper(
             }
 
         try:
-            df = pl.read_csv(io.BytesIO(file_contents), ignore_errors=True, infer_schema_length=10000)
+            df = pl.read_csv(io.BytesIO(file_contents), ignore_errors=True, infer_schema_length=10000, truncate_ragged_lines=True)
         except Exception as e:
             return {
                 "status": "error",
@@ -473,19 +515,19 @@ def execute_semantic_mapper(
 # Standard column name mappings
 STANDARD_COLUMN_MAPPINGS = {
     # Name fields
-    "first_name": ["fname", "first name", "firstname", "f_name", "given_name", "givenname"],
-    "last_name": ["lname", "last name", "lastname", "l_name", "surname", "family_name", "familyname"],
-    "full_name": ["name", "fullname", "full name", "customer_name", "person_name"],
-    "middle_name": ["mname", "middle name", "middlename", "m_name"],
+    "FirstName": ["fname", "first name", "firstname", "f_name", "given_name", "givenname", "first_name"],
+    "LastName": ["lname", "last name", "lastname", "l_name", "surname", "family_name", "familyname", "last_name"],
+    "FullName": ["name", "fullname", "full name", "customer_name", "person_name", "full_name"],
+    "MiddleName": ["mname", "middle name", "middlename", "m_name", "middle_name"],
     
     # Contact fields
-    "email": ["email_address", "emailaddress", "e_mail", "mail", "email_id", "contact_email"],
-    "phone": ["phone_number", "phonenumber", "telephone", "tel", "mobile", "cell", "contact_number", "phone_no"],
-    "address": ["street_address", "streetaddress", "addr", "address_line_1", "address1", "street"],
-    "city": ["town", "municipality", "locality"],
-    "state": ["province", "region", "state_code", "state_province"],
-    "country": ["nation", "country_code", "country_name"],
-    "zip_code": ["zipcode", "postal_code", "postalcode", "zip", "postcode", "pin_code", "pincode"],
+    "Email": ["email_address", "emailaddress", "e_mail", "mail", "email_id", "contact_email", "email"],
+    "Phone": ["phone_number", "phonenumber", "telephone", "tel", "mobile", "cell", "contact_number", "phone_no", "phone"],
+    "Address": ["street_address", "streetaddress", "addr", "address_line_1", "address1", "street", "address"],
+    "City": ["town", "municipality", "locality", "city"],
+    "State": ["province", "region", "state_code", "state_province", "state"],
+    "Country": ["nation", "country_code", "country_name", "country"],
+    "ZipCode": ["zipcode", "postal_code", "postalcode", "zip", "postcode", "pin_code", "pincode", "zip_code"],
     
     # Financial fields
     "price": ["amount", "cost", "total_cost", "unit_price", "sale_price", "value"],
@@ -519,15 +561,15 @@ STANDARD_COLUMN_MAPPINGS = {
 # Standard value mappings
 STANDARD_VALUE_MAPPINGS = {
     "country": {
-        "united states": ["usa", "u.s.", "u.s.a", "us", "america", "united states of america"],
-        "united kingdom": ["uk", "u.k.", "britain", "great britain", "england"],
-        "canada": ["ca", "can"],
-        "australia": ["au", "aus"],
-        "germany": ["de", "deutschland"],
-        "france": ["fr"],
-        "japan": ["jp", "jpn"],
-        "china": ["cn", "chn"],
-        "india": ["in", "ind"],
+        "USA": ["usa", "u.s.", "u.s.a", "us", "america", "united states of america", "united states"],
+        "UK": ["uk", "u.k.", "britain", "great britain", "england", "united kingdom"],
+        "Canada": ["ca", "can", "canada"],
+        "Australia": ["au", "aus", "australia"],
+        "Germany": ["de", "deutschland", "germany"],
+        "France": ["fr", "france"],
+        "Japan": ["jp", "jpn", "japan"],
+        "China": ["cn", "chn", "china"],
+        "India": ["in", "ind", "india"],
     },
     "gender": {
         "male": ["m", "man", "boy", "masculine"],
