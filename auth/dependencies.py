@@ -47,6 +47,9 @@ async def get_current_user(
     if user is None:
         raise UserNotFoundException()
 
+    print(f"User found: {user.email}, Active: {user.is_active}, Verified: {user.is_verified}")
+    print(f"User ID: {user.id}, Created at: {user.created_at}")
+
     if not user.is_active:
         raise UserInactiveException()
 
@@ -68,6 +71,7 @@ async def get_current_active_verified_user(
     Raises:
         HTTPException: If user is not verified
     """
+
     if not current_user.is_verified:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,

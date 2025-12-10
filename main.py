@@ -53,12 +53,14 @@ app = FastAPI(
 load_dotenv()
 
 # Configure CORS
-FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:5173") # Use an environment variable for best practice
+# Use an environment variable for best practice
+# FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:5173") 
+
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
-        FRONTEND_URL,
+        "http://localhost:5173",  # Local development URL
         "https://agensium2.netlify.app" # The specific URL causing the error
     ],
     allow_credentials=True,

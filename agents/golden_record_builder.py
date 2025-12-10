@@ -100,7 +100,14 @@ def execute_golden_record_builder(
             match_key_columns = _auto_detect_match_keys(df)
         
         # Validate match key columns exist
-        valid_match_keys = [col for col in match_key_columns if col in df.columns]
+        valid_match_keys = []
+        df_columns_normalized = {col.strip().lower(): col for col in df.columns}
+        
+        for col in match_key_columns:
+            col_clean = col.strip().lower()
+            if col_clean in df_columns_normalized:
+                valid_match_keys.append(df_columns_normalized[col_clean])
+        
         if not valid_match_keys:
             # Fallback: treat each row as its own cluster
             valid_match_keys = []
@@ -501,11 +508,19 @@ def _build_record_clusters(df: pl.DataFrame, match_keys: List[str]) -> Dict[str,
     
     for i in range(df.height):
         row = df.row(i)
-        key_values = tuple(
-            str(row[df.columns.index(col)]) if col in df.columns else ""
-            for col in match_keys
-        )
-        cluster_map[key_values].append(i)
+        key_values = []
+        for col in match_keys:
+            if col in df.columns:
+                val = row[df.columns.index(col)]
+                # Normalize value: convert to string, strip whitespace, handle None
+                if val is None:
+                    key_values.append("")
+                else:
+                    key_values.append(str(val).strip())
+            else:
+                key_values.append("")
+        
+        cluster_map[tuple(key_values)].append(i)
     
     # Convert to cluster dict
     for idx, (key_values, rows) in enumerate(cluster_map.items()):

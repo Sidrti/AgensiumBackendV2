@@ -6,18 +6,280 @@ Agents generate their own alerts, issues, recommendations, executive summaries, 
 Transformer aggregates these outputs and generates downloads.
 """
 
-from typing import Dict, List, Any
+import time
+import json
+from typing import Dict, List, Any, Optional
 from datetime import datetime
+from fastapi import UploadFile, HTTPException
+
 from ai.analysis_summary_ai import AnalysisSummaryAI
 from downloads.profile_my_data_downloads import ProfileMyDataDownloads
+from agents import readiness_rater, unified_profiler, drift_detector, score_risk, governance_checker, test_coverage_agent
+from transformers.transformers_utils import get_required_files, validate_files, read_uploaded_files, convert_files_to_csv
+
+
+async def run_profile_my_data_analysis(
+    tool_id: str,
+    agents: Optional[str],
+    parameters_json: Optional[str],
+    primary: Optional[UploadFile],
+    baseline: Optional[UploadFile],
+    analysis_id: str,
+    current_user: Any = None
+) -> Dict[str, Any]:
+    """
+    Execute profile-my-data analysis.
+    
+    Args:
+        tool_id: Tool identifier
+        agents: Comma-separated agent IDs
+        parameters_json: JSON string with agent-specific parameters
+        primary: Primary data file
+        baseline: Optional baseline/reference file
+        analysis_id: Unique analysis ID
+        current_user: Current user object
+        
+    Returns:
+        Final analysis response
+    """
+    start_time = time.time()
+    
+    try:
+        from main import TOOL_DEFINITIONS
+        
+        # Validate tool
+        if tool_id not in TOOL_DEFINITIONS:
+            raise HTTPException(status_code=400, detail=f"Tool '{tool_id}' not found")
+        
+        tool_def = TOOL_DEFINITIONS[tool_id]
+        
+        # Determine which agents to run
+        agents_to_run = tool_def["tool"]["available_agents"]
+        if agents:
+            agents_to_run = [a.strip() for a in agents.split(",")]
+        
+        # Get required files for tool and agents
+        required_files = get_required_files(tool_id, agents_to_run)
+        
+        # Build uploaded files dictionary
+        uploaded_files = {
+            "primary": primary,
+            "baseline": baseline
+        }
+        uploaded_files = {k: v for k, v in uploaded_files.items() if v is not None}
+        
+        # Validate files against requirements
+        validation_errors = validate_files(uploaded_files, required_files)
+        if validation_errors:
+            raise HTTPException(
+                status_code=400,
+                detail=f"File validation failed: {validation_errors}"
+            )
+        
+        # Read uploaded files into memory
+        files_map = await read_uploaded_files(uploaded_files)
+        
+        # Convert files to CSV format
+        files_map = convert_files_to_csv(files_map)
+        
+        # Parse parameters
+        parameters = {}
+        if parameters_json:
+            try:
+                parameters = json.loads(parameters_json)
+            except json.JSONDecodeError:
+                raise HTTPException(status_code=400, detail="Invalid parameters JSON")
+        
+        agent_results = {}
+        
+        for agent_id in agents_to_run:
+            try:
+                # Build agent-specific input
+                agent_input = _build_agent_input(agent_id, files_map, parameters, tool_def)
+                
+                # Execute agent
+                result = _execute_agent(agent_id, agent_input)
+                
+                agent_results[agent_id] = result
+                
+            except Exception as e:
+                agent_results[agent_id] = {
+                    "status": "error",
+                    "error": str(e),
+                    "execution_time_ms": 0
+                }
+        
+        # Transform results
+        return transform_profile_my_data_response(
+            agent_results,
+            int((time.time() - start_time) * 1000),
+            analysis_id,
+            current_user
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        return {
+            "analysis_id": analysis_id,
+            "status": "error",
+            "error": str(e),
+            "execution_time_ms": int((time.time() - start_time) * 1000)
+        }
+
+
+def _build_agent_input(
+    agent_id: str,
+    files_map: Dict[str, tuple],
+    parameters: Dict[str, Any],
+    tool_def: Dict[str, Any]
+) -> Dict[str, Any]:
+    """Build agent-specific input based on tool definition."""
+    agent_def = tool_def.get("agents", {}).get(agent_id, {})
+    required_files = agent_def.get("required_files", [])
+    
+    # Build files dictionary for agent
+    agent_files = {}
+    for file_key in required_files:
+        if file_key in files_map:
+            agent_files[file_key] = files_map[file_key]
+    
+    # Get agent parameters
+    agent_params = parameters.get(agent_id, {})
+    
+    return {
+        "agent_id": agent_id,
+        "files": agent_files,
+        "parameters": agent_params
+    }
+
+
+def _execute_agent(
+    agent_id: str,
+    agent_input: Dict[str, Any]
+) -> Dict[str, Any]:
+    """Execute specific agent."""
+    files_map = agent_input.get("files", {})
+    parameters = agent_input.get("parameters", {})
+    
+    if agent_id == "drift-detector":
+        if "primary" not in files_map or "baseline" not in files_map:
+            return {
+                "status": "error",
+                "error": "Drift detector requires 'primary' and 'baseline' files",
+                "execution_time_ms": 0
+            }
+        
+        baseline_bytes, baseline_filename = files_map["baseline"]
+        primary_bytes, primary_filename = files_map["primary"]
+        
+        return drift_detector.detect_drift(
+            baseline_bytes,
+            baseline_filename,
+            primary_bytes,
+            primary_filename,
+            parameters
+        )
+    
+    elif agent_id == "readiness-rater":
+        if "primary" not in files_map:
+            return {
+                "status": "error",
+                "error": "Readiness rater requires 'primary' file",
+                "execution_time_ms": 0
+            }
+        
+        primary_bytes, primary_filename = files_map["primary"]
+        
+        return readiness_rater.rate_readiness(
+            primary_bytes,
+            primary_filename,
+            parameters
+        )
+    
+    elif agent_id == "unified-profiler":
+        if "primary" not in files_map:
+            return {
+                "status": "error",
+                "error": "Unified profiler requires 'primary' file",
+                "execution_time_ms": 0
+            }
+        
+        primary_bytes, primary_filename = files_map["primary"]
+        
+        return unified_profiler.profile_data(
+            primary_bytes,
+            primary_filename,
+            parameters
+        )
+    
+    elif agent_id == "score-risk":
+        if "primary" not in files_map:
+            return {
+                "status": "error",
+                "error": "Risk scorer requires 'primary' file",
+                "execution_time_ms": 0
+            }
+        
+        primary_bytes, primary_filename = files_map["primary"]
+        
+        return score_risk.score_risk(
+            primary_bytes,
+            primary_filename,
+            parameters
+        )
+    
+    elif agent_id == "governance-checker":
+        if "primary" not in files_map:
+            return {
+                "status": "error",
+                "error": "Governance checker requires 'primary' file",
+                "execution_time_ms": 0
+            }
+        
+        primary_bytes, primary_filename = files_map["primary"]
+        
+        return governance_checker.execute_governance(
+            primary_bytes,
+            primary_filename,
+            parameters
+        )
+    
+    elif agent_id == "test-coverage-agent":
+        if "primary" not in files_map:
+            return {
+                "status": "error",
+                "error": "Test coverage agent requires 'primary' file",
+                "execution_time_ms": 0
+            }
+        
+        primary_bytes, primary_filename = files_map["primary"]
+        
+        return test_coverage_agent.execute_test_coverage(
+            primary_bytes,
+            primary_filename,
+            parameters
+        )
+    
+    else:
+        return {
+            "status": "error",
+            "error": f"Unknown agent for profile-my-data: {agent_id}",
+            "execution_time_ms": 0
+        }
 
 
 def transform_profile_my_data_response(
     agent_results: Dict[str, Any],
     execution_time_ms: int,
-    analysis_id: str
+    analysis_id: str,
+    current_user: Any = None
 ) -> Dict[str, Any]:
     """Consolidate agent outputs into unified response."""
+    
+    # Print current user data
+    if current_user:
+        print(f"[Transformer] Profile My Data - Current User: ID={current_user.id}, Email={current_user.email}, Active={current_user.is_active}, Verified={current_user.is_verified}")
     
     # ==================== CONSOLIDATE AGENT OUTPUTS ====================
     

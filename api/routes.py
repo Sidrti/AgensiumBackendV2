@@ -8,170 +8,17 @@ Supports flexible file handling based on tool definitions.
 import json
 import uuid
 import time
-import base64
 from datetime import datetime
 from typing import Dict, Any, Optional, List
-import io
-import pandas as pd
-from fastapi import APIRouter, HTTPException, File, UploadFile, Form
+from fastapi import APIRouter, HTTPException, File, UploadFile, Form, Depends
 
-from agents import readiness_rater, unified_profiler, drift_detector, score_risk, governance_checker, test_coverage_agent, null_handler, outlier_remover, type_fixer, duplicate_resolver, quarantine_agent, cleanse_writeback, field_standardization, cleanse_previewer, key_identifier, contract_enforcer, semantic_mapper, lineage_tracer, golden_record_builder, survivorship_resolver, master_writeback_agent, stewardship_flagger
 from transformers import profile_my_data_transformer, clean_my_data_transformer, master_my_data_transformer
 from ai import ChatAgent
-from .dependencies import decode_base64_file
+from auth.dependencies import get_current_active_verified_user
+from db import models
 
 # Create router for API routes
 router = APIRouter()
-
-
-# ============================================================================
-# HELPER FUNCTIONS
-# ============================================================================
-
-def get_tool_definitions() -> Dict[str, Any]:
-    """Get cached tool definitions from main module."""
-    try:
-        from main import TOOL_DEFINITIONS
-        return TOOL_DEFINITIONS
-    except ImportError:
-        return {}
-
-
-def get_required_files(tool_id: str, agents: List[str]) -> Dict[str, Dict[str, Any]]:
-    """
-    Get required files for a tool and agents.
-    
-    Returns mapping of file_key -> file_definition
-    """
-    from main import TOOL_DEFINITIONS
-    
-    if tool_id not in TOOL_DEFINITIONS:
-        return {}
-    
-    tool_def = TOOL_DEFINITIONS[tool_id]
-    tool_files = tool_def.get("tool", {}).get("files", {})
-    required_files = {}
-    
-    # Start with tool-level files
-    for file_key, file_def in tool_files.items():
-        required_files[file_key] = file_def
-    
-    # Check agent-level requirements
-    agents_def = tool_def.get("agents", {})
-    for agent_id in agents:
-        if agent_id in agents_def:
-            agent_required = agents_def[agent_id].get("required_files", [])
-            for file_key in agent_required:
-                if file_key in tool_files:
-                    required_files[file_key] = tool_files[file_key]
-    
-    return required_files
-
-
-def validate_files(
-    uploaded_files: Dict[str, Optional[UploadFile]],
-    required_files: Dict[str, Dict[str, Any]]
-) -> Dict[str, str]:
-    """
-    Validate uploaded files against tool requirements.
-    
-    Returns:
-        Dictionary of errors (if any)
-    """
-    errors = {}
-    
-    for file_key, file_def in required_files.items():
-        is_required = file_def.get("required", False)
-        
-        # Check if required file is provided
-        if is_required and file_key not in uploaded_files:
-            errors[file_key] = f"Required file '{file_key}' not provided"
-        elif is_required and uploaded_files.get(file_key) is None:
-            errors[file_key] = f"Required file '{file_key}' is empty"
-        
-        # Check file format if provided
-        if file_key in uploaded_files and uploaded_files[file_key]:
-            file_obj = uploaded_files[file_key]
-            allowed_formats = file_def.get("formats", [])
-            
-            if allowed_formats and file_obj.filename:
-                file_ext = file_obj.filename.split(".")[-1].lower()
-                if file_ext not in allowed_formats:
-                    errors[file_key] = f"File format '.{file_ext}' not allowed. Allowed: {', '.join(allowed_formats)}"
-    
-    return errors
-
-
-def build_agent_input(
-    agent_id: str,
-    files_map: Dict[str, tuple],  # file_key -> (bytes, filename)
-    parameters: Dict[str, Any],
-    tool_def: Dict[str, Any]
-) -> Dict[str, Any]:
-    """
-    Build agent-specific input based on tool definition.
-    
-    Args:
-        agent_id: Agent identifier
-        files_map: Map of file_key -> (content, filename)
-        parameters: Agent parameters
-        tool_def: Tool definition
-        
-    Returns:
-        Dictionary with agent-specific inputs
-    """
-    agent_def = tool_def.get("agents", {}).get(agent_id, {})
-    required_files = agent_def.get("required_files", [])
-    
-    # Build files dictionary for agent
-    agent_files = {}
-    for file_key in required_files:
-        if file_key in files_map:
-            agent_files[file_key] = files_map[file_key]
-    
-    # Get agent parameters
-    agent_params = parameters.get(agent_id, {})
-    
-    return {
-        "agent_id": agent_id,
-        "files": agent_files,
-        "parameters": agent_params
-    }
-
-
-def update_files_from_result(
-    files_map: Dict[str, tuple],
-    result: Dict[str, Any]
-) -> None:
-    """
-    Update files map with cleaned file from agent result.
-    Modifies files_map in place to chain agent outputs.
-    
-    Args:
-        files_map: Current files map (file_key -> (bytes, filename))
-        result: Result from previous agent execution
-    """
-    agent_id = result.get("agent_id", "unknown_agent")
-    
-    if result.get("status") == "success" and "cleaned_file" in result:
-        cleaned_file = result["cleaned_file"]
-        if cleaned_file and "content" in cleaned_file:
-            try:
-                # Decode base64 content
-                new_content = base64.b64decode(cleaned_file["content"])
-                new_filename = cleaned_file.get("filename", "cleaned_data.csv")
-                
-                # Update primary file for next agent
-                # This enables the chaining of data cleaning operations
-                files_map["primary"] = (new_content, new_filename)
-                print(f"[{agent_id}] Successfully updated primary file: {new_filename}. New size: {len(new_content)} bytes")
-            except Exception as e:
-                # If decoding fails, we keep the previous file
-                # This prevents the chain from breaking completely on a bad output
-                print(f"[{agent_id}] Error updating file from result: {str(e)}")
-                pass
-    else:
-        print(f"[{agent_id}] No cleaned file produced. Continuing with previous file.")
 
 
 # ============================================================================
@@ -199,7 +46,7 @@ async def health():
 
 
 @router.get("/tools")
-async def list_tools():
+async def list_tools(current_user: models.User = Depends(get_current_active_verified_user)):
     """List all available tools."""
     from main import TOOL_DEFINITIONS
     
@@ -219,7 +66,7 @@ async def list_tools():
 
 
 @router.get("/tools/{tool_id}")
-async def get_tool(tool_id: str):
+async def get_tool(tool_id: str, current_user: models.User = Depends(get_current_active_verified_user)):
     """Get tool definition with file requirements and agent specifications."""
     from main import TOOL_DEFINITIONS
     
@@ -250,6 +97,7 @@ async def analyze(
     parameters_json: Optional[str] = Form(None),
     primary: Optional[UploadFile] = File(None),
     baseline: Optional[UploadFile] = File(None),
+    current_user: models.User = Depends(get_current_active_verified_user)
 ):
     """
     Analyze data using specified tool and agents.
@@ -260,180 +108,56 @@ async def analyze(
         parameters_json: JSON string with agent-specific parameters
         primary: Primary data file (required for most tools)
         baseline: Optional baseline/reference file (for drift detection and comparisons)
+        current_user: Authenticated user
         
     Returns:
         Unified analysis response with analysis_id, status, and results
     """
-    from main import TOOL_DEFINITIONS
+    print(f"Analysis requested by user: {current_user.id} ({current_user.email})")
     
     analysis_id = str(uuid.uuid4())
     start_time = time.time()
     
     try:
-        # Validate tool
-        if tool_id not in TOOL_DEFINITIONS:
-            raise HTTPException(status_code=400, detail=f"Tool '{tool_id}' not found")
-        
-        tool_def = TOOL_DEFINITIONS[tool_id]
-        
-        # Determine which agents to run
-        agents_to_run = tool_def["tool"]["available_agents"]
-        
-        if agents:
-            agents_to_run = [a.strip() for a in agents.split(",")]
-        
-        # Get required files for tool and agents
-        required_files = get_required_files(tool_id, agents_to_run)
-        
-        # Build uploaded files dictionary from explicit parameters
-        uploaded_files = {
-            "primary": primary,
-            "baseline": baseline
-        }
-        # Remove None values
-        uploaded_files = {k: v for k, v in uploaded_files.items() if v is not None}
-        
-        # Validate files against requirements
-        validation_errors = validate_files(uploaded_files, required_files)
-        if validation_errors:
-            raise HTTPException(
-                status_code=400,
-                detail=f"File validation failed: {validation_errors}"
-            )
-        
-        # Read all uploaded files into memory
-        files_map = {}  # file_key -> (bytes, filename)
-        
-        for file_key, file_obj in uploaded_files.items():
-            if file_obj:
-                file_contents = await file_obj.read()
-                files_map[file_key] = (file_contents, file_obj.filename)
-        
-        # Convert input files to CSV for all tools to ensure consistent processing
-        for file_key, (content, filename) in list(files_map.items()):
-            try:
-                file_ext = filename.split(".")[-1].lower() if "." in filename else ""
-                
-                # Skip if already CSV
-                if file_ext == "csv":
-                    continue
-                    
-                df = None
-                # Handle Excel files
-                if file_ext in ["xlsx", "xls"]:
-                    try:
-                        engine = "openpyxl" if file_ext == "xlsx" else "xlrd"
-                        df = pd.read_excel(io.BytesIO(content), engine=engine)
-                    except Exception as first_error:
-                        print(f"Primary engine {engine} failed for {filename}: {first_error}")
-                        # Fallback strategies
-                        success = False
-                        
-                        # Strategy 1: Try the other Excel engine (e.g. xls renamed to xlsx)
-                        if not success:
-                            try:
-                                fallback_engine = "xlrd" if engine == "openpyxl" else "openpyxl"
-                                df = pd.read_excel(io.BytesIO(content), engine=fallback_engine)
-                                success = True
-                                print(f"Fallback to {fallback_engine} successful")
-                            except Exception:
-                                pass
-                        
-                        # Strategy 2: Try reading as CSV (sometimes files are misnamed)
-                        if not success:
-                            try:
-                                # Try with default encoding
-                                df = pd.read_csv(io.BytesIO(content))
-                                success = True
-                                print(f"Fallback to CSV reader successful")
-                            except Exception:
-                                pass
-                                
-                        if not success:
-                            raise first_error
-                # Handle JSON files
-                elif file_ext == "json":
-                    df = pd.read_json(io.BytesIO(content))
-                
-                # If conversion was successful, update the file in memory
-                if df is not None:
-                    # Convert to CSV string then bytes
-                    csv_buffer = io.StringIO()
-                    df.to_csv(csv_buffer, index=False)
-                    new_content = csv_buffer.getvalue().encode('utf-8')
-                    
-                    # Update filename
-                    base_name = ".".join(filename.split(".")[:-1]) if "." in filename else filename
-                    new_filename = f"{base_name}.csv"
-                    
-                    # Update map
-                    files_map[file_key] = (new_content, new_filename)
-            except Exception as e:
-                # Log error and fail because agents only support CSV
-                print(f"Error: Failed to convert {filename} to CSV: {str(e)}")
-                raise HTTPException(status_code=400, detail=f"Failed to convert {filename} to CSV: {str(e)}")
-
-        # Parse parameters
-        parameters = {}
-        if parameters_json:
-            try:
-                parameters = json.loads(parameters_json)
-            except json.JSONDecodeError:
-                raise HTTPException(status_code=400, detail="Invalid parameters JSON")
-        
-        # Execute agents
-        agent_results = {}
-        
-        for agent_id in agents_to_run:
-            try:
-                # Build agent-specific input
-                agent_input = build_agent_input(agent_id, files_map, parameters, tool_def)
-                
-                # Execute agent with flexible file handling
-                result = execute_agent_flexible(
-                    agent_id,
-                    agent_input
-                )
-                
-                agent_results[agent_id] = result
-                
-                # Update files map for next agent (for tools that chain agent outputs)
-                if tool_id in ["clean-my-data", "master-my-data"]:
-                    update_files_from_result(files_map, result)
-            except Exception as e:
-                agent_results[agent_id] = {
-                    "status": "error",
-                    "error": str(e),
-                    "execution_time_ms": 0
-                }
-        
-        # Transform results based on tool
+        # Execute analysis via transformer
         if tool_id == "profile-my-data":
-            final_response = profile_my_data_transformer.transform_profile_my_data_response(
-                agent_results,
-                int((time.time() - start_time) * 1000),
-                analysis_id
+            final_response = await profile_my_data_transformer.run_profile_my_data_analysis(
+                tool_id,
+                agents,
+                parameters_json,
+                primary,
+                baseline,
+                analysis_id,
+                current_user
             )
         elif tool_id == "clean-my-data":
-            final_response = clean_my_data_transformer.transform_clean_my_data_response(
-                agent_results,
-                int((time.time() - start_time) * 1000),
-                analysis_id
+            final_response = await clean_my_data_transformer.run_clean_my_data_analysis(
+                tool_id,
+                agents,
+                parameters_json,
+                primary,
+                baseline,
+                analysis_id,
+                current_user
             )
         elif tool_id == "master-my-data":
-            final_response = master_my_data_transformer.transform_master_my_data_response(
-                agent_results,
-                int((time.time() - start_time) * 1000),
-                analysis_id
+            final_response = await master_my_data_transformer.run_master_my_data_analysis(
+                tool_id,
+                agents,
+                parameters_json,
+                primary,
+                baseline,
+                analysis_id,
+                current_user
             )
         else:
-            # Default transformer (just return raw results)
+            # Default behavior for unknown tools (or just return error)
             final_response = {
                 "analysis_id": analysis_id,
                 "tool": tool_id,
-                "status": "success",
-                "execution_time_ms": int((time.time() - start_time) * 1000),
-                "agent_results": agent_results
+                "status": "error",
+                "error": f"Tool '{tool_id}' not supported for analysis execution",
+                "execution_time_ms": int((time.time() - start_time) * 1000)
             }
         
         return final_response
@@ -449,389 +173,6 @@ async def analyze(
         }
 
 
-def execute_agent_flexible(
-    agent_id: str,
-    agent_input: Dict[str, Any]
-) -> Dict[str, Any]:
-    """
-    Execute agent with flexible file handling.
-    
-    Args:
-        agent_id: Agent identifier
-        agent_input: Dictionary with 'files' and 'parameters'
-        
-    Returns:
-        Agent output
-    """
-    files_map = agent_input.get("files", {})
-    parameters = agent_input.get("parameters", {})
-    
-    # Map file keys to function arguments
-    if agent_id == "drift-detector":
-        if "primary" not in files_map or "baseline" not in files_map:
-            return {
-                "status": "error",
-                "error": "Drift detector requires 'primary' and 'baseline' files",
-                "execution_time_ms": 0
-            }
-        
-        baseline_bytes, baseline_filename = files_map["baseline"]
-        primary_bytes, primary_filename = files_map["primary"]
-        
-        return drift_detector.detect_drift(
-            baseline_bytes,
-            baseline_filename,
-            primary_bytes,
-            primary_filename,
-            parameters
-        )
-    
-    elif agent_id == "readiness-rater":
-        if "primary" not in files_map:
-            return {
-                "status": "error",
-                "error": "Readiness rater requires 'primary' file",
-                "execution_time_ms": 0
-            }
-        
-        primary_bytes, primary_filename = files_map["primary"]
-        
-        return readiness_rater.rate_readiness(
-            primary_bytes,
-            primary_filename,
-            parameters
-        )
-    
-    elif agent_id == "unified-profiler":
-        if "primary" not in files_map:
-            return {
-                "status": "error",
-                "error": "Unified profiler requires 'primary' file",
-                "execution_time_ms": 0
-            }
-        
-        primary_bytes, primary_filename = files_map["primary"]
-        
-        return unified_profiler.profile_data(
-            primary_bytes,
-            primary_filename,
-            parameters
-        )
-    
-    elif agent_id == "score-risk":
-        if "primary" not in files_map:
-            return {
-                "status": "error",
-                "error": "Risk scorer requires 'primary' file",
-                "execution_time_ms": 0
-            }
-        
-        primary_bytes, primary_filename = files_map["primary"]
-        
-        return score_risk.score_risk(
-            primary_bytes,
-            primary_filename,
-            parameters
-        )
-    
-    elif agent_id == "governance-checker":
-        if "primary" not in files_map:
-            return {
-                "status": "error",
-                "error": "Governance checker requires 'primary' file",
-                "execution_time_ms": 0
-            }
-        
-        primary_bytes, primary_filename = files_map["primary"]
-        
-        return governance_checker.execute_governance(
-            primary_bytes,
-            primary_filename,
-            parameters
-        )
-    
-    elif agent_id == "test-coverage-agent":
-        if "primary" not in files_map:
-            return {
-                "status": "error",
-                "error": "Test coverage agent requires 'primary' file",
-                "execution_time_ms": 0
-            }
-        
-        primary_bytes, primary_filename = files_map["primary"]
-        
-        return test_coverage_agent.execute_test_coverage(
-            primary_bytes,
-            primary_filename,
-            parameters
-        )
-    
-    elif agent_id == "quarantine-agent":
-        if "primary" not in files_map:
-            return {
-                "status": "error",
-                "error": "Quarantine agent requires 'primary' file",
-                "execution_time_ms": 0
-            }
-        
-        primary_bytes, primary_filename = files_map["primary"]
-        
-        return quarantine_agent.execute_quarantine_agent(
-            primary_bytes,
-            primary_filename,
-            parameters
-        )
-    
-    elif agent_id == "null-handler":
-        if "primary" not in files_map:
-            return {
-                "status": "error",
-                "error": "Null handler requires 'primary' file",
-                "execution_time_ms": 0
-            }
-        
-        primary_bytes, primary_filename = files_map["primary"]
-        
-        return null_handler.execute_null_handler(
-            primary_bytes,
-            primary_filename,
-            parameters
-        )
-    
-    elif agent_id == "outlier-remover":
-        if "primary" not in files_map:
-            return {
-                "status": "error",
-                "error": "Outlier remover requires 'primary' file",
-                "execution_time_ms": 0
-            }
-        
-        primary_bytes, primary_filename = files_map["primary"]
-        
-        return outlier_remover.execute_outlier_remover(
-            primary_bytes,
-            primary_filename,
-            parameters
-        )
-    
-    elif agent_id == "type-fixer":
-        if "primary" not in files_map:
-            return {
-                "status": "error",
-                "error": "Type fixer requires 'primary' file",
-                "execution_time_ms": 0
-            }
-        
-        primary_bytes, primary_filename = files_map["primary"]
-        
-        return type_fixer.execute_type_fixer(
-            primary_bytes,
-            primary_filename,
-            parameters
-        )
-    
-    elif agent_id == "duplicate-resolver":
-        if "primary" not in files_map:
-            return {
-                "status": "error",
-                "error": "Duplicate resolver requires 'primary' file",
-                "execution_time_ms": 0
-            }
-        
-        primary_bytes, primary_filename = files_map["primary"]
-        
-        return duplicate_resolver.execute_duplicate_resolver(
-            primary_bytes,
-            primary_filename,
-            parameters
-        )
-    
-    elif agent_id == "field-standardization":
-        if "primary" not in files_map:
-            return {
-                "status": "error",
-                "error": "Field standardization requires 'primary' file",
-                "execution_time_ms": 0
-            }
-        
-        primary_bytes, primary_filename = files_map["primary"]
-        
-        return field_standardization.execute_field_standardization(
-            primary_bytes,
-            primary_filename,
-            parameters
-        )
-    
-    elif agent_id == "cleanse-writeback":
-        if "primary" not in files_map:
-            return {
-                "status": "error",
-                "error": "Cleanse writeback requires 'primary' file",
-                "execution_time_ms": 0
-            }
-        
-        primary_bytes, primary_filename = files_map["primary"]
-        
-        return cleanse_writeback.execute_cleanse_writeback(
-            primary_bytes,
-            primary_filename,
-            parameters
-        )
-    
-    elif agent_id == "cleanse-previewer":
-        if "primary" not in files_map:
-            return {
-                "status": "error",
-                "error": "Cleanse previewer requires 'primary' file",
-                "execution_time_ms": 0
-            }
-        
-        primary_bytes, primary_filename = files_map["primary"]
-        
-        return cleanse_previewer.execute_cleanse_previewer(
-            primary_bytes,
-            primary_filename,
-            parameters
-        )
-    
-    # ==================== MASTER MY DATA AGENTS ====================
-    
-    elif agent_id == "key-identifier":
-        if "primary" not in files_map:
-            return {
-                "status": "error",
-                "error": "Key identifier requires 'primary' file",
-                "execution_time_ms": 0
-            }
-        
-        primary_bytes, primary_filename = files_map["primary"]
-        
-        return key_identifier.execute_key_identifier(
-            primary_bytes,
-            primary_filename,
-            parameters
-        )
-    
-    elif agent_id == "contract-enforcer":
-        if "primary" not in files_map:
-            return {
-                "status": "error",
-                "error": "Contract enforcer requires 'primary' file",
-                "execution_time_ms": 0
-            }
-        
-        primary_bytes, primary_filename = files_map["primary"]
-        
-        return contract_enforcer.execute_contract_enforcer(
-            primary_bytes,
-            primary_filename,
-            parameters
-        )
-    
-    elif agent_id == "semantic-mapper":
-        if "primary" not in files_map:
-            return {
-                "status": "error",
-                "error": "Semantic mapper requires 'primary' file",
-                "execution_time_ms": 0
-            }
-        
-        primary_bytes, primary_filename = files_map["primary"]
-        
-        return semantic_mapper.execute_semantic_mapper(
-            primary_bytes,
-            primary_filename,
-            parameters
-        )
-    
-    elif agent_id == "lineage-tracer":
-        if "primary" not in files_map:
-            return {
-                "status": "error",
-                "error": "Lineage tracer requires 'primary' file",
-                "execution_time_ms": 0
-            }
-        
-        primary_bytes, primary_filename = files_map["primary"]
-        
-        return lineage_tracer.execute_lineage_tracer(
-            primary_bytes,
-            primary_filename,
-            parameters
-        )
-    
-    elif agent_id == "golden-record-builder":
-        if "primary" not in files_map:
-            return {
-                "status": "error",
-                "error": "Golden record builder requires 'primary' file",
-                "execution_time_ms": 0
-            }
-        
-        primary_bytes, primary_filename = files_map["primary"]
-        
-        return golden_record_builder.execute_golden_record_builder(
-            primary_bytes,
-            primary_filename,
-            parameters
-        )
-    
-    elif agent_id == "survivorship-resolver":
-        if "primary" not in files_map:
-            return {
-                "status": "error",
-                "error": "Survivorship resolver requires 'primary' file",
-                "execution_time_ms": 0
-            }
-        
-        primary_bytes, primary_filename = files_map["primary"]
-        
-        return survivorship_resolver.execute_survivorship_resolver(
-            primary_bytes,
-            primary_filename,
-            parameters
-        )
-    
-    elif agent_id == "master-writeback-agent":
-        if "primary" not in files_map:
-            return {
-                "status": "error",
-                "error": "Master writeback agent requires 'primary' file",
-                "execution_time_ms": 0
-            }
-        
-        primary_bytes, primary_filename = files_map["primary"]
-        
-        return master_writeback_agent.execute_master_writeback_agent(
-            primary_bytes,
-            primary_filename,
-            parameters
-        )
-    
-    elif agent_id == "stewardship-flagger":
-        if "primary" not in files_map:
-            return {
-                "status": "error",
-                "error": "Stewardship flagger requires 'primary' file",
-                "execution_time_ms": 0
-            }
-        
-        primary_bytes, primary_filename = files_map["primary"]
-        
-        return stewardship_flagger.execute_stewardship_flagger(
-            primary_bytes,
-            primary_filename,
-            parameters
-        )
-    
-    else:
-        return {
-            "status": "error",
-            "error": f"Unknown agent: {agent_id}",
-            "execution_time_ms": 0
-        }
-
-
 # ============================================================================
 # CHAT ENDPOINT
 # ============================================================================
@@ -841,6 +182,7 @@ async def chat(
     question: str = Form(...),
     report_json: str = Form(...),
     conversation_history_json: Optional[str] = Form(None),
+    current_user: models.User = Depends(get_current_active_verified_user)
 ):
     """
     Chat endpoint for Q&A on analysis reports.
@@ -853,6 +195,7 @@ async def chat(
         report_json: Full report JSON from /analyze endpoint response
         conversation_history_json: Optional JSON string with previous messages
             Format: [{"role": "user"|"assistant", "content": "message"}, ...]
+        current_user: Authenticated user
         
     Returns:
         Chat response with answer, sources, and confidence
@@ -865,6 +208,8 @@ async def chat(
     """
     
     start_time = time.time()
+    
+    print(f"Chat requested by user: {current_user.id} ({current_user.email})")
     
     try:
         # Validate inputs

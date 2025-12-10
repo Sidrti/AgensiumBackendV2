@@ -6,18 +6,339 @@ Agents generate their own alerts, issues, recommendations, executive summaries, 
 Transformer aggregates these outputs and generates downloads.
 """
 
-from typing import Dict, List, Any
+import time
+import base64
+import io
+import json
+from typing import Dict, List, Any, Optional
 from datetime import datetime
+from fastapi import UploadFile, HTTPException
+
 from ai.analysis_summary_ai import AnalysisSummaryAI
 from downloads.master_my_data_downloads import MasterMyDataDownloads
+from agents import key_identifier, contract_enforcer, semantic_mapper, lineage_tracer, golden_record_builder, survivorship_resolver, master_writeback_agent, stewardship_flagger
+from transformers.transformers_utils import get_required_files, validate_files, read_uploaded_files, convert_files_to_csv
+
+
+async def run_master_my_data_analysis(
+    tool_id: str,
+    agents: Optional[str],
+    parameters_json: Optional[str],
+    primary: Optional[UploadFile],
+    baseline: Optional[UploadFile],
+    analysis_id: str,
+    current_user: Any = None
+) -> Dict[str, Any]:
+    """
+    Execute master-my-data analysis.
+    
+    Args:
+        tool_id: Tool identifier
+        agents: Comma-separated agent IDs
+        parameters_json: JSON string with agent-specific parameters
+        primary: Primary data file
+        baseline: Optional baseline/reference file
+        analysis_id: Unique analysis ID
+        current_user: Current user object
+        
+    Returns:
+        Final analysis response
+    """
+    start_time = time.time()
+    
+    try:
+        from main import TOOL_DEFINITIONS
+        
+        # Validate tool
+        if tool_id not in TOOL_DEFINITIONS:
+            raise HTTPException(status_code=400, detail=f"Tool '{tool_id}' not found")
+        
+        tool_def = TOOL_DEFINITIONS[tool_id]
+        
+        # Determine which agents to run
+        agents_to_run = tool_def["tool"]["available_agents"]
+        if agents:
+            agents_to_run = [a.strip() for a in agents.split(",")]
+        
+        # Get required files for tool and agents
+        required_files = get_required_files(tool_id, agents_to_run)
+        
+        # Build uploaded files dictionary
+        uploaded_files = {
+            "primary": primary,
+            "baseline": baseline
+        }
+        uploaded_files = {k: v for k, v in uploaded_files.items() if v is not None}
+        
+        # Validate files against requirements
+        validation_errors = validate_files(uploaded_files, required_files)
+        if validation_errors:
+            raise HTTPException(
+                status_code=400,
+                detail=f"File validation failed: {validation_errors}"
+            )
+        
+        # Read uploaded files into memory
+        files_map = await read_uploaded_files(uploaded_files)
+        
+        # Convert files to CSV format
+        files_map = convert_files_to_csv(files_map)
+        
+        # Parse parameters
+        parameters = {}
+        if parameters_json:
+            try:
+                parameters = json.loads(parameters_json)
+            except json.JSONDecodeError:
+                raise HTTPException(status_code=400, detail="Invalid parameters JSON")
+        
+        agent_results = {}
+        
+        for agent_id in agents_to_run:
+            try:
+                # Build agent-specific input
+                agent_input = _build_agent_input(agent_id, files_map, parameters, tool_def)
+                
+                # Execute agent
+                result = _execute_agent(agent_id, agent_input)
+                
+                agent_results[agent_id] = result
+                
+                # Update files map for next agent (chaining)
+                _update_files_from_result(files_map, result)
+                
+            except Exception as e:
+                agent_results[agent_id] = {
+                    "status": "error",
+                    "error": str(e),
+                    "execution_time_ms": 0
+                }
+        
+        # Transform results
+        return transform_master_my_data_response(
+            agent_results,
+            int((time.time() - start_time) * 1000),
+            analysis_id,
+            current_user
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        return {
+            "analysis_id": analysis_id,
+            "status": "error",
+            "error": str(e),
+            "execution_time_ms": int((time.time() - start_time) * 1000)
+        }
+
+
+def _build_agent_input(
+    agent_id: str,
+    files_map: Dict[str, tuple],
+    parameters: Dict[str, Any],
+    tool_def: Dict[str, Any]
+) -> Dict[str, Any]:
+    """Build agent-specific input based on tool definition."""
+    agent_def = tool_def.get("agents", {}).get(agent_id, {})
+    required_files = agent_def.get("required_files", [])
+    
+    # Build files dictionary for agent
+    agent_files = {}
+    for file_key in required_files:
+        if file_key in files_map:
+            agent_files[file_key] = files_map[file_key]
+    
+    # Get agent parameters
+    agent_params = parameters.get(agent_id, {})
+    
+    return {
+        "agent_id": agent_id,
+        "files": agent_files,
+        "parameters": agent_params
+    }
+
+
+def _update_files_from_result(
+    files_map: Dict[str, tuple],
+    result: Dict[str, Any]
+) -> None:
+    """Update files map with cleaned file from agent result."""
+    agent_id = result.get("agent_id", "unknown_agent")
+    
+    if result.get("status") == "success" and "cleaned_file" in result:
+        cleaned_file = result["cleaned_file"]
+        if cleaned_file and "content" in cleaned_file:
+            try:
+                # Decode base64 content
+                new_content = base64.b64decode(cleaned_file["content"])
+                new_filename = cleaned_file.get("filename", "cleaned_data.csv")
+                
+                # Update primary file for next agent
+                files_map["primary"] = (new_content, new_filename)
+                print(f"[{agent_id}] Successfully updated primary file: {new_filename}. New size: {len(new_content)} bytes")
+            except Exception as e:
+                print(f"[{agent_id}] Error updating file from result: {str(e)}")
+                pass
+    else:
+        print(f"[{agent_id}] No cleaned file produced. Continuing with previous file.")
+
+
+def _execute_agent(
+    agent_id: str,
+    agent_input: Dict[str, Any]
+) -> Dict[str, Any]:
+    """Execute specific agent."""
+    files_map = agent_input.get("files", {})
+    parameters = agent_input.get("parameters", {})
+    
+    if agent_id == "key-identifier":
+        if "primary" not in files_map:
+            return {
+                "status": "error",
+                "error": "Key identifier requires 'primary' file",
+                "execution_time_ms": 0
+            }
+        
+        primary_bytes, primary_filename = files_map["primary"]
+        
+        return key_identifier.execute_key_identifier(
+            primary_bytes,
+            primary_filename,
+            parameters
+        )
+    
+    elif agent_id == "contract-enforcer":
+        if "primary" not in files_map:
+            return {
+                "status": "error",
+                "error": "Contract enforcer requires 'primary' file",
+                "execution_time_ms": 0
+            }
+        
+        primary_bytes, primary_filename = files_map["primary"]
+        
+        return contract_enforcer.execute_contract_enforcer(
+            primary_bytes,
+            primary_filename,
+            parameters
+        )
+    
+    elif agent_id == "semantic-mapper":
+        if "primary" not in files_map:
+            return {
+                "status": "error",
+                "error": "Semantic mapper requires 'primary' file",
+                "execution_time_ms": 0
+            }
+        
+        primary_bytes, primary_filename = files_map["primary"]
+        
+        return semantic_mapper.execute_semantic_mapper(
+            primary_bytes,
+            primary_filename,
+            parameters
+        )
+    
+    elif agent_id == "lineage-tracer":
+        if "primary" not in files_map:
+            return {
+                "status": "error",
+                "error": "Lineage tracer requires 'primary' file",
+                "execution_time_ms": 0
+            }
+        
+        primary_bytes, primary_filename = files_map["primary"]
+        
+        return lineage_tracer.execute_lineage_tracer(
+            primary_bytes,
+            primary_filename,
+            parameters
+        )
+    
+    elif agent_id == "golden-record-builder":
+        if "primary" not in files_map:
+            return {
+                "status": "error",
+                "error": "Golden record builder requires 'primary' file",
+                "execution_time_ms": 0
+            }
+        
+        primary_bytes, primary_filename = files_map["primary"]
+        
+        return golden_record_builder.execute_golden_record_builder(
+            primary_bytes,
+            primary_filename,
+            parameters
+        )
+    
+    elif agent_id == "survivorship-resolver":
+        if "primary" not in files_map:
+            return {
+                "status": "error",
+                "error": "Survivorship resolver requires 'primary' file",
+                "execution_time_ms": 0
+            }
+        
+        primary_bytes, primary_filename = files_map["primary"]
+        
+        return survivorship_resolver.execute_survivorship_resolver(
+            primary_bytes,
+            primary_filename,
+            parameters
+        )
+    
+    elif agent_id == "master-writeback-agent":
+        if "primary" not in files_map:
+            return {
+                "status": "error",
+                "error": "Master writeback agent requires 'primary' file",
+                "execution_time_ms": 0
+            }
+        
+        primary_bytes, primary_filename = files_map["primary"]
+        
+        return master_writeback_agent.execute_master_writeback_agent(
+            primary_bytes,
+            primary_filename,
+            parameters
+        )
+    
+    elif agent_id == "stewardship-flagger":
+        if "primary" not in files_map:
+            return {
+                "status": "error",
+                "error": "Stewardship flagger requires 'primary' file",
+                "execution_time_ms": 0
+            }
+        
+        primary_bytes, primary_filename = files_map["primary"]
+        
+        return stewardship_flagger.execute_stewardship_flagger(
+            primary_bytes,
+            primary_filename,
+            parameters
+        )
+    
+    else:
+        return {
+            "status": "error",
+            "error": f"Unknown agent for master-my-data: {agent_id}",
+            "execution_time_ms": 0
+        }
 
 
 def transform_master_my_data_response(
     agent_results: Dict[str, Any],
     execution_time_ms: int,
-    analysis_id: str
+    analysis_id: str,
+    current_user: Any = None
 ) -> Dict[str, Any]:
     """Consolidate agent outputs into unified response."""
+    
+    # Print current user data
+    if current_user:
+        print(f"[Transformer] Master My Data - Current User: ID={current_user.id}, Email={current_user.email}, Active={current_user.is_active}, Verified={current_user.is_verified}")
     
     # ==================== CONSOLIDATE AGENT OUTPUTS ====================
     
