@@ -29,6 +29,7 @@ import io
 import time
 from typing import Dict, Any, Optional, List, Tuple
 from datetime import datetime
+from agents.agent_utils import safe_get_dict
 
 def execute_cleanse_writeback(
     file_contents: bytes,
@@ -49,7 +50,8 @@ def execute_cleanse_writeback(
     start_time = time.time()
     parameters = parameters or {}
 
-    # Extract parameters with defaults
+    # Extract and parse parameters with defaults
+    agent_manifests = safe_get_dict(parameters, "agent_manifests", {})
     verify_numeric_types = parameters.get("verify_numeric_types", True)
     verify_datetime_types = parameters.get("verify_datetime_types", True)
     verify_no_new_nulls = parameters.get("verify_no_new_nulls", True)
@@ -57,9 +59,6 @@ def execute_cleanse_writeback(
     verify_data_retention = parameters.get("verify_data_retention", True)
     generate_comprehensive_manifest = parameters.get("generate_comprehensive_manifest", True)
     include_transformation_summary = parameters.get("include_transformation_summary", True)
-    
-    # Manifest sources from previous agents
-    agent_manifests = parameters.get("agent_manifests", {})  # Dict of agent_id -> manifest
     original_row_count = parameters.get("original_row_count", None)
     original_column_count = parameters.get("original_column_count", None)
     

@@ -25,6 +25,7 @@ import polars as pl
 from typing import Dict, Any, Optional, List
 from datetime import datetime
 from collections import defaultdict
+from agents.agent_utils import safe_get_list, safe_get_dict
 
 
 def execute_master_writeback_agent(
@@ -47,21 +48,17 @@ def execute_master_writeback_agent(
     start_time = time.time()
     parameters = parameters or {}
 
-    # Extract parameters with defaults
+    # Extract and parse parameters with defaults
+    pipeline_results = safe_get_dict(parameters, "pipeline_results", {})
+    lineage_data = safe_get_list(parameters, "lineage_data", [])
+    flagged_record_ids = safe_get_list(parameters, "flagged_record_ids", [])
     include_metadata_columns = parameters.get("include_metadata_columns", True)
     include_audit_trail = parameters.get("include_audit_trail", True)
     output_format = parameters.get("output_format", "csv")
     version_suffix = parameters.get("version_suffix", datetime.utcnow().strftime("%Y%m%d_%H%M%S"))
     drop_internal_columns = parameters.get("drop_internal_columns", True)
-    
-    # Agent results from pipeline
-    pipeline_results = parameters.get("pipeline_results", {})
-    lineage_data = parameters.get("lineage_data", [])
-    
-    # Quality thresholds
     min_quality_score = parameters.get("min_quality_score", 0.0)
     exclude_flagged_records = parameters.get("exclude_flagged_records", False)
-    flagged_record_ids = parameters.get("flagged_record_ids", [])
     
     # Scoring thresholds
     excellent_threshold = parameters.get("excellent_threshold", 90)

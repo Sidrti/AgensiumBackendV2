@@ -30,6 +30,7 @@ import base64
 import json
 from typing import Dict, Any, Optional, List, Tuple
 from datetime import datetime
+from agents.agent_utils import safe_get_dict
 
 
 def execute_contract_enforcer(
@@ -50,35 +51,10 @@ def execute_contract_enforcer(
     """
 
     start_time = time.time()
-    
-    # Handle parameters being a string (JSON)
-    if isinstance(parameters, str):
-        try:
-            parameters = json.loads(parameters)
-        except Exception as e:
-             return {
-                "status": "error",
-                "agent_id": "contract-enforcer",
-                "error": f"Parameters is a string but failed to parse as JSON: {str(e)}",
-                "execution_time_ms": int((time.time() - start_time) * 1000)
-            }
-
     parameters = parameters or {}
 
-    # Extract contract and parameters
-    contract = parameters.get("contract", {})
-    
-    # Handle contract being a string (JSON)
-    if isinstance(contract, str):
-        try:
-            contract = json.loads(contract)
-        except Exception as e:
-             return {
-                "status": "error",
-                "agent_id": "contract-enforcer",
-                "error": f"Contract parameter is a string but failed to parse as JSON: {str(e)}",
-                "execution_time_ms": int((time.time() - start_time) * 1000)
-            }
+    # Extract and parse parameters with defaults
+    contract = safe_get_dict(parameters, "contract", {})
 
     auto_transform = parameters.get("auto_transform", True)
     strict_mode = parameters.get("strict_mode", False)  # If True, fail on first violation

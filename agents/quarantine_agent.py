@@ -40,6 +40,7 @@ import json
 from typing import Dict, Any, Optional, Tuple, List
 from datetime import datetime
 import re
+from agents.agent_utils import safe_get_list, safe_get_dict
 
 def execute_quarantine_agent(
     file_contents: bytes,
@@ -61,17 +62,17 @@ def execute_quarantine_agent(
     start_time = time.time()
     parameters = parameters or {}
 
-    # Extract parameters with defaults
+    # Extract and parse parameters with defaults
+    required_fields = safe_get_list(parameters, "required_fields", [])
+    range_constraints = safe_get_dict(parameters, "range_constraints", {})
+    format_constraints = safe_get_dict(parameters, "format_constraints", {})
+    expected_schema = safe_get_dict(parameters, "expected_schema", {})
     detect_missing_fields = parameters.get("detect_missing_fields", True)
     detect_type_mismatches = parameters.get("detect_type_mismatches", True)
     detect_out_of_range = parameters.get("detect_out_of_range", True)
     detect_invalid_formats = parameters.get("detect_invalid_formats", True)
     detect_broken_records = parameters.get("detect_broken_records", True)
     detect_schema_mismatches = parameters.get("detect_schema_mismatches", True)
-    required_fields = parameters.get("required_fields", [])
-    range_constraints = parameters.get("range_constraints", {})
-    format_constraints = parameters.get("format_constraints", {})
-    expected_schema = parameters.get("expected_schema", {})
     quarantine_reduction_weight = parameters.get("quarantine_reduction_weight", 0.5)
     data_integrity_weight = parameters.get("data_integrity_weight", 0.3)
     processing_efficiency_weight = parameters.get("processing_efficiency_weight", 0.2)

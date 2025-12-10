@@ -15,6 +15,7 @@ import time
 import re
 import base64
 from typing import Dict, Any, Optional, List, Set, Tuple
+from agents.agent_utils import safe_get_list
 
 def execute_duplicate_resolver(
     file_contents: bytes,
@@ -35,11 +36,11 @@ def execute_duplicate_resolver(
     start_time = time.time()
     parameters = parameters or {}
 
-    # Extract parameters with defaults
-    detection_types = parameters.get("detection_types", ["exact", "case_variations", "email_case", "missing_values", "conflicting"])
-    merge_strategy = parameters.get("merge_strategy", "remove_duplicates")  # remove_duplicates or merge_smart
-    email_columns = parameters.get("email_columns", [])
-    key_columns = parameters.get("key_columns", [])
+    # Extract and parse parameters with defaults
+    detection_types = safe_get_list(parameters, "detection_types", ["exact", "case_variations", "email_case", "missing_values", "conflicting"])
+    email_columns = safe_get_list(parameters, "email_columns", [])
+    key_columns = safe_get_list(parameters, "key_columns", [])
+    merge_strategy = parameters.get("merge_strategy", "remove_duplicates")
     null_handling = parameters.get("null_handling", "ignore_nulls")  # ignore_nulls or match_nulls
     conflict_resolution = parameters.get("conflict_resolution", "keep_first")
     dedup_reduction_weight = parameters.get("dedup_reduction_weight", 0.5)

@@ -30,6 +30,7 @@ import polars as pl
 from typing import Dict, Any, Optional, List, Tuple
 from datetime import datetime
 from collections import Counter, defaultdict
+from agents.agent_utils import safe_get_list, safe_get_dict
 
 
 # ==================== VALIDATION PATTERNS ====================
@@ -78,18 +79,16 @@ def execute_survivorship_resolver(
     start_time = time.time()
     parameters = parameters or {}
 
-    # Extract parameters with defaults
-    match_key_columns = parameters.get("match_key_columns", [])
-    survivorship_rules = parameters.get("survivorship_rules", {})  # column -> rule
-    source_priority = parameters.get("source_priority", {})  # source -> priority (lower = better)
+    # Extract and parse parameters with defaults
+    match_key_columns = safe_get_list(parameters, "match_key_columns", [])
+    survivorship_rules = safe_get_dict(parameters, "survivorship_rules", {})
+    source_priority = safe_get_dict(parameters, "source_priority", {})
+    quality_score_columns = safe_get_dict(parameters, "quality_score_columns", {})
+    field_validation_rules = safe_get_dict(parameters, "field_validation_rules", {})
     source_column = parameters.get("source_column", None)
     timestamp_column = parameters.get("timestamp_column", None)
-    quality_score_columns = parameters.get("quality_score_columns", {})  # column -> quality score column
     default_rule = parameters.get("default_rule", "quality_score")
     min_confidence_threshold = parameters.get("min_confidence_threshold", 0.5)
-    
-    # Field-specific validation rules
-    field_validation_rules = parameters.get("field_validation_rules", {})
     
     # Scoring thresholds
     excellent_threshold = parameters.get("excellent_threshold", 90)

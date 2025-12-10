@@ -12,6 +12,7 @@ import io
 import time
 import re
 from typing import Dict, Any, Optional, List
+from agents.agent_utils import safe_get_list
 
 def execute_governance(
     file_contents: bytes,
@@ -97,9 +98,9 @@ def execute_governance(
         row_level_issues = []
         
         # Add row-level issues for missing required governance fields
-        required_lineage_fields = parameters.get('required_lineage_fields', [])
-        required_consent_fields = parameters.get('required_consent_fields', [])
-        required_classification_fields = parameters.get('required_classification_fields', [])
+        required_lineage_fields = safe_get_list(parameters, 'required_lineage_fields', [])
+        required_consent_fields = safe_get_list(parameters, 'required_consent_fields', [])
+        required_classification_fields = safe_get_list(parameters, 'required_classification_fields', [])
         
         all_required_fields = required_lineage_fields + required_consent_fields + required_classification_fields
         

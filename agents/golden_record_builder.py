@@ -26,6 +26,7 @@ import polars as pl
 from typing import Dict, Any, Optional, List, Tuple
 from datetime import datetime
 from collections import defaultdict
+from agents.agent_utils import safe_get_list, safe_get_dict
 
 
 def execute_golden_record_builder(
@@ -48,12 +49,12 @@ def execute_golden_record_builder(
     start_time = time.time()
     parameters = parameters or {}
 
-    # Extract parameters with defaults
-    match_key_columns = parameters.get("match_key_columns", [])  # Columns to identify related records
-    survivorship_rules = parameters.get("survivorship_rules", {})  # Column -> rule mapping
-    source_priority = parameters.get("source_priority", {})  # Source -> priority mapping
-    source_column = parameters.get("source_column", None)  # Column identifying record source
-    timestamp_column = parameters.get("timestamp_column", None)  # Column for recency rules
+    # Extract and parse parameters with defaults
+    match_key_columns = safe_get_list(parameters, "match_key_columns", [])
+    survivorship_rules = safe_get_dict(parameters, "survivorship_rules", {})
+    source_priority = safe_get_dict(parameters, "source_priority", {})
+    source_column = parameters.get("source_column", None)
+    timestamp_column = parameters.get("timestamp_column", None)
     default_survivorship_rule = parameters.get("default_survivorship_rule", "most_complete")
     min_trust_score = parameters.get("min_trust_score", 0.5)
     
@@ -106,7 +107,8 @@ def execute_golden_record_builder(
         for col in match_key_columns:
             col_clean = col.strip().lower()
             if col_clean in df_columns_normalized:
-                valid_match_keys.append(df_columns_normalized[col_clean])
+                actual_col = df_columns_normalized[col_clean]
+                valid_match_keys.append(actual_col)
         
         if not valid_match_keys:
             # Fallback: treat each row as its own cluster
@@ -122,7 +124,7 @@ def execute_golden_record_builder(
         values_survived = 0
         row_level_issues = []
         
-        for cluster_id, cluster_info in clusters.items():
+        for idx, (cluster_id, cluster_info) in enumerate(clusters.items()):
             cluster_rows = cluster_info["rows"]
             cluster_df = df.filter(pl.col("__row_index__").is_in(cluster_rows)) if "__row_index__" in df.columns else df[cluster_rows]
             
@@ -648,10 +650,11 @@ def _apply_survivorship_rule(
         # Use timestamp column if available
         if timestamp_column and timestamp_column in cluster_data.columns:
             try:
-                # Get row with most recent timestamp
+                # Parse dates and sort
                 sorted_df = cluster_data.sort(timestamp_column, descending=True)
-                return sorted_df[column][0], 0.85
-            except:
+                result = sorted_df[column][0]
+                return result, 0.85
+            except Exception as e:
                 pass
         # Fallback to last value
         return non_null_values[-1], 0.7

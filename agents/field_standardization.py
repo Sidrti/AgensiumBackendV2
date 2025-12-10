@@ -16,6 +16,7 @@ import time
 import re
 import base64
 from typing import Dict, Any, Optional, List, Set, Tuple
+from agents.agent_utils import safe_get_list, safe_get_dict
 
 def execute_field_standardization(
     file_contents: bytes,
@@ -37,18 +38,18 @@ def execute_field_standardization(
     start_time = time.time()
     parameters = parameters or {}
 
-    # Extract parameters with defaults
-    case_strategy = parameters.get("case_strategy", "lowercase")  # lowercase, uppercase, titlecase, none
+    # Extract and parse parameters with defaults
+    target_columns = safe_get_list(parameters, "target_columns", [])
+    preserve_columns = safe_get_list(parameters, "preserve_columns", [])
+    synonym_mappings = safe_get_dict(parameters, "synonym_mappings", {})
+    unit_mappings = safe_get_dict(parameters, "unit_mappings", {})
+    case_strategy = parameters.get("case_strategy", "lowercase")
     trim_whitespace = parameters.get("trim_whitespace", True)
     normalize_internal_spacing = parameters.get("normalize_internal_spacing", True)
     apply_synonyms = parameters.get("apply_synonyms", True)
-    synonym_mappings = parameters.get("synonym_mappings", {})  # Dict of column -> {synonym -> standard}
     unit_standardization = parameters.get("unit_standardization", False)
-    unit_mappings = parameters.get("unit_mappings", {})  # Dict of column -> {unit -> standard_unit, conversion_factor}
     date_standardization = parameters.get("date_standardization", True)
     target_date_format = parameters.get("target_date_format", "%Y-%m-%d")
-    target_columns = parameters.get("target_columns", [])  # Columns to standardize (all if empty)
-    preserve_columns = parameters.get("preserve_columns", [])  # Columns to preserve from standardization
     
     # Scoring weights
     standardization_effectiveness_weight = parameters.get("standardization_effectiveness_weight", 0.5)

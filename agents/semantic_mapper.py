@@ -21,6 +21,7 @@ import base64
 import polars as pl
 from typing import Dict, Any, Optional, List, Tuple
 from datetime import datetime
+from agents.agent_utils import safe_get_dict
 
 
 def execute_semantic_mapper(
@@ -41,53 +42,11 @@ def execute_semantic_mapper(
     """
 
     start_time = time.time()
-    
-    # Handle parameters being a string (JSON)
-    if isinstance(parameters, str):
-        try:
-            import json
-            parameters = json.loads(parameters)
-        except Exception as e:
-             return {
-                "status": "error",
-                "agent_id": "semantic-mapper",
-                "error": f"Parameters is a string but failed to parse as JSON: {str(e)}",
-                "execution_time_ms": int((time.time() - start_time) * 1000)
-            }
-
     parameters = parameters or {}
 
-    # Extract parameters with defaults
-    custom_column_mappings = parameters.get("custom_column_mappings", {})  # raw_name -> standard_name
-    
-    # Handle custom_column_mappings being a string (JSON)
-    if isinstance(custom_column_mappings, str):
-        try:
-            import json
-            custom_column_mappings = json.loads(custom_column_mappings)
-        except Exception as e:
-             return {
-                "status": "error",
-                "agent_id": "semantic-mapper",
-                "error": f"custom_column_mappings is a string but failed to parse as JSON: {str(e)}",
-                "execution_time_ms": int((time.time() - start_time) * 1000)
-            }
-
-    custom_value_mappings = parameters.get("custom_value_mappings", {})  # column -> {raw_value -> standard_value}
-    
-    # Handle custom_value_mappings being a string (JSON)
-    if isinstance(custom_value_mappings, str):
-        try:
-            import json
-            custom_value_mappings = json.loads(custom_value_mappings)
-        except Exception as e:
-             return {
-                "status": "error",
-                "agent_id": "semantic-mapper",
-                "error": f"custom_value_mappings is a string but failed to parse as JSON: {str(e)}",
-                "execution_time_ms": int((time.time() - start_time) * 1000)
-            }
-
+    # Extract and parse parameters with defaults
+    custom_column_mappings = safe_get_dict(parameters, "custom_column_mappings", {})
+    custom_value_mappings = safe_get_dict(parameters, "custom_value_mappings", {})
     confidence_threshold = parameters.get("confidence_threshold", 0.7)
     auto_detect_semantics = parameters.get("auto_detect_semantics", True)
     apply_mappings = parameters.get("apply_mappings", True)

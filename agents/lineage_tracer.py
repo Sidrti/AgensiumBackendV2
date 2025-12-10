@@ -24,6 +24,7 @@ import hashlib
 import polars as pl
 from typing import Dict, Any, Optional, List
 from datetime import datetime
+from agents.agent_utils import safe_get_list, safe_get_dict
 
 
 def execute_lineage_tracer(
@@ -46,14 +47,14 @@ def execute_lineage_tracer(
     start_time = time.time()
     parameters = parameters or {}
 
-    # Extract parameters with defaults
-    previous_lineage = parameters.get("previous_lineage", [])  # Lineage from prior agents
+    # Extract and parse parameters with defaults
+    previous_lineage = safe_get_list(parameters, "previous_lineage", [])
+    source_metadata = safe_get_dict(parameters, "source_metadata", {})
+    execution_context = safe_get_dict(parameters, "execution_context", {})
     source_system = parameters.get("source_system", "unknown")
-    source_metadata = parameters.get("source_metadata", {})
     track_column_lineage = parameters.get("track_column_lineage", True)
     track_row_fingerprints = parameters.get("track_row_fingerprints", False)
     max_fingerprint_rows = parameters.get("max_fingerprint_rows", 1000)
-    execution_context = parameters.get("execution_context", {})
     
     # Scoring thresholds
     excellent_threshold = parameters.get("excellent_threshold", 90)

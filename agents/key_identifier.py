@@ -20,6 +20,7 @@ import time
 import re
 import base64
 from typing import Dict, Any, Optional, List
+from agents.agent_utils import safe_get_dict
 
 
 def execute_key_identifier(
@@ -42,13 +43,13 @@ def execute_key_identifier(
     start_time = time.time()
     parameters = parameters or {}
 
-    # Extract parameters with defaults
-    pk_uniqueness_threshold = parameters.get("pk_uniqueness_threshold", 99.0)  # % uniqueness for PK candidate
-    pk_null_threshold = parameters.get("pk_null_threshold", 0.0)  # Max % nulls for PK candidate
-    entity_key_uniqueness_min = parameters.get("entity_key_uniqueness_min", 50.0)  # Min uniqueness for entity key
-    entity_key_uniqueness_max = parameters.get("entity_key_uniqueness_max", 99.0)  # Max uniqueness for entity key
-    fk_overlap_threshold = parameters.get("fk_overlap_threshold", 70.0)  # % overlap for FK detection
-    reference_tables = parameters.get("reference_tables", {})  # Dict of table_name -> {column: [values]}
+    # Extract and parse parameters with defaults
+    reference_tables = safe_get_dict(parameters, "reference_tables", {})
+    pk_uniqueness_threshold = parameters.get("pk_uniqueness_threshold", 99.0)
+    pk_null_threshold = parameters.get("pk_null_threshold", 0.0)
+    entity_key_uniqueness_min = parameters.get("entity_key_uniqueness_min", 50.0)
+    entity_key_uniqueness_max = parameters.get("entity_key_uniqueness_max", 99.0)
+    fk_overlap_threshold = parameters.get("fk_overlap_threshold", 70.0)
     analyze_composite_keys = parameters.get("analyze_composite_keys", True)
     max_composite_key_columns = parameters.get("max_composite_key_columns", 3)
     

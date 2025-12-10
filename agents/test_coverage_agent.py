@@ -12,6 +12,7 @@ import io
 import time
 import re
 from typing import Dict, Any, Optional, List
+from agents.agent_utils import safe_get_list, safe_get_dict
 
 
 def execute_test_coverage(
@@ -99,7 +100,7 @@ def execute_test_coverage(
         row_level_issues = []
         
         # Check uniqueness constraints at row level
-        unique_columns = parameters.get('unique_columns', [])
+        unique_columns = safe_get_list(parameters, 'unique_columns', [])
         for col in unique_columns:
             if col in df.columns:
                 # Find rows with duplicate values
@@ -124,7 +125,7 @@ def execute_test_coverage(
                 if len(row_level_issues) >= 1000: break
         
         # Check range constraints at row level
-        range_tests = parameters.get('range_tests', {})
+        range_tests = safe_get_dict(parameters, 'range_tests', {})
         for col, constraints in range_tests.items():
             if len(row_level_issues) >= 1000: break
             if col in df.columns and df[col].dtype in [pl.Int8, pl.Int16, pl.Int32, pl.Int64, pl.Float32, pl.Float64]:
@@ -159,7 +160,7 @@ def execute_test_coverage(
                     })
         
         # Check format constraints at row level
-        format_tests = parameters.get('format_tests', {})
+        format_tests = safe_get_dict(parameters, 'format_tests', {})
         for col, pattern_info in format_tests.items():
             if len(row_level_issues) >= 1000: break
             if col in df.columns:

@@ -18,6 +18,7 @@ import numpy as np
 import io
 import time
 from typing import Dict, Any, Optional, List, Tuple
+from agents.agent_utils import safe_get_list
 
 def execute_cleanse_previewer(
     file_contents: bytes,
@@ -38,8 +39,8 @@ def execute_cleanse_previewer(
     start_time = time.time()
     parameters = parameters or {}
 
-    # Extract parameters with defaults
-    preview_rules = parameters.get("preview_rules", [])
+    # Extract and parse parameters with defaults
+    preview_rules = safe_get_list(parameters, "preview_rules", [])
     impact_threshold_high = parameters.get("impact_threshold_high", 10)
     impact_threshold_medium = parameters.get("impact_threshold_medium", 5)
     confidence_level = parameters.get("confidence_level", 0.95)

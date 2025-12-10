@@ -35,6 +35,7 @@ import polars as pl
 from typing import Dict, Any, Optional, List, Tuple
 from datetime import datetime
 from collections import defaultdict
+from agents.agent_utils import safe_get_list, safe_get_dict
 
 
 # ==================== ISSUE CATEGORIES ====================
@@ -108,20 +109,14 @@ def execute_stewardship_flagger(
     start_time = time.time()
     parameters = parameters or {}
 
-    # Extract parameters with defaults
-    required_columns = parameters.get("required_columns", [])
+    # Extract and parse parameters with defaults
+    required_columns = safe_get_list(parameters, "required_columns", [])
+    confidence_columns = safe_get_list(parameters, "confidence_columns", [])
+    duplicate_key_columns = safe_get_list(parameters, "duplicate_key_columns", [])
+    business_rules = safe_get_list(parameters, "business_rules", [])
+    field_validation_rules = safe_get_dict(parameters, "field_validation_rules", {})
+    outlier_thresholds = safe_get_dict(parameters, "outlier_thresholds", DEFAULT_OUTLIER_THRESHOLDS)
     confidence_threshold = parameters.get("confidence_threshold", 0.7)
-    confidence_columns = parameters.get("confidence_columns", [])  # Columns containing confidence scores
-    
-    # Validation rules
-    field_validation_rules = parameters.get("field_validation_rules", {})
-    outlier_thresholds = parameters.get("outlier_thresholds", DEFAULT_OUTLIER_THRESHOLDS)
-    
-    # Duplicate detection
-    duplicate_key_columns = parameters.get("duplicate_key_columns", [])
-    
-    # Business rules
-    business_rules = parameters.get("business_rules", [])
     
     # Priority configuration
     severity_weights = parameters.get("severity_weights", {

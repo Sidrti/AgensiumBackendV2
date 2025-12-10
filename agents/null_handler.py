@@ -13,6 +13,7 @@ import io
 import time
 import base64
 from typing import Dict, Any, Optional, List
+from agents.agent_utils import safe_get_dict
 
 try:
     from sklearn.impute import KNNImputer
@@ -41,10 +42,10 @@ def execute_null_handler(
     start_time = time.time()
     parameters = parameters or {}
 
-    # Extract parameters with defaults
+    # Extract and parse parameters with defaults
+    column_strategies = safe_get_dict(parameters, "column_strategies", {})
+    fill_values = safe_get_dict(parameters, "fill_values", {})
     global_strategy = parameters.get("global_strategy", "column_specific")
-    column_strategies = parameters.get("column_strategies", {})
-    fill_values = parameters.get("fill_values", {})
     knn_neighbors = parameters.get("knn_neighbors", 5)
     null_reduction_weight = parameters.get("null_reduction_weight", 0.5)
     data_retention_weight = parameters.get("data_retention_weight", 0.3)
