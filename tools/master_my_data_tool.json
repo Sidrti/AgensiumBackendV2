@@ -467,7 +467,8 @@
         "match_key_columns": {
           "type": "array",
           "description": "Columns to use for identifying related records",
-          "default": []
+          "default": [],
+          "example": ["Email", "Phone"]
         },
         "survivorship_rules": {
           "type": "object",
@@ -482,7 +483,8 @@
         "source_column": {
           "type": "string",
           "description": "Column identifying the record source",
-          "default": null
+          "default": null,
+          "example": "SourceSystem"
         },
         "timestamp_column": {
           "type": "string",
@@ -589,7 +591,9 @@
         "match_key_columns": {
           "type": "array",
           "description": "Columns to use for identifying related records",
-          "default": []
+          "default": [],
+          "example": ["Email", "Phone"],
+          "required": true
         },
         "survivorship_rules": {
           "type": "object",
@@ -604,7 +608,9 @@
         "source_column": {
           "type": "string",
           "description": "Column identifying the record source",
-          "default": null
+          "default": null,
+          "example": "SourceSystem",
+          "required": true
         },
         "timestamp_column": {
           "type": "string",
