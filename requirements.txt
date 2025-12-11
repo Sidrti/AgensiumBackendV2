@@ -33,3 +33,5 @@ email-validator>=2.1.0
 pydantic[email]>=2.0.0
 pymysql
 
+rapidfuzz>=3.0.0
+jellyfish>=1.0.0

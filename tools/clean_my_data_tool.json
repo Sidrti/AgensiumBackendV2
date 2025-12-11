@@ -42,7 +42,9 @@
         "Statistical Confidence Scoring",
         "Safety Validation"
       ],
-      "input": { "type": "CSV, XLSX + cleaning rules" },
+      "input": {
+        "type": "CSV, XLSX + cleaning rules"
+      },
       "version": "1.0.0",
       "required_files": ["primary"],
       "parameters": {
@@ -50,100 +52,122 @@
           "type": "array",
           "description": "List of cleaning rules to preview. Each rule specifies: {type, target_columns, description, ...}. Supported types: drop_nulls, impute_nulls, remove_outliers, drop_duplicates, drop_columns, convert_types",
           "default": [],
-          "items": "object"
+          "example": [
+            {
+              "type": "drop_nulls",
+              "target_columns": ["email", "customer_id"],
+              "description": "Drop rows with missing critical identifiers"
+            },
+            {
+              "type": "impute_nulls",
+              "target_columns": ["age"],
+              "strategy": "mean",
+              "description": "Impute missing age with mean"
+            },
+            {
+              "type": "remove_outliers",
+              "target_columns": ["salary"],
+              "method": "iqr",
+              "threshold": 1.5,
+              "description": "Remove salary outliers using IQR"
+            }
+          ],
+          "items": "object",
+          "show": true,
+          "required": false
         },
         "impact_threshold_high": {
           "type": "float",
           "description": "Percentage change threshold to classify as high impact",
           "default": 10,
           "min": 0,
-          "max": 100
+          "max": 100,
+          "show": false,
+          "required": false
         },
         "impact_threshold_medium": {
           "type": "float",
           "description": "Percentage change threshold to classify as medium impact",
           "default": 5,
           "min": 0,
-          "max": 100
+          "max": 100,
+          "show": false,
+          "required": false
         },
         "confidence_level": {
           "type": "float",
           "description": "Statistical confidence level for analysis",
           "default": 0.95,
           "min": 0.8,
-          "max": 0.99
+          "max": 0.99,
+          "show": false,
+          "required": false
         },
         "calculate_distributions": {
           "type": "boolean",
           "description": "Calculate distribution metrics (skewness, kurtosis)",
-          "default": true
+          "default": true,
+          "show": false,
+          "required": false
         },
         "compare_statistics": {
           "type": "boolean",
           "description": "Compare statistical measures before/after",
-          "default": true
+          "default": true,
+          "show": false,
+          "required": false
         },
         "analyze_correlations": {
           "type": "boolean",
           "description": "Analyze correlation changes",
-          "default": false
+          "default": false,
+          "show": false,
+          "required": false
         },
         "accuracy_weight": {
           "type": "float",
           "description": "Weight for preview accuracy in scoring",
           "default": 0.4,
           "min": 0,
-          "max": 1
+          "max": 1,
+          "show": false,
+          "required": false
         },
         "safety_weight": {
           "type": "float",
           "description": "Weight for operation safety in scoring",
           "default": 0.3,
           "min": 0,
-          "max": 1
+          "max": 1,
+          "show": false,
+          "required": false
         },
         "completeness_weight": {
           "type": "float",
           "description": "Weight for analysis completeness in scoring",
           "default": 0.3,
           "min": 0,
-          "max": 1
+          "max": 1,
+          "show": false,
+          "required": false
         },
         "excellent_threshold": {
           "type": "integer",
           "description": "Score threshold for excellent preview quality",
           "default": 90,
           "min": 0,
-          "max": 100
+          "max": 100,
+          "show": false,
+          "required": false
         },
         "good_threshold": {
           "type": "integer",
           "description": "Score threshold for good preview quality",
           "default": 75,
           "min": 0,
-          "max": 100
-        }
-      },
-      "output_structure": {
-        "agent_id": "string",
-        "agent_name": "string",
-        "status": "string",
-        "execution_time_ms": "integer",
-        "summary_metrics": {
-          "total_rows_analyzed": "integer",
-          "total_rules_previewed": "integer",
-          "high_impact_rules": "integer",
-          "medium_impact_rules": "integer",
-          "low_impact_rules": "integer",
-          "safe_to_execute": "boolean",
-          "total_warnings": "integer"
-        },
-        "data": {
-          "preview_score": "object",
-          "quality_status": "string",
-          "preview_analysis": "object",
-          "summary": "string",
-          "impact_issues": "array"
+          "max": 100,
+          "show": false,
+          "required": false
         }
       }
     },
@@ -161,122 +185,138 @@
         "Quality Scoring",
         "Corruption Prevention"
       ],
-      "input": { "type": "CSV, JSON, XLSX" },
+      "input": {
+        "type": "CSV, JSON, XLSX"
+      },
       "version": "1.0.0",
       "required_files": ["primary"],
       "parameters": {
         "detect_missing_fields": {
           "type": "boolean",
           "description": "Detect missing required fields",
-          "default": true
+          "default": true,
+          "show": false,
+          "required": false
         },
         "detect_type_mismatches": {
           "type": "boolean",
           "description": "Detect data type mismatches",
-          "default": true
+          "default": true,
+          "show": false,
+          "required": false
         },
         "detect_out_of_range": {
           "type": "boolean",
           "description": "Detect out-of-range numeric values",
-          "default": true
+          "default": true,
+          "show": false,
+          "required": false
         },
         "detect_invalid_formats": {
           "type": "boolean",
           "description": "Detect invalid format values",
-          "default": true
+          "default": true,
+          "show": false,
+          "required": false
         },
         "detect_broken_records": {
           "type": "boolean",
           "description": "Detect corrupted or broken records",
-          "default": true
+          "default": true,
+          "show": false,
+          "required": false
         },
         "detect_schema_mismatches": {
           "type": "boolean",
           "description": "Detect schema mismatches",
-          "default": true
+          "default": true,
+          "show": false,
+          "required": false
         },
         "required_fields": {
           "type": "array",
           "description": "List of required field names",
           "default": [],
-          "items": "string"
+          "items": "string",
+          "example": ["customer_id", "email", "created_at"],
+          "show": true,
+          "required": false
         },
         "range_constraints": {
           "type": "object",
           "description": "Numeric range constraints (column -> {min, max})",
-          "default": {}
+          "default": {},
+          "example": {
+            "age": { "min": 18, "max": 120 },
+            "salary": { "min": 0, "max": 1000000 },
+            "score": { "min": 0, "max": 100 }
+          },
+          "show": true,
+          "required": false
         },
         "format_constraints": {
           "type": "object",
           "description": "Format constraints (column -> regex pattern)",
-          "default": {}
+          "default": {},
+          "example": {
+            "email": "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$",
+            "phone": "^\\+?[1-9]\\d{1,14}$",
+            "zip_code": "^\\d{5}(-\\d{4})?$"
+          },
+          "show": true,
+          "required": false
         },
         "expected_schema": {
           "type": "object",
           "description": "Expected data types for columns (column -> type)",
-          "default": {}
+          "default": {},
+          "show": false,
+          "required": false
         },
         "quarantine_reduction_weight": {
           "type": "float",
           "description": "Weight for quarantine effectiveness in scoring",
           "default": 0.5,
           "min": 0,
-          "max": 1
+          "max": 1,
+          "show": false,
+          "required": false
         },
         "data_integrity_weight": {
           "type": "float",
           "description": "Weight for data integrity in scoring",
           "default": 0.3,
           "min": 0,
-          "max": 1
+          "max": 1,
+          "show": false,
+          "required": false
         },
         "processing_efficiency_weight": {
           "type": "float",
           "description": "Weight for processing efficiency in scoring",
           "default": 0.2,
           "min": 0,
-          "max": 1
+          "max": 1,
+          "show": false,
+          "required": false
         },
         "excellent_threshold": {
           "type": "integer",
           "description": "Score threshold for excellent quality",
           "default": 90,
           "min": 0,
-          "max": 100
+          "max": 100,
+          "show": false,
+          "required": false
         },
         "good_threshold": {
           "type": "integer",
           "description": "Score threshold for good quality",
           "default": 75,
           "min": 0,
-          "max": 100
-        }
-      },
-      "output_structure": {
-        "agent_id": "string",
-        "agent_name": "string",
-        "status": "string",
-        "execution_time_ms": "integer",
-        "summary_metrics": {
-          "total_rows_processed": "integer",
-          "quarantined_records": "integer",
-          "clean_records": "integer",
-          "quarantine_percentage": "number",
-          "quarantine_issues_found": "integer"
-        },
-        "data": {
-          "quality_score": "object",
-          "quality_status": "string",
-          "quarantine_analysis": "object",
-          "quarantine_log": "array",
-          "summary": "string",
-          "row_level_issues": "array"
-        },
-        "cleaned_file": {
-          "filename": "string",
-          "content": "string (base64)",
-          "size_bytes": "integer",
-          "format": "string"
+          "max": 100,
+          "show": false,
+          "required": false
         }
       }
     },
@@ -293,84 +333,84 @@
         "Automatic Type Conversion",
         "Quality Scoring"
       ],
-      "input": { "type": "CSV, JSON, XLSX" },
+      "input": {
+        "type": "CSV, JSON, XLSX"
+      },
       "version": "1.0.0",
       "required_files": ["primary"],
       "parameters": {
         "auto_convert_numeric": {
           "type": "boolean",
           "description": "Automatically convert to numeric type",
-          "default": true
+          "default": true,
+          "show": false,
+          "required": false
         },
         "auto_convert_datetime": {
           "type": "boolean",
           "description": "Automatically convert to datetime type",
-          "default": true
+          "default": true,
+          "show": false,
+          "required": false
         },
         "auto_convert_category": {
           "type": "boolean",
           "description": "Automatically convert to category type",
-          "default": true
+          "default": true,
+          "show": false,
+          "required": false
         },
         "preserve_mixed_types": {
           "type": "boolean",
           "description": "Keep columns with mixed types as object",
-          "default": false
+          "default": false,
+          "show": false,
+          "required": false
         },
         "type_reduction_weight": {
           "type": "float",
           "description": "Weight for type issue reduction in scoring",
           "default": 0.5,
           "min": 0,
-          "max": 1
+          "max": 1,
+          "show": false,
+          "required": false
         },
         "data_retention_weight": {
           "type": "float",
           "description": "Weight for data retention in scoring",
           "default": 0.3,
           "min": 0,
-          "max": 1
+          "max": 1,
+          "show": false,
+          "required": false
         },
         "column_retention_weight": {
           "type": "float",
           "description": "Weight for column retention in scoring",
           "default": 0.2,
           "min": 0,
-          "max": 1
+          "max": 1,
+          "show": false,
+          "required": false
         },
         "excellent_threshold": {
           "type": "integer",
           "description": "Score threshold for excellent quality",
           "default": 90,
           "min": 0,
-          "max": 100
+          "max": 100,
+          "show": false,
+          "required": false
         },
         "good_threshold": {
           "type": "integer",
           "description": "Score threshold for good quality",
           "default": 75,
           "min": 0,
-          "max": 100
-        }
-      },
-      "output_structure": {
-        "agent_id": "string",
-        "agent_name": "string",
-        "status": "string",
-        "execution_time_ms": "integer",
-        "summary_metrics": {
-          "total_rows_processed": "integer",
-          "type_issues_fixed": "integer",
-          "original_type_issues": "integer",
-          "remaining_type_issues": "integer",
-          "total_issues": "integer"
-        },
-        "data": {
-          "fixing_score": "object",
-          "type_analysis": "object",
-          "fix_log": "array",
-          "summary": "string",
-          "row_level_issues": "array"
+          "max": 100,
+          "show": false,
+          "required": false
         }
       }
     },
@@ -388,7 +428,9 @@
         "Unit Alignment & Conversion",
         "Column-Specific Standardization"
       ],
-      "input": { "type": "CSV, JSON, XLSX" },
+      "input": {
+        "type": "CSV, JSON, XLSX"
+      },
       "version": "1.0.0",
       "required_files": ["primary"],
       "parameters": {
@@ -396,121 +438,153 @@
           "type": "string",
           "description": "Case normalization strategy to apply",
           "default": "lowercase",
-          "allowed": ["lowercase", "uppercase", "titlecase", "none"]
+          "allowed": ["lowercase", "uppercase", "titlecase", "none"],
+          "example": "lowercase",
+          "show": true,
+          "required": false
         },
         "trim_whitespace": {
           "type": "boolean",
           "description": "Remove leading and trailing whitespace",
-          "default": true
+          "default": true,
+          "show": false,
+          "required": false
         },
         "normalize_internal_spacing": {
           "type": "boolean",
           "description": "Normalize internal spacing (collapse multiple spaces to single space)",
-          "default": true
+          "default": true,
+          "show": false,
+          "required": false
         },
         "apply_synonyms": {
           "type": "boolean",
           "description": "Apply synonym replacement mappings",
-          "default": true
+          "default": true,
+          "show": false,
+          "required": false
         },
         "synonym_mappings": {
           "type": "object",
           "description": "Column-specific synonym mappings (column -> {synonym -> standard_value}). Example: {'address': {'St.': 'Street', 'Ave.': 'Avenue', 'Rd.': 'Road'}}",
-          "default": {}
+          "default": {},
+          "example": {
+            "country": {
+              "USA": "United States",
+              "US": "United States",
+              "UK": "United Kingdom"
+            },
+            "status": {
+              "Y": "Active",
+              "N": "Inactive",
+              "1": "Active",
+              "0": "Inactive"
+            }
+          },
+          "show": true,
+          "required": false
         },
         "unit_standardization": {
           "type": "boolean",
           "description": "Apply unit conversion and standardization",
-          "default": false
+          "default": false,
+          "show": false,
+          "required": false
         },
         "unit_mappings": {
           "type": "object",
           "description": "Column-specific unit conversion mappings (column -> {unit_pattern -> {factor: number, target_unit: string}}). Example: {'height': {'ft': {'factor': 12, 'target_unit': 'inches'}}}",
-          "default": {}
+          "default": {},
+          "example": {
+            "weight": {
+              "kg": { "factor": 2.20462, "target_unit": "lbs" },
+              "g": { "factor": 0.00220462, "target_unit": "lbs" }
+            },
+            "distance": {
+              "km": { "factor": 0.621371, "target_unit": "miles" },
+              "m": { "factor": 0.000621371, "target_unit": "miles" }
+            }
+          },
+          "show": true,
+          "required": false
         },
         "date_standardization": {
           "type": "boolean",
           "description": "Standardize date formats to a consistent target format",
-          "default": true
+          "default": true,
+          "show": false,
+          "required": false
         },
         "target_date_format": {
           "type": "string",
           "description": "Target format for date standardization (e.g., %Y-%m-%d)",
-          "default": "%Y-%m-%d"
+          "default": "%Y-%m-%d",
+          "example": "%Y-%m-%d",
+          "show": true,
+          "required": false
         },
         "target_columns": {
           "type": "array",
           "description": "Specific columns to standardize (all columns if empty)",
           "default": [],
-          "items": "string"
+          "items": "string",
+          "example": ["first_name", "last_name", "city"],
+          "show": true,
+          "required": false
         },
         "preserve_columns": {
           "type": "array",
           "description": "Columns to exclude from standardization",
           "default": [],
-          "items": "string"
+          "items": "string",
+          "example": ["id", "metadata"],
+          "show": true,
+          "required": false
         },
         "standardization_effectiveness_weight": {
           "type": "float",
           "description": "Weight for standardization effectiveness in scoring",
           "default": 0.5,
           "min": 0,
-          "max": 1
+          "max": 1,
+          "show": false,
+          "required": false
         },
         "data_retention_weight": {
           "type": "float",
           "description": "Weight for data retention in scoring",
           "default": 0.3,
           "min": 0,
-          "max": 1
+          "max": 1,
+          "show": false,
+          "required": false
         },
         "column_retention_weight": {
           "type": "float",
           "description": "Weight for column retention in scoring",
           "default": 0.2,
           "min": 0,
-          "max": 1
+          "max": 1,
+          "show": false,
+          "required": false
         },
         "excellent_threshold": {
           "type": "integer",
           "description": "Score threshold for excellent quality",
           "default": 90,
           "min": 0,
-          "max": 100
+          "max": 100,
+          "show": false,
+          "required": false
         },
         "good_threshold": {
           "type": "integer",
           "description": "Score threshold for good quality",
           "default": 75,
           "min": 0,
-          "max": 100
-        }
-      },
-      "output_structure": {
-        "agent_id": "string",
-        "agent_name": "string",
-        "status": "string",
-        "execution_time_ms": "integer",
-        "summary_metrics": {
-          "total_rows_processed": "integer",
-          "columns_standardized": "integer",
-          "values_changed": "integer",
-          "variations_reduced": "integer",
-          "total_issues": "integer"
-        },
-        "data": {
-          "standardization_score": "object",
-          "quality_status": "string",
-          "standardization_analysis": "object",
-          "standardization_log": "array",
-          "summary": "string",
-          "row_level_issues": "array"
-        },
-        "cleaned_file": {
-          "filename": "string",
-          "content": "string (base64)",
-          "size_bytes": "integer",
-          "format": "string"
+          "max": 100,
+          "show": false,
+          "required": false
         }
       }
     },
@@ -529,7 +603,9 @@
         "Conflicting Duplicate Detection",
         "Smart Merge Strategies"
       ],
-      "input": { "type": "CSV, JSON, XLSX" },
+      "input": {
+        "type": "CSV, JSON, XLSX"
+      },
       "version": "1.0.0",
       "required_files": ["primary"],
       "parameters": {
@@ -550,94 +626,97 @@
             "email_case",
             "missing_values",
             "conflicting"
-          ]
+          ],
+          "show": false,
+          "required": false
         },
         "merge_strategy": {
           "type": "string",
           "description": "Strategy for handling duplicates",
           "default": "remove_duplicates",
-          "allowed": ["remove_duplicates", "merge_smart"]
+          "allowed": ["remove_duplicates", "merge_smart"],
+          "example": "merge_smart",
+          "show": true,
+          "required": false
         },
         "email_columns": {
           "type": "array",
           "description": "Column names containing email addresses (auto-detected if empty)",
           "default": [],
-          "items": "string"
+          "items": "string",
+          "example": ["email", "work_email"],
+          "show": true,
+          "required": false
         },
         "key_columns": {
           "type": "array",
           "description": "Columns to use as deduplication key (all columns if empty)",
           "default": [],
-          "items": "string"
+          "items": "string",
+          "example": ["first_name", "last_name", "dob"],
+          "show": true,
+          "required": false
         },
         "null_handling": {
           "type": "string",
           "description": "How to handle null values in duplicate detection",
           "default": "ignore_nulls",
-          "allowed": ["ignore_nulls", "match_nulls"]
+          "allowed": ["ignore_nulls", "match_nulls"],
+          "show": false,
+          "required": false
         },
         "conflict_resolution": {
           "type": "string",
           "description": "Strategy for resolving conflicting duplicate values",
           "default": "keep_first",
-          "allowed": ["keep_first", "keep_last", "merge_smart"]
+          "allowed": ["keep_first", "keep_last", "merge_smart"],
+          "show": false,
+          "required": false
         },
         "dedup_reduction_weight": {
           "type": "float",
           "description": "Weight for deduplication effectiveness in scoring",
           "default": 0.5,
           "min": 0,
-          "max": 1
+          "max": 1,
+          "show": false,
+          "required": false
         },
         "data_retention_weight": {
           "type": "float",
           "description": "Weight for data retention in scoring",
           "default": 0.3,
           "min": 0,
-          "max": 1
+          "max": 1,
+          "show": false,
+          "required": false
         },
         "column_retention_weight": {
           "type": "float",
           "description": "Weight for column retention in scoring",
           "default": 0.2,
           "min": 0,
-          "max": 1
+          "max": 1,
+          "show": false,
+          "required": false
         },
         "excellent_threshold": {
           "type": "integer",
           "description": "Score threshold for excellent quality",
           "default": 90,
           "min": 0,
-          "max": 100
+          "max": 100,
+          "show": false,
+          "required": false
         },
         "good_threshold": {
           "type": "integer",
           "description": "Score threshold for good quality",
           "default": 75,
           "min": 0,
-          "max": 100
-        }
-      },
-      "output_structure": {
-        "agent_id": "string",
-        "agent_name": "string",
-        "status": "string",
-        "execution_time_ms": "integer",
-        "summary_metrics": {
-          "total_rows_processed": "integer",
-          "duplicates_detected": "integer",
-          "duplicates_resolved": "integer",
-          "remaining_rows": "integer",
-          "rows_removed": "integer",
-          "total_issues": "integer"
-        },
-        "data": {
-          "dedup_score": "object",
-          "quality_status": "string",
-          "duplicate_analysis": "object",
-          "resolution_log": "array",
-          "summary": "string",
-          "row_level_issues": "array"
+          "max": 100,
+          "show": false,
+          "required": false
         }
       }
     },
@@ -654,7 +733,9 @@
         "Imputation Strategies",
         "Quality Scoring"
       ],
-      "input": { "type": "CSV, JSON, XLSX" },
+      "input": {
+        "type": "CSV, JSON, XLSX"
+      },
       "version": "1.0.0",
       "required_files": ["primary"],
       "parameters": {
@@ -662,79 +743,88 @@
           "type": "string",
           "description": "Global strategy for handling nulls",
           "default": "column_specific",
-          "allowed": ["drop_rows", "column_specific"]
+          "allowed": ["drop_rows", "column_specific"],
+          "example": "column_specific",
+          "show": true,
+          "required": false
         },
         "column_strategies": {
           "type": "object",
           "description": "Per-column imputation strategies (column -> strategy)",
-          "default": {}
+          "default": {},
+          "example": {
+            "age": "mean",
+            "salary": "median",
+            "category": "mode",
+            "comments": "constant"
+          },
+          "show": false,
+          "required": false
         },
         "fill_values": {
           "type": "object",
           "description": "Constant values for constant fill strategy",
-          "default": {}
+          "default": {},
+          "example": {
+            "comments": "No comments",
+            "status": "Unknown"
+          },
+          "show": false,
+          "required": false
         },
         "knn_neighbors": {
           "type": "integer",
           "description": "Number of neighbors for KNN imputation",
           "default": 5,
           "min": 1,
-          "max": 20
+          "max": 20,
+          "show": false,
+          "required": false
         },
         "null_reduction_weight": {
           "type": "float",
           "description": "Weight for null reduction in scoring",
           "default": 0.5,
           "min": 0,
-          "max": 1
+          "max": 1,
+          "show": false,
+          "required": false
         },
         "data_retention_weight": {
           "type": "float",
           "description": "Weight for data retention in scoring",
           "default": 0.3,
           "min": 0,
-          "max": 1
+          "max": 1,
+          "show": false,
+          "required": false
         },
         "column_retention_weight": {
           "type": "float",
           "description": "Weight for column retention in scoring",
           "default": 0.2,
           "min": 0,
-          "max": 1
+          "max": 1,
+          "show": false,
+          "required": false
         },
         "excellent_threshold": {
           "type": "integer",
           "description": "Score threshold for excellent quality",
           "default": 90,
           "min": 0,
-          "max": 100
+          "max": 100,
+          "show": false,
+          "required": false
         },
         "good_threshold": {
           "type": "integer",
           "description": "Score threshold for good quality",
           "default": 75,
           "min": 0,
-          "max": 100
-        }
-      },
-      "output_structure": {
-        "agent_id": "string",
-        "agent_name": "string",
-        "status": "string",
-        "execution_time_ms": "integer",
-        "summary_metrics": {
-          "total_rows_processed": "integer",
-          "nulls_handled": "integer",
-          "original_nulls": "integer",
-          "remaining_nulls": "integer",
-          "total_issues": "integer"
-        },
-        "data": {
-          "cleaning_score": "object",
-          "null_analysis": "object",
-          "imputation_log": "array",
-          "summary": "string",
-          "row_level_issues": "array"
+          "max": 100,
+          "show": false,
+          "required": false
         }
       }
     },
@@ -751,7 +841,9 @@
         "Removal/Imputation",
         "Quality Scoring"
       ],
-      "input": { "type": "CSV, JSON, XLSX" },
+      "input": {
+        "type": "CSV, JSON, XLSX"
+      },
       "version": "1.0.0",
       "required_files": ["primary"],
       "parameters": {
@@ -759,96 +851,100 @@
           "type": "string",
           "description": "Outlier detection method",
           "default": "iqr",
-          "allowed": ["z_score", "iqr", "percentile"]
+          "allowed": ["z_score", "iqr", "percentile"],
+          "example": "iqr",
+          "show": true,
+          "required": false
         },
         "removal_strategy": {
           "type": "string",
           "description": "Strategy for handling detected outliers",
           "default": "remove",
-          "allowed": ["remove", "impute_mean", "impute_median"]
+          "allowed": ["remove", "impute_mean", "impute_median"],
+          "example": "impute_median",
+          "show": true,
+          "required": false
         },
         "z_threshold": {
           "type": "float",
           "description": "Z-score threshold for outlier detection",
           "default": 3.0,
           "min": 1.0,
-          "max": 5.0
+          "max": 5.0,
+          "show": false,
+          "required": false
         },
         "iqr_multiplier": {
           "type": "float",
           "description": "IQR multiplier for outlier bounds",
           "default": 1.5,
           "min": 0.5,
-          "max": 3.0
+          "max": 3.0,
+          "show": false,
+          "required": false
         },
         "lower_percentile": {
           "type": "float",
           "description": "Lower percentile for percentile method",
           "default": 1.0,
           "min": 0,
-          "max": 10
+          "max": 10,
+          "show": false,
+          "required": false
         },
         "upper_percentile": {
           "type": "float",
           "description": "Upper percentile for percentile method",
           "default": 99.0,
           "min": 90,
-          "max": 100
+          "max": 100,
+          "show": false,
+          "required": false
         },
         "outlier_reduction_weight": {
           "type": "float",
           "description": "Weight for outlier reduction in scoring",
           "default": 0.5,
           "min": 0,
-          "max": 1
+          "max": 1,
+          "show": false,
+          "required": false
         },
         "data_retention_weight": {
           "type": "float",
           "description": "Weight for data retention in scoring",
           "default": 0.3,
           "min": 0,
-          "max": 1
+          "max": 1,
+          "show": false,
+          "required": false
         },
         "column_retention_weight": {
           "type": "float",
           "description": "Weight for column retention in scoring",
           "default": 0.2,
           "min": 0,
-          "max": 1
+          "max": 1,
+          "show": false,
+          "required": false
         },
         "excellent_threshold": {
           "type": "integer",
           "description": "Score threshold for excellent quality",
           "default": 90,
           "min": 0,
-          "max": 100
+          "max": 100,
+          "show": false,
+          "required": false
         },
         "good_threshold": {
           "type": "integer",
           "description": "Score threshold for good quality",
           "default": 75,
           "min": 0,
-          "max": 100
-        }
-      },
-      "output_structure": {
-        "agent_id": "string",
-        "agent_name": "string",
-        "status": "string",
-        "execution_time_ms": "integer",
-        "summary_metrics": {
-          "total_rows_processed": "integer",
-          "outliers_handled": "integer",
-          "original_outliers": "integer",
-          "remaining_outliers": "integer",
-          "total_issues": "integer"
-        },
-        "data": {
-          "outlier_score": "object",
-          "outlier_analysis": "object",
-          "removal_log": "array",
-          "summary": "string",
-          "row_level_issues": "array"
+          "max": 100,
+          "show": false,
+          "required": false
         }
       }
     },
@@ -867,134 +963,128 @@
         "Chain Integrity Enforcement",
         "Lineage Documentation"
       ],
-      "input": { "type": "CSV, JSON, XLSX (cleaned data)" },
+      "input": {
+        "type": "CSV, JSON, XLSX (cleaned data)"
+      },
       "version": "1.0.0",
       "required_files": ["primary"],
       "parameters": {
         "verify_numeric_types": {
           "type": "boolean",
           "description": "Verify that numeric columns are truly numeric after cleaning",
-          "default": true
+          "default": true,
+          "show": false,
+          "required": false
         },
         "verify_datetime_types": {
           "type": "boolean",
           "description": "Verify that datetime columns are properly formatted",
-          "default": true
+          "default": true,
+          "show": false,
+          "required": false
         },
         "verify_no_new_nulls": {
           "type": "boolean",
           "description": "Verify that cleaning operations did not introduce new nulls",
-          "default": true
+          "default": true,
+          "show": false,
+          "required": false
         },
         "verify_no_duplicates": {
           "type": "boolean",
           "description": "Verify that no duplicate rows were introduced during cleaning",
-          "default": true
+          "default": true,
+          "show": false,
+          "required": false
         },
         "verify_data_retention": {
           "type": "boolean",
           "description": "Verify that data retention is within acceptable limits",
-          "default": true
+          "default": true,
+          "show": false,
+          "required": false
         },
         "generate_comprehensive_manifest": {
           "type": "boolean",
           "description": "Generate comprehensive cleansing manifest with all agent actions",
-          "default": true
+          "default": true,
+          "show": false,
+          "required": false
         },
         "include_transformation_summary": {
           "type": "boolean",
           "description": "Include high-level transformation summary in manifest",
-          "default": true
+          "default": true,
+          "show": false,
+          "required": false
         },
         "agent_manifests": {
           "type": "object",
           "description": "Dictionary of agent_id -> agent output for manifest aggregation",
-          "default": {}
+          "default": {},
+          "show": false,
+          "required": false
         },
         "original_row_count": {
           "type": "integer",
           "description": "Original row count before cleaning (for retention verification)",
-          "default": null
+          "default": null,
+          "show": false,
+          "required": false
         },
         "original_column_count": {
           "type": "integer",
           "description": "Original column count before cleaning (for retention verification)",
-          "default": null
+          "default": null,
+          "show": false,
+          "required": false
         },
         "integrity_weight": {
           "type": "float",
           "description": "Weight for integrity verification in scoring",
           "default": 0.4,
           "min": 0,
-          "max": 1
+          "max": 1,
+          "show": false,
+          "required": false
         },
         "completeness_weight": {
           "type": "float",
           "description": "Weight for manifest completeness in scoring",
           "default": 0.3,
           "min": 0,
-          "max": 1
+          "max": 1,
+          "show": false,
+          "required": false
         },
         "auditability_weight": {
           "type": "float",
           "description": "Weight for auditability in scoring",
           "default": 0.3,
           "min": 0,
-          "max": 1
+          "max": 1,
+          "show": false,
+          "required": false
         },
         "excellent_threshold": {
           "type": "integer",
           "description": "Score threshold for excellent quality",
           "default": 95,
           "min": 0,
-          "max": 100
+          "max": 100,
+          "show": false,
+          "required": false
         },
         "good_threshold": {
           "type": "integer",
           "description": "Score threshold for good quality",
           "default": 85,
           "min": 0,
-          "max": 100
-        }
-      },
-      "output_structure": {
-        "agent_id": "string",
-        "agent_name": "string",
-        "status": "string",
-        "execution_time_ms": "integer",
-        "summary_metrics": {
-          "total_rows_verified": "integer",
-          "total_columns_verified": "integer",
-          "integrity_checks_passed": "integer",
-          "integrity_checks_failed": "integer",
-          "agents_in_manifest": "integer",
-          "data_ready_for_pipeline": "boolean",
-          "total_transformations_logged": "integer"
-        },
-        "data": {
-          "writeback_score": "object",
-          "quality_status": "string",
-          "writeback_analysis": "object",
-          "summary": "string",
-          "integrity_issues": "array"
+          "max": 100,
+          "show": false,
+          "required": false
         }
       }
-    }
-  },
-  "response_structure": {
-    "status": "string",
-    "timestamp": "string (ISO 8601)",
-    "execution_time_ms": "integer",
-    "report": {
-      "common_arrays": {
-        "alerts": "array - Contains cleaning and validation alerts across selected agents",
-        "issues": "array - Field-level issues detected by selected agents",
-        "recommendations": "array - Recommendations for data improvement",
-        "executiveSummary": "array - High-level summary metrics",
-        "visualizations": "array - Graph-ready data structures (reserved for future use)"
-      },
-      "agent_results": "object - Individual agent results keyed by agent_id",
-      "downloads": "array - Available downloadable reports"
     }
   }
 }

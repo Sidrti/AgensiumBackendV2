@@ -28,6 +28,14 @@ from datetime import datetime
 from collections import defaultdict
 from agents.agent_utils import safe_get_list, safe_get_dict
 
+try:
+    import rapidfuzz
+    from rapidfuzz import fuzz, distance
+    import jellyfish
+except ImportError:
+    rapidfuzz = None
+    jellyfish = None
+
 
 def execute_golden_record_builder(
     file_contents: bytes,
@@ -57,6 +65,11 @@ def execute_golden_record_builder(
     timestamp_column = parameters.get("timestamp_column", None)
     default_survivorship_rule = parameters.get("default_survivorship_rule", "most_complete")
     min_trust_score = parameters.get("min_trust_score", 0.5)
+    
+    # Fuzzy matching parameters
+    enable_fuzzy_matching = parameters.get("enable_fuzzy_matching", False)
+    fuzzy_threshold = parameters.get("fuzzy_threshold", 80.0)
+    fuzzy_config = safe_get_dict(parameters, "fuzzy_config", {})
     
     # Scoring thresholds
     excellent_threshold = parameters.get("excellent_threshold", 90)
@@ -115,7 +128,10 @@ def execute_golden_record_builder(
             valid_match_keys = []
         
         # ==================== CLUSTER RELATED RECORDS ====================
-        clusters = _build_record_clusters(df, valid_match_keys)
+        if enable_fuzzy_matching and rapidfuzz and jellyfish:
+             clusters = _build_fuzzy_clusters(df, fuzzy_config, fuzzy_threshold, valid_match_keys)
+        else:
+             clusters = _build_record_clusters(df, valid_match_keys)
         
         # ==================== BUILD GOLDEN RECORDS ====================
         golden_records = []
@@ -141,7 +157,7 @@ def execute_golden_record_builder(
                 cluster_rows=cluster_rows
             )
             
-            golden_records.append({
+            golden_record_entry = {
                 "cluster_id": cluster_id,
                 "golden_record": golden_record,
                 "source_record_count": len(cluster_rows),
@@ -149,7 +165,17 @@ def execute_golden_record_builder(
                 "match_key_values": cluster_info.get("match_values", {}),
                 "trust_score": golden_record.get("__trust_score__", 1.0),
                 "conflicts_resolved": cluster_conflicts
-            })
+            }
+            
+            # Add fuzzy details if present
+            if "match_details" in cluster_info and cluster_info["match_details"]:
+                 golden_record_entry["fuzzy_match_details"] = cluster_info["match_details"]
+                 # Calculate average similarity for the cluster (excluding the first record which is the rep)
+                 scores = [d["similarity_score"] for d in cluster_info["match_details"] if d["similarity_score"] >= 0]
+                 if scores:
+                     golden_record_entry["avg_similarity_score"] = sum(scores) / len(scores)
+
+            golden_records.append(golden_record_entry)
             
             field_resolutions.extend(resolutions)
             conflicts_resolved += cluster_conflicts
@@ -221,7 +247,9 @@ def execute_golden_record_builder(
                 "conflicts_resolved": conflicts_resolved,
                 "values_survived": values_survived,
                 "average_trust_score": round(avg_trust_score, 3),
-                "match_key_columns": valid_match_keys
+                "match_key_columns": valid_match_keys,
+                "fuzzy_matching_enabled": enable_fuzzy_matching,
+                "fuzzy_threshold": fuzzy_threshold if enable_fuzzy_matching else None
             },
             "survivorship_rules_applied": survivorship_rules or {"default": default_survivorship_rule},
             "summary": f"Golden record building completed. Created {golden_record_count} golden records "
@@ -741,3 +769,175 @@ def _generate_golden_file(df: pl.DataFrame, original_filename: str) -> bytes:
     output = io.BytesIO()
     df.write_csv(output)
     return output.getvalue()
+
+
+def _normalize_fuzzy_value(value: Any, field_type: str) -> str:
+    """Normalize value for fuzzy matching based on field type."""
+    if value is None:
+        return ""
+    
+    s_val = str(value).lower().strip()
+    
+    # Remove punctuation/special characters
+    s_val = re.sub(r'[^\w\s]', '', s_val)
+    
+    if field_type == "phone":
+        # Digits only
+        return re.sub(r'\D', '', s_val)
+    
+    elif field_type == "email":
+        return s_val
+    
+    elif field_type == "date":
+        # Try to parse and format YYYY-MM-DD
+        # Simple heuristic: keep alphanumeric
+        return s_val
+            
+    elif field_type == "address":
+        # Remove redundant words
+        redundant = ["road", "rd", "street", "st", "avenue", "ave", "lane", "ln", "drive", "dr"]
+        words = s_val.split()
+        return " ".join([w for w in words if w not in redundant])
+        
+    return s_val
+
+
+def _calculate_field_similarity(val1: str, val2: str, field_type: str) -> float:
+    """Calculate similarity score (0-100) for a single field."""
+    if not val1 or not val2:
+        return 0.0
+    
+    if val1 == val2:
+        return 100.0
+        
+    if field_type == "name":
+        # Jaro-Winkler + Double Metaphone
+        # Use rapidfuzz for Jaro-Winkler
+        jw_score = rapidfuzz.distance.JaroWinkler.similarity(val1, val2) * 100
+        
+        # Use jellyfish for Metaphone (proxy for Double Metaphone if not available)
+        try:
+            m1 = jellyfish.metaphone(val1)
+            m2 = jellyfish.metaphone(val2)
+            phonetic_match = 100.0 if m1 == m2 and m1 else 0.0
+        except:
+            phonetic_match = 0.0
+            
+        # Weighted combination: 80% JW, 20% Phonetic
+        return (jw_score * 0.8) + (phonetic_match * 0.2)
+        
+    elif field_type == "email":
+        # Exact + Levenshtein
+        return rapidfuzz.fuzz.ratio(val1, val2)
+        
+    elif field_type == "phone":
+        # Exact (normalized) + Levenshtein
+        return rapidfuzz.fuzz.ratio(val1, val2)
+        
+    elif field_type == "address":
+        # Token Sort Ratio
+        return rapidfuzz.fuzz.token_sort_ratio(val1, val2)
+        
+    elif field_type in ["dob", "zip", "pin"]:
+        # Exact
+        return 100.0 if val1 == val2 else 0.0
+        
+    else:
+        # Default Levenshtein
+        return rapidfuzz.fuzz.ratio(val1, val2)
+
+
+def _calculate_record_similarity(row1: Dict, row2: Dict, fuzzy_config: Dict) -> Tuple[float, Dict]:
+    """Calculate weighted similarity between two records."""
+    total_score = 0.0
+    total_weight = 0.0
+    field_scores = {}
+    
+    columns_config = fuzzy_config.get("columns", {})
+    
+    # If no config provided, use all columns with equal weight and default type
+    if not columns_config:
+        for col in row1.keys():
+            if col in row2:
+                columns_config[col] = {"type": "text", "weight": 1.0}
+    
+    for col, config in columns_config.items():
+        if col not in row1 or col not in row2:
+            continue
+            
+        field_type = config.get("type", "text")
+        weight = config.get("weight", 1.0)
+        
+        val1 = _normalize_fuzzy_value(row1[col], field_type)
+        val2 = _normalize_fuzzy_value(row2[col], field_type)
+        
+        score = _calculate_field_similarity(val1, val2, field_type)
+        field_scores[col] = score
+        
+        total_score += score * weight
+        total_weight += weight
+        
+    if total_weight == 0:
+        return 0.0, {}
+        
+    final_score = total_score / total_weight
+    return final_score, field_scores
+
+
+def _build_fuzzy_clusters(df: pl.DataFrame, fuzzy_config: Dict, threshold: float, blocking_keys: List[str]) -> Dict[str, Dict]:
+    """Build clusters using fuzzy matching."""
+    clusters = {}
+    cluster_counter = 0
+    
+    # Convert to list of dicts for easier iteration
+    records = df.to_dicts()
+    
+    # Map: cluster_id -> representative_record
+    cluster_representatives = {}
+    
+    for i, record in enumerate(records):
+        best_cluster_id = None
+        best_score = -1.0
+        best_field_scores = {}
+        
+        # Compare with existing clusters
+        for cluster_id, rep_record in cluster_representatives.items():
+            # Blocking check (optional optimization)
+            # If blocking keys are provided, only compare if they match exactly
+            if blocking_keys:
+                match = True
+                for k in blocking_keys:
+                    if str(record.get(k)) != str(rep_record.get(k)):
+                        match = False
+                        break
+                if not match:
+                    continue
+            
+            score, field_scores = _calculate_record_similarity(record, rep_record, fuzzy_config)
+            
+            if score >= threshold and score > best_score:
+                best_score = score
+                best_cluster_id = cluster_id
+                best_field_scores = field_scores
+        
+        if best_cluster_id:
+            # Add to existing cluster
+            clusters[best_cluster_id]["rows"].append(i)
+            # Store match details
+            clusters[best_cluster_id]["match_details"].append({
+                "row_index": i,
+                "similarity_score": best_score,
+                "field_scores": best_field_scores
+            })
+        else:
+            # Create new cluster
+            cluster_id = f"cluster_{cluster_counter}"
+            cluster_counter += 1
+            clusters[cluster_id] = {
+                "rows": [i],
+                "match_values": {},
+                "match_details": [] # First record has no match details relative to itself
+            }
+            cluster_representatives[cluster_id] = record
+            
+    return clusters

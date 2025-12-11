@@ -44,7 +44,9 @@
         "Outlier Detection",
         "Distribution Analysis"
       ],
-      "input": { "type": "CSV, JSON, XLSX" },
+      "input": {
+        "type": "CSV, JSON, XLSX"
+      },
       "version": "1.0.0",
       "required_files": ["primary"],
       "parameters": {
@@ -53,66 +55,51 @@
           "description": "Threshold for null value alerts (%)",
           "default": 50,
           "min": 0,
-          "max": 100
+          "max": 100,
+          "show": false,
+          "required": false
         },
         "categorical_threshold": {
           "type": "integer",
           "description": "Threshold for categorical field detection",
           "default": 20,
-          "min": 1
+          "min": 1,
+          "show": false,
+          "required": false
         },
         "categorical_ratio_threshold": {
           "type": "float",
           "description": "Ratio threshold for categorical analysis",
           "default": 0.05,
           "min": 0,
-          "max": 1
+          "max": 1,
+          "show": false,
+          "required": false
         },
         "top_n_values": {
           "type": "integer",
           "description": "Number of top values to track",
           "default": 10,
-          "min": 1
+          "min": 1,
+          "show": false,
+          "required": false
         },
         "outlier_iqr_multiplier": {
           "type": "float",
           "description": "IQR multiplier for outlier detection",
           "default": 1.5,
-          "min": 0.5
+          "min": 0.5,
+          "show": false,
+          "required": false
         },
         "outlier_alert_threshold": {
           "type": "integer",
           "description": "Threshold for outlier alerts (%)",
           "default": 5,
           "min": 0,
-          "max": 100
-        }
-      },
-      "output_structure": {
-        "agent_id": "string",
-        "agent_name": "string",
-        "status": "string",
-        "execution_time_ms": "integer",
-        "summary_metrics": {
-          "total_columns": "integer",
-          "total_rows": "integer",
-          "columns_with_issues": "integer"
-        },
-        "data": {
-          "fields": [
-            {
-              "field_id": "string",
-              "field_name": "string",
-              "data_type": "string",
-              "semantic_type": "string",
-              "properties": "object",
-              "statistics": "object",
-              "distribution": "object",
-              "quality_score": "number",
-              "quality_indicators": "object"
-            }
-          ],
-          "quality_summary": "object"
+          "max": 100,
+          "show": false,
+          "required": false
         }
       }
     },
@@ -129,7 +116,9 @@
         "PSI Scoring",
         "Change Detection"
       ],
-      "input": { "type": "CSV, JSON, XLSX" },
+      "input": {
+        "type": "CSV, JSON, XLSX"
+      },
       "version": "1.0.0",
       "required_files": ["primary", "baseline"],
       "parameters": {
@@ -137,48 +126,26 @@
           "type": "string",
           "description": "Statistical test method",
           "default": "kolmogorov_smirnov",
-          "allowed": ["kolmogorov_smirnov", "chi2", "wasserstein"]
+          "allowed": ["kolmogorov_smirnov", "chi2", "wasserstein"],
+          "show": false,
+          "required": false
         },
         "significance_level": {
           "type": "float",
           "description": "Significance level for statistical tests",
           "default": 0.05,
           "min": 0,
-          "max": 1
+          "max": 1,
+          "show": false,
+          "required": false
         },
         "min_sample_size": {
           "type": "integer",
           "description": "Minimum sample size for analysis",
           "default": 100,
-          "min": 10
-        }
-      },
-      "output_structure": {
-        "agent_id": "string",
-        "agent_name": "string",
-        "status": "string",
-        "execution_time_ms": "integer",
-        "summary_metrics": {
-          "fields_analyzed": "integer",
-          "drift_detected_count": "integer",
-          "drift_severity_high": "integer",
-          "drift_severity_medium": "integer",
-          "drift_severity_low": "integer",
-          "average_psi_score": "number"
-        },
-        "data": {
-          "fields": [
-            {
-              "field_id": "string",
-              "field_name": "string",
-              "baseline_statistics": "object",
-              "current_statistics": "object",
-              "drift_analysis": "object",
-              "drift_interpretation": "object",
-              "issue_severity": "string"
-            }
-          ],
-          "drift_summary": "object"
+          "min": 10,
+          "show": false,
+          "required": false
         }
       }
     },
@@ -195,7 +162,9 @@
         "Compliance Check",
         "Governance Gap Analysis"
       ],
-      "input": { "type": "CSV, JSON, XLSX" },
+      "input": {
+        "type": "CSV, JSON, XLSX"
+      },
       "version": "1.0.0",
       "required_files": ["primary"],
       "parameters": {
@@ -203,158 +172,48 @@
           "type": "integer",
           "description": "Sample size for PII detection",
           "default": 100,
-          "min": 10
+          "min": 10,
+          "show": false,
+          "required": false
         },
         "high_risk_threshold": {
           "type": "integer",
           "description": "Score threshold for high risk classification",
           "default": 70,
           "min": 0,
-          "max": 100
+          "max": 100,
+          "show": false,
+          "required": false
         },
         "medium_risk_threshold": {
           "type": "integer",
           "description": "Score threshold for medium risk classification",
           "default": 40,
           "min": 0,
-          "max": 100
+          "max": 100,
+          "show": false,
+          "required": false
         },
         "pii_detection_enabled": {
           "type": "boolean",
           "description": "Enable PII detection",
-          "default": true
+          "default": true,
+          "show": false,
+          "required": false
         },
         "sensitive_field_detection_enabled": {
           "type": "boolean",
           "description": "Enable sensitive field detection",
-          "default": true
+          "default": true,
+          "show": false,
+          "required": false
         },
         "governance_check_enabled": {
           "type": "boolean",
           "description": "Enable governance checks",
-          "default": true
-        }
-      },
-      "output_structure": {
-        "agent_id": "string",
-        "agent_name": "string",
-        "status": "string",
-        "execution_time_ms": "integer",
-        "summary_metrics": {
-          "total_fields_analyzed": "integer",
-          "fields_with_high_risk": "integer",
-          "fields_with_medium_risk": "integer",
-          "fields_with_low_risk": "integer",
-          "pii_fields_detected": "integer",
-          "sensitive_fields_detected": "integer",
-          "governance_gaps": "integer"
-        },
-        "data": {
-          "fields": [
-            {
-              "field_id": "string",
-              "field_name": "string",
-              "risk_score": "number",
-              "risk_level": "string",
-              "risk_factors": "array",
-              "compliance_issues": "array",
-              "remediation_priority": "string",
-              "remediation_effort": "string"
-            }
-          ],
-          "risk_summary": "object"
-        }
-      }
-    },
-    "governance-checker": {
-      "id": "governance-checker",
-      "name": "Governance Checker",
-      "description": "Validates data governance compliance including lineage, consent, and classification requirements. Ensures data meets governance standards and compliance frameworks.",
-      "icon": "🏛️",
-      "category": "Governance",
-      "accuracy": "95%",
-      "features": [
-        "Lineage Validation",
-        "Consent Verification",
-        "Classification Check",
-        "PII Detection"
-      ],
-      "input": { "type": "CSV, JSON, XLSX" },
-      "version": "1.0.0",
-      "required_files": ["primary"],
-      "parameters": {
-        "lineage_weight": {
-          "type": "float",
-          "description": "Weight for lineage component",
-          "default": 0.3,
-          "min": 0,
-          "max": 1
-        },
-        "consent_weight": {
-          "type": "float",
-          "description": "Weight for consent component",
-          "default": 0.4,
-          "min": 0,
-          "max": 1
-        },
-        "classification_weight": {
-          "type": "float",
-          "description": "Weight for classification component",
-          "default": 0.3,
-          "min": 0,
-          "max": 1
-        },
-        "compliance_threshold": {
-          "type": "integer",
-          "description": "Score threshold for compliant status",
-          "default": 80,
-          "min": 0,
-          "max": 100
-        },
-        "needs_review_threshold": {
-          "type": "integer",
-          "description": "Score threshold for needs review status",
-          "default": 60,
-          "min": 0,
-          "max": 100
-        },
-        "required_lineage_fields": {
-          "type": "array",
-          "description": "List of required lineage fields",
-          "default": [],
-          "items": "string"
-        },
-        "required_consent_fields": {
-          "type": "array",
-          "description": "List of required consent fields",
-          "default": [],
-          "items": "string"
-        },
-        "required_classification_fields": {
-          "type": "array",
-          "description": "List of required classification fields",
-          "default": [],
-          "items": "string"
-        }
-      },
-      "output_structure": {
-        "agent_id": "string",
-        "agent_name": "string",
-        "status": "string",
-        "execution_time_ms": "integer",
-        "summary_metrics": {
-          "total_records": "integer",
-          "total_fields": "integer",
-          "governance_score": "number",
-          "compliance_status": "string",
-          "issues_found": "integer"
-        },
-        "data": {
-          "governance_scores": "object",
-          "compliance_status": "string",
-          "total_records": "integer",
-          "fields_analyzed": "array",
-          "governance_issues": "array"
+          "default": true,
+          "show": false,
+          "required": false
         }
       }
     },
@@ -371,7 +230,9 @@
         "Format Validation",
         "Coverage Scoring"
       ],
-      "input": { "type": "CSV, JSON, XLSX" },
+      "input": {
+        "type": "CSV, JSON, XLSX"
+      },
       "version": "1.0.0",
       "required_files": ["primary"],
       "parameters": {
@@ -380,71 +241,81 @@
           "description": "Weight for uniqueness tests",
           "default": 0.4,
           "min": 0,
-          "max": 1
+          "max": 1,
+          "show": false,
+          "required": false
         },
         "range_weight": {
           "type": "float",
           "description": "Weight for range tests",
           "default": 0.3,
           "min": 0,
-          "max": 1
+          "max": 1,
+          "show": false,
+          "required": false
         },
         "format_weight": {
           "type": "float",
           "description": "Weight for format tests",
           "default": 0.3,
           "min": 0,
-          "max": 1
+          "max": 1,
+          "show": false,
+          "required": false
         },
         "excellent_threshold": {
           "type": "integer",
           "description": "Score threshold for excellent status",
           "default": 90,
           "min": 0,
-          "max": 100
+          "max": 100,
+          "show": false,
+          "required": false
         },
         "good_threshold": {
           "type": "integer",
           "description": "Score threshold for good status",
           "default": 75,
           "min": 0,
-          "max": 100
+          "max": 100,
+          "show": false,
+          "required": false
         },
         "unique_columns": {
           "type": "array",
           "description": "List of columns that should have unique values",
           "default": [],
-          "items": "string"
+          "items": "string",
+          "example": ["user_id", "email", "ssn", "order_id"],
+          "show": true,
+          "required": false
         },
         "range_tests": {
           "type": "object",
           "description": "Range constraints for numeric columns (column -> {min, max})",
-          "default": {}
+          "default": {},
+          "example": {
+            "age": { "min": 0, "max": 120 },
+            "rating": { "min": 1, "max": 5 },
+            "percentage": { "min": 0, "max": 100 }
+          },
+          "show": true,
+          "required": false
         },
         "format_tests": {
           "type": "object",
           "description": "Format constraints for columns (column -> pattern or {pattern, description})",
-          "default": {}
-        }
-      },
-      "output_structure": {
-        "agent_id": "string",
-        "agent_name": "string",
-        "status": "string",
-        "execution_time_ms": "integer",
-        "summary_metrics": {
-          "total_records": "integer",
-          "total_fields": "integer",
-          "test_coverage_score": "number",
-          "coverage_status": "string",
-          "issues_found": "integer"
-        },
-        "data": {
-          "test_coverage_scores": "object",
-          "coverage_status": "string",
-          "total_records": "integer",
-          "fields_analyzed": "array",
-          "test_coverage_issues": "array"
+          "default": {},
+          "example": {
+            "email": {
+              "pattern": "^[^@]+@[^@]+\\.[^@]+$",
+              "description": "Valid email address"
+            },
+            "sku": "^[A-Z]{3}-\\d{4}$",
+            "phone": "^\\+?[1-9]\\d{1,14}$"
+          },
+          "show": true,
+          "required": false
         }
       }
     },
@@ -461,7 +332,9 @@
         "Completeness Check",
         "Health Status"
       ],
-      "input": { "type": "CSV, JSON, XLSX" },
+      "input": {
+        "type": "CSV, JSON, XLSX"
+      },
       "version": "1.0.0",
       "required_files": ["primary"],
       "parameters": {
@@ -470,188 +343,46 @@
           "description": "Score threshold for 'READY' status (0-100)",
           "default": 80,
           "min": 0,
-          "max": 100
+          "max": 100,
+          "show": false,
+          "required": false
         },
         "needs_review_threshold": {
           "type": "integer",
           "description": "Score threshold for 'NEEDS_REVIEW' status (0-100)",
           "default": 50,
           "min": 0,
-          "max": 100
+          "max": 100,
+          "show": false,
+          "required": false
         },
         "completeness_weight": {
           "type": "float",
           "description": "Weight for completeness component",
           "default": 0.3,
           "min": 0,
-          "max": 1
+          "max": 1,
+          "show": false,
+          "required": false
         },
         "consistency_weight": {
           "type": "float",
           "description": "Weight for consistency component",
           "default": 0.3,
           "min": 0,
-          "max": 1
+          "max": 1,
+          "show": false,
+          "required": false
         },
         "schema_health_weight": {
           "type": "float",
           "description": "Weight for schema health component",
           "default": 0.4,
           "min": 0,
-          "max": 1
+          "max": 1,
+          "show": false,
+          "required": false
         }
-      },
-      "output_structure": {
-        "agent_id": "string",
-        "agent_name": "string",
-        "status": "string",
-        "execution_time_ms": "integer",
-        "summary_metrics": {
-          "readiness_score": "number",
-          "readiness_status": "string",
-          "components_ready": "integer",
-          "components_needs_review": "integer",
-          "components_not_ready": "integer"
-        },
-        "data": {
-          "readiness_assessment": "object",
-          "component_scores": "array",
-          "deductions": "array"
-        }
-      }
-    }
-  },
-  "response_structure": {
-    "status": "string",
-    "timestamp": "string (ISO 8601)",
-    "execution_time_ms": "integer",
-    "report": {
-      "common_arrays": {
-        "alerts": "array - Contains critical alerts across all selected agents",
-        "routing": "array - Routing information for different systems",
-        "issues": "array - All issues detected by selected agents",
-        "recommendations": "array - Recommendations from all selected agents",
-        "executiveSummary": "array - High-level summary metrics",
-        "visualizations": "array - NEW: Graph-ready data structures for direct frontend use (see visualizations section below)"
-      },
-      "agent_results": "object - Individual agent results keyed by agent_id (unified-profiler, drift-detector, score-risk, readiness-rater)",
-      "downloads": "array - Available downloadable reports"
-    }
-  },
-  "visualizations": {
-    "description": "Graph-ready visualizations that can be used directly by frontend charting libraries without transformation",
-    "structure": "Each visualization is a GraphReadyData object with chart_type, title, data, options, and insights",
-    "by_agent": {
-      "unified-profiler": {
-        "graph_count": 5,
-        "visualizations": [
-          {
-            "graph_id": "field_quality_scorecard",
-            "title": "Field-Level Quality Scores",
-            "chart_type": "bar_chart",
-            "description": "Quality assessment for each field (0-100 scale)",
-            "data_source": "fields[].quality_score"
-          },
-          {
-            "graph_id": "quality_indicators_radar",
-            "title": "Data Quality Dimensions",
-            "chart_type": "radar_chart",
-            "description": "Multi-dimensional assessment: Completeness, Validity, Consistency, Accuracy"
-          },
-          {
-            "graph_id": "field_completeness_heatmap",
-            "title": "Field Completeness Matrix",
-            "chart_type": "heatmap",
-            "description": "Percentage of non-null values per field"
-          },
-          {
-            "graph_id": "numeric_histogram",
-            "title": "Distribution (per numeric field)",
-            "chart_type": "histogram",
-            "description": "Value distribution with mean, median, stddev"
-          },
-          {
-            "graph_id": "categorical_pie",
-            "title": "Categorical Distribution",
-            "chart_type": "pie_chart",
-            "description": "Top values for categorical fields"
-          }
-        ]
-      },
-      "drift-detector": {
-        "graph_count": 3,
-        "visualizations": [
-          {
-            "graph_id": "drift_status_grid",
-            "title": "Field Drift Status",
-            "chart_type": "status_grid",
-            "description": "Drift detection traffic lights (stable/warning/critical)"
-          },
-          {
-            "graph_id": "psi_score_comparison",
-            "title": "Population Stability Index (PSI)",
-            "chart_type": "bar_chart",
-            "description": "PSI scores per field (0-1, higher = more drift)"
-          },
-          {
-            "graph_id": "baseline_vs_current",
-            "title": "Baseline vs. Current Distribution",
-            "chart_type": "line_overlay",
-            "description": "Statistical comparison of baseline and current data"
-          }
-        ]
-      },
-      "score-risk": {
-        "graph_count": 3,
-        "visualizations": [
-          {
-            "graph_id": "risk_score_gauge",
-            "title": "Overall Risk Level",
-            "chart_type": "gauge",
-            "description": "Aggregate risk score (0-100) with zones"
-          },
-          {
-            "graph_id": "pii_field_bubble_chart",
-            "title": "Field Risk Analysis",
-            "chart_type": "bubble_chart",
-            "description": "Per-field risk with PII detection (bubble size = risk)"
-          },
-          {
-            "graph_id": "compliance_stacked_bar",
-            "title": "Compliance Frameworks Impacted",
-            "chart_type": "stacked_bar_chart",
-            "description": "Fields affected by GDPR, CCPA, HIPAA frameworks"
-          }
-        ]
-      },
-      "readiness-rater": {
-        "graph_count": 1,
-        "visualizations": [
-          {
-            "graph_id": "readiness_progress_ring",
-            "title": "Data Readiness Score",
-            "chart_type": "progress_ring",
-            "description": "Overall readiness with component breakdown"
-          }
-        ]
-      }
-    },
-    "total_possible_visualizations": 12,
-    "frontend_usage": {
-      "note": "Each visualization in report.visualizations is immediately ready for charting libraries",
-      "structure": {
-        "graph_id": "Unique identifier for the visualization",
-        "agent_id": "Which agent generated this",
-        "chart_type": "bar_chart | pie_chart | line_chart | gauge | heatmap | radar_chart | bubble_chart | histogram | progress_ring | status_grid | stacked_bar_chart | line_overlay",
-        "title": "Display title for the visualization",
-        "description": "What the visualization shows",
-        "data": "Chart-specific data structure (BarChartData, PieChartData, etc.)",
-        "options": "Display hints: color_scheme, threshold_colors, show_grid, show_legend, etc.",
-        "insights": "Array of key takeaways or findings",
-        "data_quality": "Metadata about the visualization data quality"
-      },
-      "example_frontend_code": {
-        "React_with_Recharts": "const viz = response.report.visualizations.find(v => v.chart_type === 'bar_chart'); <BarChart data={viz.data} options={viz.options} />"
       }
     }
   }
