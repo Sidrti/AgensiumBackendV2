@@ -437,16 +437,5 @@
     "name": "unit_mappings",
     "agent": "Field Standardization",
     "tool": "Clean My Data"
-  },
-  {
-    "type": "string",
-    "description": "Target format for date standardization (e.g., %Y-%m-%d)",
-    "default": "%Y-%m-%d",
-    "example": "%Y-%m-%d",
-    "show": true,
-    "required": false,
-    "name": "target_date_format",
-    "agent": "Field Standardization",
-    "tool": "Clean My Data"
   }
 ]
