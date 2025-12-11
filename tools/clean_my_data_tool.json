@@ -240,7 +240,8 @@
           "items": "string",
           "example": ["customer_id", "email", "created_at"],
           "show": true,
-          "required": false
+          "required": false,
+          "columnSelection": true
         },
         "range_constraints": {
           "type": "object",
@@ -530,7 +531,8 @@
           "items": "string",
           "example": ["first_name", "last_name", "city"],
           "show": true,
-          "required": false
+          "required": false,
+          "columnSelection": true
         },
         "preserve_columns": {
           "type": "array",
@@ -539,7 +541,8 @@
           "items": "string",
           "example": ["id", "metadata"],
           "show": true,
-          "required": false
+          "required": false,
+          "columnSelection": true
         },
         "standardization_effectiveness_weight": {
           "type": "float",
@@ -646,7 +649,8 @@
           "items": "string",
           "example": ["email", "work_email"],
           "show": true,
-          "required": false
+          "required": false,
+          "columnSelection": true
         },
         "key_columns": {
           "type": "array",
@@ -655,7 +659,8 @@
           "items": "string",
           "example": ["first_name", "last_name", "dob"],
           "show": true,
-          "required": false
+          "required": false,
+          "columnSelection": true
         },
         "null_handling": {
           "type": "string",

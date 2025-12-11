@@ -468,7 +468,8 @@
           "items": "string",
           "example": ["Email", "Phone"],
           "show": true,
-          "required": true
+          "required": true,
+          "columnSelection": true
         },
         "survivorship_rules": {
           "type": "object",
@@ -503,7 +504,8 @@
           "default": null,
           "example": "SourceSystem",
           "show": true,
-          "required": true
+          "required": true,
+          "columnSelection": true
         },
         "timestamp_column": {
           "type": "string",
@@ -511,7 +513,8 @@
           "default": null,
           "example": "updated_at",
           "show": true,
-          "required": false
+          "required": false,
+          "columnSelection": true
         },
         "default_rule": {
           "type": "string",
@@ -601,7 +604,8 @@
           "items": "string",
           "example": ["Email", "Phone"],
           "required": true,
-          "show": true
+          "show": true,
+          "columnSelection": true
         },
         "survivorship_rules": {
           "type": "object",
@@ -634,7 +638,8 @@
           "default": null,
           "example": "SourceSystem",
           "required": true,
-          "show": true
+          "show": true,
+          "columnSelection": true
         },
         "timestamp_column": {
           "type": "string",
@@ -642,7 +647,8 @@
           "default": null,
           "example": "updated_at",
           "show": true,
-          "required": false
+          "required": false,
+          "columnSelection": true
         },
         "default_survivorship_rule": {
           "type": "string",
@@ -747,7 +753,8 @@
           "items": "string",
           "example": ["customer_id", "email", "created_at"],
           "show": true,
-          "required": false
+          "required": false,
+          "columnSelection": true
         },
         "confidence_threshold": {
           "type": "float",
@@ -799,7 +806,8 @@
           "default": [],
           "example": ["email", "phone", "tax_id"],
           "show": true,
-          "required": false
+          "required": false,
+          "columnSelection": true
         },
         "business_rules": {
           "type": "array",

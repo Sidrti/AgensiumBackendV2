@@ -34,128 +34,23 @@
   },
   {
     "type": "array",
-    "description": "Columns to use for duplicate detection",
-    "items": "string",
-    "default": [],
-    "example": [
-      "email",
-      "phone",
-      "tax_id"
-    ],
-    "show": true,
-    "required": false,
-    "columnSelection": true,
-    "name": "duplicate_key_columns",
-    "agent": "Stewardship Flagger",
-    "tool": "Master My Data"
-  },
-  {
-    "type": "array",
-    "description": "Column names containing email addresses (auto-detected if empty)",
-    "default": [],
-    "items": "string",
-    "example": [
-      "email",
-      "work_email"
-    ],
-    "show": true,
-    "required": false,
-    "columnSelection": true,
-    "name": "email_columns",
-    "agent": "Duplicate Resolver",
-    "tool": "Clean My Data"
-  },
-  {
-    "type": "array",
-    "description": "Columns to use as deduplication key (all columns if empty)",
-    "default": [],
-    "items": "string",
-    "example": [
-      "first_name",
-      "last_name",
-      "dob"
-    ],
-    "show": true,
-    "required": false,
-    "columnSelection": true,
-    "name": "key_columns",
-    "agent": "Duplicate Resolver",
-    "tool": "Clean My Data"
-  },
-  {
-    "type": "array",
-    "description": "Columns to use for identifying related records",
-    "default": [],
-    "items": "string",
-    "example": [
-      "Email",
-      "Phone"
-    ],
-    "show": true,
-    "required": true,
-    "columnSelection": true,
-    "name": "match_key_columns",
-    "agent": "Survivorship Resolver",
-    "tool": "Master My Data"
-  },
-  {
-    "type": "array",
-    "description": "Columns to use for identifying related records",
-    "default": [],
-    "items": "string",
-    "example": [
-      "Email",
-      "Phone"
-    ],
-    "required": true,
-    "show": true,
-    "columnSelection": true,
-    "name": "match_key_columns",
-    "agent": "Golden Record Builder",
-    "tool": "Master My Data"
-  },
-  {
-    "type": "array",
-    "description": "Columns to exclude from standardization",
-    "default": [],
-    "items": "string",
-    "example": [
-      "id",
-      "metadata"
-    ],
-    "show": true,
-    "required": false,
-    "columnSelection": true,
-    "name": "preserve_columns",
-    "agent": "Field Standardization",
-    "tool": "Clean My Data"
-  },
-  {
-    "type": "array",
     "description": "List of cleaning rules to preview. Each rule specifies: {type, target_columns, description, ...}. Supported types: drop_nulls, impute_nulls, remove_outliers, drop_duplicates, drop_columns, convert_types",
     "default": [],
     "example": [
       {
         "type": "drop_nulls",
-        "target_columns": [
-          "email",
-          "customer_id"
-        ],
+        "target_columns": ["email", "customer_id"],
         "description": "Drop rows with missing critical identifiers"
       },
       {
         "type": "impute_nulls",
-        "target_columns": [
-          "age"
-        ],
+        "target_columns": ["age"],
         "strategy": "mean",
         "description": "Impute missing age with mean"
       },
       {
         "type": "remove_outliers",
-        "target_columns": [
-          "salary"
-        ],
+        "target_columns": ["salary"],
         "method": "iqr",
         "threshold": 1.5,
         "description": "Remove salary outliers using IQR"
@@ -169,88 +64,12 @@
     "tool": "Clean My Data"
   },
   {
-    "type": "array",
-    "description": "List of columns that must have values",
-    "default": [],
-    "items": "string",
-    "example": [
-      "customer_id",
-      "email",
-      "created_at"
-    ],
-    "show": true,
-    "required": false,
-    "columnSelection": true,
-    "name": "required_columns",
-    "agent": "Stewardship Flagger",
-    "tool": "Master My Data"
-  },
-  {
-    "type": "array",
-    "description": "List of required field names",
-    "default": [],
-    "items": "string",
-    "example": [
-      "customer_id",
-      "email",
-      "created_at"
-    ],
-    "show": true,
-    "required": false,
-    "columnSelection": true,
-    "name": "required_fields",
-    "agent": "Quarantine Agent",
-    "tool": "Clean My Data"
-  },
-  {
-    "type": "array",
-    "description": "Specific columns to standardize (all columns if empty)",
-    "default": [],
-    "items": "string",
-    "example": [
-      "first_name",
-      "last_name",
-      "city"
-    ],
-    "show": true,
-    "required": false,
-    "columnSelection": true,
-    "name": "target_columns",
-    "agent": "Field Standardization",
-    "tool": "Clean My Data"
-  },
-  {
-    "type": "array",
-    "description": "List of columns that should have unique values",
-    "default": [],
-    "items": "string",
-    "example": [
-      "user_id",
-      "email",
-      "ssn",
-      "order_id"
-    ],
-    "show": true,
-    "required": false,
-    "columnSelection": true,
-    "name": "unique_columns",
-    "agent": "Test Coverage Agent",
-    "tool": "Profile My Data"
-  },
-  {
     "type": "object",
     "description": "Contract definition containing required_columns, optional_columns, column_types, column_mappings, value_constraints, uniqueness_constraints",
     "default": {},
     "example": {
-      "required_columns": [
-        "id",
-        "name",
-        "email"
-      ],
-      "optional_columns": [
-        "phone",
-        "address"
-      ],
+      "required_columns": ["id", "name", "email"],
+      "optional_columns": ["phone", "address"],
       "column_types": {
         "id": "integer",
         "name": "string",
@@ -262,10 +81,7 @@
           "pattern": "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$"
         }
       },
-      "uniqueness_constraints": [
-        "id",
-        "email"
-      ]
+      "uniqueness_constraints": ["id", "email"]
     },
     "show": true,
     "required": true,
@@ -339,11 +155,7 @@
       },
       "country_code": {
         "min_length": 2,
-        "allowed_values": [
-          "US",
-          "CA",
-          "UK"
-        ]
+        "allowed_values": ["US", "CA", "UK"]
       }
     },
     "show": true,
@@ -492,25 +304,13 @@
     "default": {},
     "example": {
       "customers": {
-        "customer_id": [
-          "C001",
-          "C002",
-          "C003"
-        ]
+        "customer_id": ["C001", "C002", "C003"]
       },
       "products": {
-        "product_id": [
-          "P001",
-          "P002",
-          "P003"
-        ]
+        "product_id": ["P001", "P002", "P003"]
       },
       "regions": {
-        "region_code": [
-          "NA",
-          "EMEA",
-          "APAC"
-        ]
+        "region_code": ["NA", "EMEA", "APAC"]
       }
     },
     "show": true,
@@ -640,109 +440,6 @@
   },
   {
     "type": "string",
-    "description": "Case normalization strategy to apply",
-    "default": "lowercase",
-    "allowed": [
-      "lowercase",
-      "uppercase",
-      "titlecase",
-      "none"
-    ],
-    "example": "lowercase",
-    "show": true,
-    "required": false,
-    "name": "case_strategy",
-    "agent": "Field Standardization",
-    "tool": "Clean My Data"
-  },
-  {
-    "type": "string",
-    "description": "Outlier detection method",
-    "default": "iqr",
-    "allowed": [
-      "z_score",
-      "iqr",
-      "percentile"
-    ],
-    "example": "iqr",
-    "show": true,
-    "required": false,
-    "name": "detection_method",
-    "agent": "Outlier Remover",
-    "tool": "Clean My Data"
-  },
-  {
-    "type": "string",
-    "description": "Global strategy for handling nulls",
-    "default": "column_specific",
-    "allowed": [
-      "drop_rows",
-      "column_specific"
-    ],
-    "example": "column_specific",
-    "show": true,
-    "required": false,
-    "name": "global_strategy",
-    "agent": "Null Handler",
-    "tool": "Clean My Data"
-  },
-  {
-    "type": "string",
-    "description": "Strategy for handling duplicates",
-    "default": "remove_duplicates",
-    "allowed": [
-      "remove_duplicates",
-      "merge_smart"
-    ],
-    "example": "merge_smart",
-    "show": true,
-    "required": false,
-    "name": "merge_strategy",
-    "agent": "Duplicate Resolver",
-    "tool": "Clean My Data"
-  },
-  {
-    "type": "string",
-    "description": "Strategy for handling detected outliers",
-    "default": "remove",
-    "allowed": [
-      "remove",
-      "impute_mean",
-      "impute_median"
-    ],
-    "example": "impute_median",
-    "show": true,
-    "required": false,
-    "name": "removal_strategy",
-    "agent": "Outlier Remover",
-    "tool": "Clean My Data"
-  },
-  {
-    "type": "string",
-    "description": "Column identifying the record source",
-    "default": null,
-    "example": "SourceSystem",
-    "show": true,
-    "required": true,
-    "columnSelection": true,
-    "name": "source_column",
-    "agent": "Survivorship Resolver",
-    "tool": "Master My Data"
-  },
-  {
-    "type": "string",
-    "description": "Column identifying the record source",
-    "default": null,
-    "example": "SourceSystem",
-    "required": true,
-    "show": true,
-    "columnSelection": true,
-    "name": "source_column",
-    "agent": "Golden Record Builder",
-    "tool": "Master My Data"
-  },
-  {
-    "type": "string",
     "description": "Target format for date standardization (e.g., %Y-%m-%d)",
     "default": "%Y-%m-%d",
     "example": "%Y-%m-%d",
@@ -751,29 +448,5 @@
     "name": "target_date_format",
     "agent": "Field Standardization",
     "tool": "Clean My Data"
-  },
-  {
-    "type": "string",
-    "description": "Column for freshness-based resolution",
-    "default": null,
-    "example": "updated_at",
-    "show": true,
-    "required": false,
-    "columnSelection": true,
-    "name": "timestamp_column",
-    "agent": "Survivorship Resolver",
-    "tool": "Master My Data"
-  },
-  {
-    "type": "string",
-    "description": "Column for recency-based survivorship rules",
-    "default": null,
-    "example": "updated_at",
-    "show": true,
-    "required": false,
-    "columnSelection": true,
-    "name": "timestamp_column",
-    "agent": "Golden Record Builder",
-    "tool": "Master My Data"
   }
 ]
