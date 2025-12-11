@@ -483,8 +483,12 @@ def execute_contract_enforcer(
                 
                 # Add row-level issues for duplicates
                 dup_values = duplicates[unique_col].to_list()[:10]
+                df_with_index = df.with_row_index("row_index")
                 for dup_val in dup_values:
-                    dup_rows = df.with_row_index("row_index").filter(pl.col(unique_col) == dup_val)
+                    if dup_val is None:
+                        dup_rows = df_with_index.filter(pl.col(unique_col).is_null())
+                    else:
+                        dup_rows = df_with_index.filter(pl.col(unique_col) == dup_val)
                     for row in dup_rows.iter_rows(named=True):
                         if len(row_level_issues) < 1000:
                             row_level_issues.append({
