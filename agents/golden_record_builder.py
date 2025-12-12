@@ -56,7 +56,7 @@ def execute_golden_record_builder(
 
     start_time = time.time()
     parameters = parameters or {}
-
+    
     # Extract and parse parameters with defaults
     match_key_columns = safe_get_list(parameters, "match_key_columns", [])
     match_key_weights = safe_get_dict(parameters, "match_key_weights", {})
@@ -70,9 +70,6 @@ def execute_golden_record_builder(
     # Fuzzy matching parameters
     enable_fuzzy_matching = parameters.get("enable_fuzzy_matching", False)
     fuzzy_threshold = parameters.get("fuzzy_threshold", 80.0)
-    # NOTE: `fuzzy_config` is deprecated in favor of match_key_columns + match_key_weights.
-    # Kept for backward compatibility with older clients.
-    legacy_fuzzy_config = safe_get_dict(parameters, "fuzzy_config", {})
     
     # Scoring thresholds
     excellent_threshold = parameters.get("excellent_threshold", 90)
@@ -114,7 +111,11 @@ def execute_golden_record_builder(
         
         # Auto-detect match key columns if not provided
         if not match_key_columns:
-            match_key_columns = _auto_detect_match_keys(df)
+            # If fuzzy matching is enabled but no match columns provided, auto-detect
+            if enable_fuzzy_matching:
+                match_key_columns = _auto_detect_match_keys_intelligent(df)
+            else:
+                match_key_columns = _auto_detect_match_keys(df)
         
         # Validate match key columns exist
         valid_match_keys = []
@@ -135,8 +136,7 @@ def execute_golden_record_builder(
                derived_fuzzy_config = _derive_fuzzy_config(
                   match_keys=valid_match_keys,
                   match_key_weights=match_key_weights,
-                  all_columns=df.columns,
-                  legacy_fuzzy_config=legacy_fuzzy_config
+                  all_columns=df.columns
                )
                # IMPORTANT: Do NOT use match keys as strict blocking keys.
                # Blocking by exact equality across multiple match keys disables fuzzy matching.
@@ -532,6 +532,52 @@ def _auto_detect_match_keys(df: pl.DataFrame) -> List[str]:
     return potential_keys[:3]  # Limit to top 3
 
 
+def _auto_detect_match_keys_intelligent(df: pl.DataFrame) -> List[str]:
+    """
+    Intelligently auto-detect match key columns for fuzzy matching.
+    For fuzzy matching, prioritize name/email/phone columns over IDs.
+    """
+    match_cols = []
+    
+    # Priority 1: Names (FirstName, LastName, FullName, Name)
+    for col in df.columns:
+        col_lower = col.lower()
+        if any(x in col_lower for x in ['firstname', 'first_name', 'lastname', 'last_name', 'fullname', 'full_name', 'name']):
+            if col_lower not in [c.lower() for c in match_cols]:
+                match_cols.append(col)
+    
+    # Priority 2: Email
+    for col in df.columns:
+        col_lower = col.lower()
+        if 'email' in col_lower or 'mail' in col_lower:
+            if col_lower not in [c.lower() for c in match_cols]:
+                match_cols.append(col)
+    
+    # Priority 3: Phone
+    for col in df.columns:
+        col_lower = col.lower()
+        if 'phone' in col_lower or 'mobile' in col_lower or 'contact' in col_lower:
+            if col_lower not in [c.lower() for c in match_cols]:
+                match_cols.append(col)
+    
+    # Priority 4: Address
+    for col in df.columns:
+        col_lower = col.lower()
+        if 'address' in col_lower or 'addr' in col_lower or 'street' in col_lower:
+            if col_lower not in [c.lower() for c in match_cols]:
+                match_cols.append(col)
+    
+    # Priority 5: Other good matching columns (City, PostalCode, Country)
+    for col in df.columns:
+        col_lower = col.lower()
+        if any(x in col_lower for x in ['city', 'postcode', 'postal', 'zip', 'country', 'state']):
+            if col_lower not in [c.lower() for c in match_cols]:
+                match_cols.append(col)
+    
+    # Return top 6 columns for fuzzy matching
+    return match_cols[:6]
+
+
 def _build_record_clusters(df: pl.DataFrame, match_keys: List[str]) -> Dict[str, Dict]:
     """Build clusters of related records based on match keys."""
     clusters = {}
@@ -837,28 +883,23 @@ def _infer_fuzzy_field_type(column_name: str) -> str:
 def _derive_fuzzy_config(
     match_keys: List[str],
     match_key_weights: Dict[str, Any],
-    all_columns: List[str],
-    legacy_fuzzy_config: Optional[Dict[str, Any]] = None
+    all_columns: List[str]
 ) -> Dict[str, Any]:
     """Build internal fuzzy_config from match keys + user weights.
 
-    This replaces manual `fuzzy_config` to avoid contradictions with match_key_columns.
-    If match_keys is empty, falls back to legacy config (if any) or all columns.
+    If match_keys is empty, uses all columns.
 
     match_key_weights expects: {"colName": 0-100, ...}
     We normalize weights internally.
     """
-
-    legacy_fuzzy_config = legacy_fuzzy_config or {}
 
     # Determine which columns participate in similarity.
     similarity_columns: List[str]
     if match_keys:
         similarity_columns = list(match_keys)
     else:
-        # If no match keys provided, allow legacy config to control columns.
-        legacy_cols = list((legacy_fuzzy_config.get("columns") or {}).keys())
-        similarity_columns = legacy_cols if legacy_cols else list(all_columns)
+        # If no match keys provided, use all columns
+        similarity_columns = list(all_columns)
 
     # Build raw weights map (0-100). If missing, distribute evenly.
     raw_weights: Dict[str, float] = {}
@@ -873,7 +914,18 @@ def _derive_fuzzy_config(
             w_num = None
 
         if w_num is None:
-            raw_weights[col] = 0.0
+            # Smart default weights for auto-detected columns
+            col_lower = col.lower()
+            if any(x in col_lower for x in ['email', 'mail']):
+                raw_weights[col] = 40.0  # Email is very unique
+            elif any(x in col_lower for x in ['phone', 'mobile']):
+                raw_weights[col] = 30.0  # Phone is unique
+            elif any(x in col_lower for x in ['lastname', 'last_name']):
+                raw_weights[col] = 35.0  # Last name is important
+            elif any(x in col_lower for x in ['firstname', 'first_name']):
+                raw_weights[col] = 25.0  # First name matters
+            else:
+                raw_weights[col] = 10.0  # Default
         else:
             raw_weights[col] = max(0.0, min(100.0, w_num))
 
@@ -889,14 +941,8 @@ def _derive_fuzzy_config(
 
     columns_config: Dict[str, Dict[str, Any]] = {}
     for col in similarity_columns:
-        # If legacy config provides a type, keep it, otherwise infer
-        legacy_type = None
-        try:
-            legacy_type = (legacy_fuzzy_config.get("columns") or {}).get(col, {}).get("type")
-        except Exception:
-            legacy_type = None
         columns_config[col] = {
-            "type": legacy_type or _infer_fuzzy_field_type(col),
+            "type": _infer_fuzzy_field_type(col),
             "weight": float(normalized.get(col, 1.0))
         }
 
