@@ -1,0 +1,27 @@
+{
+  "analysis_id": "d46160cb-6523-47f5-b066-20a9e1a35e4d",
+  "outputs_dir": "uploads\\2\\d46160cb-6523-47f5-b066-20a9e1a35e4d\\outputs",
+  "saved_count": 2,
+  "error_count": 0,
+  "saved": [
+    {
+      "index": 0,
+      "download_id": "d46160cb-6523-47f5-b066-20a9e1a35e4d_profile_excel",
+      "file_name": "profile_my_data_analysis.xlsx",
+      "path": "uploads\\2\\d46160cb-6523-47f5-b066-20a9e1a35e4d\\outputs\\profile_my_data_analysis.xlsx",
+      "size_bytes": 21208,
+      "mimeType": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      "type": "complete_report"
+    },
+    {
+      "index": 1,
+      "download_id": "d46160cb-6523-47f5-b066-20a9e1a35e4d_profile_json",
+      "file_name": "profile_my_data_analysis.json",
+      "path": "uploads\\2\\d46160cb-6523-47f5-b066-20a9e1a35e4d\\outputs\\profile_my_data_analysis.json",
+      "size_bytes": 50777,
+      "mimeType": "application/json",
+      "type": "complete_report"
+    }
+  ],
+  "errors": []
+}

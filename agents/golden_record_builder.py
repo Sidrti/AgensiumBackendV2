@@ -59,6 +59,7 @@ def execute_golden_record_builder(
 
     # Extract and parse parameters with defaults
     match_key_columns = safe_get_list(parameters, "match_key_columns", [])
+    match_key_weights = safe_get_dict(parameters, "match_key_weights", {})
     survivorship_rules = safe_get_dict(parameters, "survivorship_rules", {})
     source_priority = safe_get_dict(parameters, "source_priority", {})
     source_column = parameters.get("source_column", None)
@@ -69,7 +70,9 @@ def execute_golden_record_builder(
     # Fuzzy matching parameters
     enable_fuzzy_matching = parameters.get("enable_fuzzy_matching", False)
     fuzzy_threshold = parameters.get("fuzzy_threshold", 80.0)
-    fuzzy_config = safe_get_dict(parameters, "fuzzy_config", {})
+    # NOTE: `fuzzy_config` is deprecated in favor of match_key_columns + match_key_weights.
+    # Kept for backward compatibility with older clients.
+    legacy_fuzzy_config = safe_get_dict(parameters, "fuzzy_config", {})
     
     # Scoring thresholds
     excellent_threshold = parameters.get("excellent_threshold", 90)
@@ -129,7 +132,15 @@ def execute_golden_record_builder(
         
         # ==================== CLUSTER RELATED RECORDS ====================
         if enable_fuzzy_matching and rapidfuzz and jellyfish:
-             clusters = _build_fuzzy_clusters(df, fuzzy_config, fuzzy_threshold, valid_match_keys)
+               derived_fuzzy_config = _derive_fuzzy_config(
+                  match_keys=valid_match_keys,
+                  match_key_weights=match_key_weights,
+                  all_columns=df.columns,
+                  legacy_fuzzy_config=legacy_fuzzy_config
+               )
+               # IMPORTANT: Do NOT use match keys as strict blocking keys.
+               # Blocking by exact equality across multiple match keys disables fuzzy matching.
+               clusters = _build_fuzzy_clusters(df, derived_fuzzy_config, fuzzy_threshold, blocking_keys=[])
         else:
              clusters = _build_record_clusters(df, valid_match_keys)
         
@@ -259,6 +270,7 @@ def execute_golden_record_builder(
             "issue_summary": issue_summary,
             "overrides": {
                 "match_key_columns": match_key_columns,
+                "match_key_weights": match_key_weights,
                 "default_survivorship_rule": default_survivorship_rule,
                 "source_column": source_column,
                 "timestamp_column": timestamp_column,
@@ -800,6 +812,95 @@ def _normalize_fuzzy_value(value: Any, field_type: str) -> str:
         return " ".join([w for w in words if w not in redundant])
         
     return s_val
+
+
+def _infer_fuzzy_field_type(column_name: str) -> str:
+    """Infer fuzzy field type from a column name (heuristic)."""
+    c = (column_name or "").strip().lower()
+    if not c:
+        return "text"
+    if "email" in c:
+        return "email"
+    if "phone" in c or "mobile" in c or "contact" in c or c in {"msisdn"}:
+        return "phone"
+    if "name" in c or c in {"first_name", "lastname", "last_name", "fullname", "full_name"}:
+        return "name"
+    if "address" in c or "addr" in c:
+        return "address"
+    if "dob" in c or "birth" in c or "date" in c:
+        return "date"
+    if "zip" in c or "postal" in c or "pincode" in c or "pin" in c:
+        return "zip"
+    return "text"
+
+
+def _derive_fuzzy_config(
+    match_keys: List[str],
+    match_key_weights: Dict[str, Any],
+    all_columns: List[str],
+    legacy_fuzzy_config: Optional[Dict[str, Any]] = None
+) -> Dict[str, Any]:
+    """Build internal fuzzy_config from match keys + user weights.
+
+    This replaces manual `fuzzy_config` to avoid contradictions with match_key_columns.
+    If match_keys is empty, falls back to legacy config (if any) or all columns.
+
+    match_key_weights expects: {"colName": 0-100, ...}
+    We normalize weights internally.
+    """
+
+    legacy_fuzzy_config = legacy_fuzzy_config or {}
+
+    # Determine which columns participate in similarity.
+    similarity_columns: List[str]
+    if match_keys:
+        similarity_columns = list(match_keys)
+    else:
+        # If no match keys provided, allow legacy config to control columns.
+        legacy_cols = list((legacy_fuzzy_config.get("columns") or {}).keys())
+        similarity_columns = legacy_cols if legacy_cols else list(all_columns)
+
+    # Build raw weights map (0-100). If missing, distribute evenly.
+    raw_weights: Dict[str, float] = {}
+    for col in similarity_columns:
+        w = match_key_weights.get(col)
+        if w is None:
+            # also allow lowercase key match
+            w = match_key_weights.get(col.lower())
+        try:
+            w_num = float(w) if w is not None else None
+        except Exception:
+            w_num = None
+
+        if w_num is None:
+            raw_weights[col] = 0.0
+        else:
+            raw_weights[col] = max(0.0, min(100.0, w_num))
+
+    if similarity_columns:
+        if sum(raw_weights.values()) <= 0:
+            # Even distribution if nothing specified
+            even = 1.0
+            raw_weights = {c: even for c in similarity_columns}
+
+    # Normalize to weights used by _calculate_record_similarity.
+    total = float(sum(raw_weights.values())) if raw_weights else 0.0
+    normalized = {c: (raw_weights[c] / total) if total > 0 else 1.0 for c in raw_weights}
+
+    columns_config: Dict[str, Dict[str, Any]] = {}
+    for col in similarity_columns:
+        # If legacy config provides a type, keep it, otherwise infer
+        legacy_type = None
+        try:
+            legacy_type = (legacy_fuzzy_config.get("columns") or {}).get(col, {}).get("type")
+        except Exception:
+            legacy_type = None
+        columns_config[col] = {
+            "type": legacy_type or _infer_fuzzy_field_type(col),
+            "weight": float(normalized.get(col, 1.0))
+        }
+
+    return {"columns": columns_config}
 
 
 def _calculate_field_similarity(val1: str, val2: str, field_type: str) -> float:

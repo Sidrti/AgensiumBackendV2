@@ -605,7 +605,18 @@
           "example": ["Email", "Phone"],
           "required": true,
           "show": true,
-          "columnSelection": true
+          "columnSelection": true,
+          "collectWeights": true,
+          "weightsParamKey": "match_key_weights",
+          "weightsRange": { "min": 0, "max": 100 }
+        },
+        "match_key_weights": {
+          "type": "object",
+          "description": "Weights (0-100) per match_key column for fuzzy matching. This is filled automatically from the match key UI.",
+          "default": {},
+          "example": { "Email": 60, "Phone": 40 },
+          "show": false,
+          "required": false
         },
         "survivorship_rules": {
           "type": "object",
@@ -690,18 +701,6 @@
           "min": 0,
           "max": 100,
           "show": false,
-          "required": false
-        },
-        "fuzzy_config": {
-          "type": "object",
-          "description": "Configuration for fuzzy matching (columns -> {type, weight})",
-          "default": {},
-          "example": {
-            "name": { "type": "name", "weight": 2.0 },
-            "address": { "type": "address", "weight": 1.0 },
-            "email": { "type": "email", "weight": 3.0 }
-          },
-          "show": true,
           "required": false
         },
         "excellent_threshold": {

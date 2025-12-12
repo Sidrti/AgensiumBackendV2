@@ -1,0 +1,21 @@
+customer_id,SourceSystem,FirstName,LastName,Email,Phone,Address,City,__cluster_id__,__resolution_confidence__,__trust_score__,__source_count__,__stewardship_issues__,__flagged_at__,__needs_review__
+,WebPortal,E. Clark,eclark@gmail.com,555-6666,23 Thames St,London,N.Y.,cluster_0,1.0,1.0,1,INVALID_FORMAT:Email; INVALID_FORMAT:Phone,2025-12-12T07:16:50.857941Z,true
+,Marketing,Emilie,Clarke,emily.clark@helpdesk.com,555-5555,404 Cedar Street,San Francisco,cluster_1,0.667,1.0,1,LOW_CONFIDENCE:__resolution_confidence__,2025-12-12T07:16:50.857941Z,true
+,Marketing,Lee,Wei,li.wei@helpdesk.com,555-8888,88 Nanjing Road,Shanghai,cluster_2,0.69,1.0,1,LOW_CONFIDENCE:__resolution_confidence__,2025-12-12T07:16:50.857941Z,true
+,Support,Johnathan,Smith,john.smith@helpdesk.com,555-0000,789 Broadway,New York,cluster_3,1.0,1.0,1,"",2025-12-12T07:16:50.857941Z,false
+,WebPortal,Michael,Browne,michael.brown@email.com,555-3333,77 King Street,Evanston,cluster_4,0.657,1.0,1,LOW_CONFIDENCE:__resolution_confidence__,2025-12-12T07:16:50.857941Z,true
+,Marketing,Anna,Garcia,ana.garcia@promo.com,555-6666,12 Calle Real,Madrid,cluster_5,0.69,1.0,1,LOW_CONFIDENCE:__resolution_confidence__,2025-12-12T07:16:50.857941Z,true
+,WebPortal,A. Khan,akhan@gmail.com,555-8888,56 Souq Rd,Dubai,,cluster_6,1.0,1.0,1,INVALID_FORMAT:Email; INVALID_FORMAT:Phone,2025-12-12T07:16:50.857941Z,true
+,Marketing,Fatima,Ally,fatima.ali@email.com,555-4444,202 Maple Street,Houston,cluster_7,0.67,1.0,1,LOW_CONFIDENCE:__resolution_confidence__,2025-12-12T07:16:50.857941Z,true
+,WebPortal,Johnny,Smith,j.smith@gmail.com,555-5678,456 Elm St,Brooklyn,cluster_8,1.0,1.0,1,"",2025-12-12T07:16:50.857941Z,false
+,Marketing,Mary,A. Jones,mary.jones@email.com,555-2222,789 Oak Avenue,Chicago,cluster_9,0.703,1.0,1,"",2025-12-12T07:16:50.857941Z,false
+,WebPortal,R. Wang,rwang@gmail.com,555-8888,505 Spruce Ln,Oakland,CA,cluster_10,1.0,1.0,1,INVALID_FORMAT:Email; INVALID_FORMAT:Phone,2025-12-12T07:16:50.857941Z,true
+,WebPortal,S. Connor,sconnor@gmail.com,555-2222,13 Past St,Los Angeles,CA,cluster_11,1.0,1.0,1,INVALID_FORMAT:Email; INVALID_FORMAT:Phone,2025-12-12T07:16:50.857941Z,true
+,Marketing,Sarah,Connor,sarah.connor@helpdesk.com,555-1111,12 Future Boulevard,Los Angeles,cluster_12,0.678,1.0,1,LOW_CONFIDENCE:__resolution_confidence__,2025-12-12T07:16:50.857941Z,true
+,Marketing,John,Smith,john.smith@email.com,555-1234,123 Main Street,New York,cluster_13,0.695,1.0,1,LOW_CONFIDENCE:__resolution_confidence__,2025-12-12T07:16:50.857941Z,true
+,CRM,Ahmed,Khan,ahmed.khan@email.com,555-7777,55 Market Street,Dubai,cluster_14,0.685,1.0,1,LOW_CONFIDENCE:__resolution_confidence__,2025-12-12T07:16:50.857941Z,true
+,WebPortal,M. Brown,mbrown@gmail.com,555-4444,78 Queen St,Toronto,ON,cluster_15,1.0,1.0,1,INVALID_FORMAT:Email; INVALID_FORMAT:Phone,2025-12-12T07:16:50.857941Z,true
+,WebPortal,A. Garcia,agarcia@gmail.com,555-7777,13 Calle Mayor,Madrid,,cluster_16,1.0,1.0,1,INVALID_FORMAT:Email; INVALID_FORMAT:Phone,2025-12-12T07:16:50.857941Z,true
+,WebPortal,L. Wei,lwei@gmail.com,555-9999,89 Beijing Rd,Shanghai,,cluster_17,1.0,1.0,1,INVALID_FORMAT:Email; INVALID_FORMAT:Phone,2025-12-12T07:16:50.857941Z,true
+,WebPortal,F. Ali,fali@gmail.com,555-9999,303 Birch Blvd,Houston,TX,cluster_18,1.0,1.0,1,INVALID_FORMAT:Email; INVALID_FORMAT:Phone,2025-12-12T07:16:50.857941Z,true
+,Support,M. Jones,mjones@helpdesk.com,555-,,,,cluster_19,1.0,1.0,1,INVALID_FORMAT:Email,2025-12-12T07:16:50.857941Z,true

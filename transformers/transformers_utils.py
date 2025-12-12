@@ -1,9 +1,235 @@
 
 import io
 import json
+import os
+import base64
+from pathlib import Path
 import pandas as pd
-from typing import Dict, List, Any, Optional
+from typing import Dict, List, Any, Optional, Union
 from fastapi import UploadFile, HTTPException
+
+
+# ----------------------------
+# Analysis storage helpers
+# ----------------------------
+
+def _uploads_root() -> Path:
+    """Root folder used for persisting inputs/outputs.
+
+    Can be overridden via env var AGENSIUM_UPLOADS_DIR.
+    """
+    root = os.getenv("AGENSIUM_UPLOADS_DIR", "uploads")
+    return Path(root)
+
+
+def _safe_filename(filename: Optional[str], fallback: str = "file") -> str:
+    """Prevent path traversal and normalize empty names."""
+    if not filename:
+        return fallback
+    name = Path(filename).name
+    return name if name else fallback
+
+
+def get_analysis_dirs(
+    user_id: Union[str, int],
+    analysis_id: str,
+    root_dir: Optional[Union[str, Path]] = None
+) -> Dict[str, Path]:
+    """Create (if needed) and return analysis directory paths.
+
+    Layout:
+      uploads/<user_id>/<analysis_id>/inputs
+      uploads/<user_id>/<analysis_id>/outputs
+    """
+    root = Path(root_dir) if root_dir is not None else _uploads_root()
+    analysis_dir = root / str(user_id) / str(analysis_id)
+    inputs_dir = analysis_dir / "inputs"
+    outputs_dir = analysis_dir / "outputs"
+
+    inputs_dir.mkdir(parents=True, exist_ok=True)
+    outputs_dir.mkdir(parents=True, exist_ok=True)
+
+    return {
+        "root": root,
+        "analysis_dir": analysis_dir,
+        "inputs": inputs_dir,
+        "outputs": outputs_dir,
+    }
+
+
+async def save_upload_file(
+    upload_file: UploadFile,
+    dest_path: Union[str, Path],
+    *,
+    chunk_size: int = 1024 * 1024,
+    reset_pointer: bool = True
+) -> int:
+    """Persist an UploadFile to disk efficiently and (optionally) reset its pointer.
+
+    Returns number of bytes written.
+    """
+    dest = Path(dest_path)
+    dest.parent.mkdir(parents=True, exist_ok=True)
+
+    # Ensure we copy from the start.
+    try:
+        await upload_file.seek(0)
+    except Exception:
+        # Some implementations might not support seek; ignore.
+        pass
+
+    bytes_written = 0
+    with open(dest, "wb") as f:
+        while True:
+            chunk = await upload_file.read(chunk_size)
+            if not chunk:
+                break
+            f.write(chunk)
+            bytes_written += len(chunk)
+
+    if reset_pointer:
+        try:
+            await upload_file.seek(0)
+        except Exception:
+            pass
+
+    return bytes_written
+
+
+async def persist_analysis_inputs(
+    *,
+    user_id: Union[str, int],
+    analysis_id: str,
+    primary: Optional[UploadFile] = None,
+    baseline: Optional[UploadFile] = None,
+    parameters_json: Optional[str] = None,
+    root_dir: Optional[Union[str, Path]] = None
+) -> Dict[str, Any]:
+    """Store incoming request inputs under uploads/<user_id>/<analysis_id>/inputs."""
+    dirs = get_analysis_dirs(user_id=user_id, analysis_id=analysis_id, root_dir=root_dir)
+    inputs_dir = dirs["inputs"]
+
+    result: Dict[str, Any] = {
+        "inputs_dir": str(inputs_dir),
+        "primary_path": None,
+        "baseline_path": None,
+        "parameters_path": None,
+        "primary_size": 0,
+        "baseline_size": 0,
+    }
+
+    if primary:
+        primary_name = _safe_filename(primary.filename, "primary")
+        primary_path = inputs_dir / primary_name
+        result["primary_size"] = await save_upload_file(primary, primary_path)
+        result["primary_path"] = str(primary_path)
+
+    if baseline:
+        baseline_name = _safe_filename(baseline.filename, "baseline")
+        baseline_path = inputs_dir / baseline_name
+        result["baseline_size"] = await save_upload_file(baseline, baseline_path)
+        result["baseline_path"] = str(baseline_path)
+
+    if parameters_json is not None:
+        params_path = inputs_dir / "parameters.json"
+        with open(params_path, "w", encoding="utf-8") as f:
+            f.write(parameters_json)
+        result["parameters_path"] = str(params_path)
+
+    return result
+
+
+def persist_downloads_to_outputs(
+    *,
+    downloads: Any,
+    user_id: Union[str, int],
+    analysis_id: str,
+    root_dir: Optional[Union[str, Path]] = None
+) -> Dict[str, Any]:
+    """Persist download artifacts (base64 payloads) under outputs folder.
+
+    Expects downloads to be a list of dicts with keys: file_name, content_base64.
+    Writes a manifest.json describing what was saved.
+    """
+    dirs = get_analysis_dirs(user_id=user_id, analysis_id=analysis_id, root_dir=root_dir)
+    outputs_dir = dirs["outputs"]
+
+    saved: List[Dict[str, Any]] = []
+    errors: List[Dict[str, Any]] = []
+
+    if not isinstance(downloads, list):
+        return {
+            "outputs_dir": str(outputs_dir),
+            "saved": saved,
+            "errors": [{"error": "downloads is not a list"}],
+        }
+
+    for idx, item in enumerate(downloads):
+        if not isinstance(item, dict):
+            errors.append({"index": idx, "error": "download item is not a dict"})
+            continue
+
+        content_b64 = item.get("content_base64")
+        file_name = item.get("file_name") or item.get("filename") or item.get("name")
+
+        # Some error entries won't have file payloads.
+        if not content_b64 or not file_name:
+            errors.append({
+                "index": idx,
+                "download_id": item.get("download_id"),
+                "error": "missing file_name/content_base64",
+            })
+            continue
+
+        try:
+            raw = base64.b64decode(content_b64)
+            safe_name = _safe_filename(str(file_name), f"download_{idx}")
+
+            # Avoid overwriting if duplicates
+            dest = outputs_dir / safe_name
+            if dest.exists():
+                stem = dest.stem
+                suffix = dest.suffix
+                dest = outputs_dir / f"{stem}_{idx}{suffix}"
+
+            with open(dest, "wb") as f:
+                f.write(raw)
+
+            saved.append({
+                "index": idx,
+                "download_id": item.get("download_id"),
+                "file_name": safe_name,
+                "path": str(dest),
+                "size_bytes": len(raw),
+                "mimeType": item.get("mimeType"),
+                "type": item.get("type"),
+            })
+        except Exception as e:
+            errors.append({
+                "index": idx,
+                "download_id": item.get("download_id"),
+                "error": f"failed to persist download: {str(e)}",
+            })
+
+    manifest = {
+        "analysis_id": analysis_id,
+        "outputs_dir": str(outputs_dir),
+        "saved_count": len(saved),
+        "error_count": len(errors),
+        "saved": saved,
+        "errors": errors,
+    }
+
+    try:
+        with open(outputs_dir / "manifest.json", "w", encoding="utf-8") as f:
+            json.dump(manifest, f, ensure_ascii=False, indent=2)
+    except Exception:
+        # Don't fail if manifest write fails.
+        pass
+
+    return manifest
+
+
 
 def get_required_files(tool_id: str, agents: List[str]) -> Dict[str, Dict[str, Any]]:
     """

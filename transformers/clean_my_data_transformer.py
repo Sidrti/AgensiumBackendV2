@@ -17,7 +17,13 @@ from fastapi import UploadFile, HTTPException
 from ai.analysis_summary_ai import AnalysisSummaryAI
 from downloads.clean_my_data_downloads import CleanMyDataDownloads
 from agents import null_handler, outlier_remover, type_fixer, duplicate_resolver, quarantine_agent, cleanse_writeback, field_standardization, cleanse_previewer
-from transformers.transformers_utils import get_required_files, validate_files, read_uploaded_files, convert_files_to_csv
+from transformers.transformers_utils import (
+    get_required_files,
+    validate_files,
+    read_uploaded_files,
+    convert_files_to_csv,
+    persist_downloads_to_outputs,
+)
 
 
 async def run_clean_my_data_analysis(
@@ -584,6 +590,17 @@ def transform_clean_my_data_response(
         issue_summary=issue_summary,
         routing_decisions=routing_decisions
     )
+
+    # Persist downloads to disk (best-effort; does not affect API response)
+    # try:
+    #     if current_user is not None and hasattr(current_user, "id"):
+    #         persist_downloads_to_outputs(
+    #             downloads=downloads,
+    #             user_id=current_user.id,
+    #             analysis_id=analysis_id,
+    #         )
+    # except Exception as e:
+    #     print(f"Warning: failed to persist downloads for analysis {analysis_id}: {str(e)}")
     
     # ==================== BUILD FINAL RESPONSE ====================
     
