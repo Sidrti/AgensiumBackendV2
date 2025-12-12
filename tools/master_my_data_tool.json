@@ -691,7 +691,7 @@
           "type": "boolean",
           "description": "Enable fuzzy matching for record clustering",
           "default": false,
-          "show": false,
+          "show": true,
           "required": false
         },
         "fuzzy_threshold": {

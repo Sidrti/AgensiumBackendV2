@@ -1,0 +1,9 @@
+record_id,source_system,updated_at,first_name,last_name,email,phone,address,city,state,zip,loyalty_tier
+1,CRM,2025-11-01,John,Smith,john.smith@gmail.com,555-123-4567,"12 Road St",Springfield,IL,62704,Gold
+2,Ecommerce,2025-12-01,Jon,Smyth,john.smith@gmail.com,"(555) 123 4567","12 Rd Street",Springfield,IL,62704,
+3,Support,2025-10-15,John,Smith,j.smith@gmail.com,5551234567,"12 Road Street Apt 4",Springfield,IL,62704,Silver
+4,CRM,2025-11-05,Jane,Doe,jane.doe@acme.com,555-987-6543,"500 Market Street",San Francisco,CA,94105,Platinum
+5,Ecommerce,2025-12-03,Jane,Do,jane.doe@acme.com,5559876543,"500 Market St.",San Francisco,CA,94105,
+6,Support,2025-11-18,Jane,Doe,jane_doe@acme.com,"(555) 987-6543","500 Market Street Suite 12",San Francisco,CA,94105,Gold
+7,CRM,2025-11-20,Alice,Johnson,alice.johnson@example.com,555-222-3333,"77 Sunset Boulevard",Los Angeles,CA,90028,Silver
+8,Ecommerce,2025-12-02,Bob,Stone,bob.stone@example.com,555-444-9999,"9 Lake View Rd",Austin,TX,73301,Bronze

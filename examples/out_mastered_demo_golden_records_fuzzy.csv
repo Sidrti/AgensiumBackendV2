@@ -1,0 +1,5 @@
+record_id,source_system,updated_at,first_name,last_name,email,phone,address,city,state,zip,loyalty_tier,__cluster_id__,__trust_score__,__source_count__
+1,Ecommerce,2025-12-01,John,Smith,john.smith@gmail.com,(555) 123 4567,12 Road Street Apt 4,Springfield,IL,62704,Gold,cluster_0,0.875,3
+4,Ecommerce,2025-12-03,Jane,Doe,jane.doe@acme.com,5559876543,500 Market Street Suite 12,San Francisco,CA,94105,Platinum,cluster_1,0.8916666666666666,3
+7,CRM,2025-11-20,Alice,Johnson,alice.johnson@example.com,555-222-3333,77 Sunset Boulevard,Los Angeles,CA,90028,Silver,cluster_2,1.0,1
+8,Ecommerce,2025-12-02,Bob,Stone,bob.stone@example.com,555-444-9999,9 Lake View Rd,Austin,TX,73301,Bronze,cluster_3,1.0,1
