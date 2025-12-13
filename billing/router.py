@@ -384,15 +384,15 @@ async def estimate_cost(
     "/agent-costs",
     response_model=AgentCostsListResponse,
     summary="List agent costs",
-    description="Get cost configuration for all agents"
+    description="Get cost configuration for all agents (PUBLIC - No Auth Required)"
 )
 async def list_agent_costs(
-    current_user: models.User = Depends(get_current_active_verified_user),
     db: Session = Depends(get_db)
 ):
     """
     Get all agent costs.
     
+    Public endpoint - no authentication required.
     Returns list of agents with their credit costs.
     """
     agent_costs_service = AgentCostsService(db)

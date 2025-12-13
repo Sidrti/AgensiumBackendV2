@@ -47,7 +47,7 @@ async def health():
 
 
 @router.get("/tools")
-async def list_tools(current_user: models.User = Depends(get_current_active_verified_user)):
+async def list_tools():
     """List all available tools."""
     from main import TOOL_DEFINITIONS
     
@@ -67,7 +67,7 @@ async def list_tools(current_user: models.User = Depends(get_current_active_veri
 
 
 @router.get("/tools/{tool_id}")
-async def get_tool(tool_id: str, current_user: models.User = Depends(get_current_active_verified_user)):
+async def get_tool(tool_id: str):
     """Get tool definition with file requirements and agent specifications."""
     from main import TOOL_DEFINITIONS
     

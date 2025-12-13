@@ -3,10 +3,17 @@ import io
 import json
 import os
 import base64
+import time
 from pathlib import Path
 import pandas as pd
-from typing import Dict, List, Any, Optional, Union
+from typing import Dict, List, Any, Optional, Union, Tuple
 from fastapi import UploadFile, HTTPException
+
+# Billing imports
+from billing.wallet_service import WalletService
+from billing.agent_costs_service import AgentCostsService
+from billing.exceptions import InsufficientCreditsError, AgentCostNotFoundError, UserWalletNotFoundError
+from db.database import SessionLocal
 
 
 # ----------------------------
@@ -400,3 +407,204 @@ def convert_files_to_csv(
             raise HTTPException(status_code=400, detail=f"Failed to convert {filename} to CSV: {str(e)}")
     
     return files_map
+
+# ----------------------------
+# Billing utilities
+# ----------------------------
+
+class BillingContext:
+    """Context manager for handling billing operations in transformers."""
+    
+    def __init__(self, current_user: Any = None):
+        """Initialize billing context.
+        
+        Args:
+            current_user: Current user object (must have 'id' attribute)
+        """
+        self.current_user = current_user
+        self.billing_enabled = current_user is not None and hasattr(current_user, 'id')
+        self.db_session = None
+        self.wallet_service = None
+        
+    def __enter__(self):
+        """Setup billing services."""
+        if self.billing_enabled:
+            try:
+                self.db_session = SessionLocal()
+                self.wallet_service = WalletService(self.db_session)
+            except Exception as e:
+                print(f"Warning: Could not initialize billing services: {e}")
+                self.billing_enabled = False
+        return self
+    
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        """Cleanup database session."""
+        if self.db_session:
+            self.db_session.close()
+        return False
+    
+    def consume_credits_for_agent(
+        self,
+        agent_id: str,
+        tool_id: str,
+        analysis_id: str,
+        start_time: float
+    ) -> Optional[Dict[str, Any]]:
+        """Consume credits for agent execution.
+        
+        Args:
+            agent_id: Agent identifier
+            tool_id: Tool identifier
+            analysis_id: Analysis identifier
+            start_time: Analysis start time (for calculating execution time)
+            
+        Returns:
+            Error response dict if billing fails, None if success or billing disabled
+        """
+        if not self.billing_enabled or not self.wallet_service:
+            return None
+        
+        try:
+            self.wallet_service.consume_for_agent(
+                user_id=self.current_user.id,
+                agent_id=agent_id,
+                tool_id=tool_id,
+                analysis_id=analysis_id
+            )
+            print(f"[Billing] Debited credits for agent: {agent_id}")
+            return None
+            
+        except InsufficientCreditsError as e:
+            # Return error response with billing details
+            return {
+                "analysis_id": analysis_id,
+                "tool": tool_id,
+                "status": "error",
+                "error_code": "BILLING_INSUFFICIENT_CREDITS",
+                "error": e.detail,
+                "context": e.context,
+                "execution_time_ms": int((time.time() - start_time) * 1000),
+            }
+            
+        except AgentCostNotFoundError as e:
+            # Agent cost not configured - log warning but continue
+            print(f"Warning: Agent cost not configured for {agent_id}: {e.detail}")
+            return None
+            
+        except UserWalletNotFoundError as e:
+            # User doesn't have a wallet - return error
+            return {
+                "analysis_id": analysis_id,
+                "tool": tool_id,
+                "status": "error",
+                "error_code": "BILLING_WALLET_NOT_FOUND",
+                "error": e.detail,
+                "context": e.context,
+                "execution_time_ms": int((time.time() - start_time) * 1000)
+            }
+
+
+def initialize_billing_services(current_user: Any = None) -> Tuple[bool, Optional[Any], Optional[WalletService]]:
+    """Initialize billing services (legacy function for backward compatibility).
+    
+    Args:
+        current_user: Current user object
+        
+    Returns:
+        Tuple of (billing_enabled, db_session, wallet_service)
+        
+    Note:
+        Consider using BillingContext context manager instead for automatic cleanup.
+    """
+    billing_enabled = current_user is not None and hasattr(current_user, 'id')
+    db_session = None
+    wallet_service = None
+    
+    if billing_enabled:
+        try:
+            db_session = SessionLocal()
+            wallet_service = WalletService(db_session)
+        except Exception as e:
+            print(f"Warning: Could not initialize billing services: {e}")
+            billing_enabled = False
+    
+    return billing_enabled, db_session, wallet_service
+
+
+def cleanup_billing_session(db_session: Optional[Any]) -> None:
+    """Cleanup billing database session (legacy function for backward compatibility).
+    
+    Args:
+        db_session: Database session to close
+        
+    Note:
+        Consider using BillingContext context manager instead for automatic cleanup.
+    """
+    if db_session:
+        db_session.close()
+
+
+def handle_agent_billing(
+    billing_enabled: bool,
+    wallet_service: Optional[WalletService],
+    current_user: Any,
+    agent_id: str,
+    tool_id: str,
+    analysis_id: str,
+    start_time: float
+) -> Optional[Dict[str, Any]]:
+    """Handle billing for agent execution (legacy function for backward compatibility).
+    
+    Args:
+        billing_enabled: Whether billing is enabled
+        wallet_service: Wallet service instance
+        current_user: Current user object
+        agent_id: Agent identifier
+        tool_id: Tool identifier
+        analysis_id: Analysis identifier
+        start_time: Analysis start time
+        
+    Returns:
+        Error response dict if billing fails, None if success
+        
+    Note:
+        Consider using BillingContext.consume_credits_for_agent() instead.
+    """
+    if not billing_enabled or not wallet_service:
+        return None
+    
+    try:
+        wallet_service.consume_for_agent(
+            user_id=current_user.id,
+            agent_id=agent_id,
+            tool_id=tool_id,
+            analysis_id=analysis_id
+        )
+        print(f"[Billing] Debited credits for agent: {agent_id}")
+        return None
+        
+    except InsufficientCreditsError as e:
+        return {
+            "analysis_id": analysis_id,
+            "tool": tool_id,
+            "status": "error",
+            "error_code": "BILLING_INSUFFICIENT_CREDITS",
+            "error": e.detail,
+            "context": e.context,
+            "execution_time_ms": int((time.time() - start_time) * 1000),
+        }
+        
+    except AgentCostNotFoundError as e:
+        print(f"Warning: Agent cost not configured for {agent_id}: {e.detail}")
+        return None
+        
+    except UserWalletNotFoundError as e:
+        return {
+            "analysis_id": analysis_id,
+            "tool": tool_id,
+            "status": "error",
+            "error_code": "BILLING_WALLET_NOT_FOUND",
+            "error": e.detail,
+            "context": e.context,
+            "execution_time_ms": int((time.time() - start_time) * 1000)
+        }

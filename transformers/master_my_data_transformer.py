@@ -23,13 +23,8 @@ from transformers.transformers_utils import (
     read_uploaded_files,
     convert_files_to_csv,
     persist_downloads_to_outputs,
+    BillingContext,
 )
-
-# Billing imports
-from billing.wallet_service import WalletService
-from billing.agent_costs_service import AgentCostsService
-from billing.exceptions import InsufficientCreditsError, AgentCostNotFoundError, UserWalletNotFoundError
-from db.database import SessionLocal
 
 
 async def run_master_my_data_analysis(
@@ -106,58 +101,21 @@ async def run_master_my_data_analysis(
         
         agent_results = {}
         
-        # Initialize billing services if user is authenticated
-        billing_enabled = current_user is not None and hasattr(current_user, 'id')
-        db_session = None
-        wallet_service = None
-        
-        if billing_enabled:
-            try:
-                db_session = SessionLocal()
-                wallet_service = WalletService(db_session)
-            except Exception as e:
-                print(f"Warning: Could not initialize billing services: {e}")
-                billing_enabled = False
-        
-        try:
+        # Initialize billing context
+        with BillingContext(current_user) as billing:
             for agent_id in agents_to_run:
                 try:
                     # ========== BILLING: Debit credits before agent execution ==========
-                    if billing_enabled and wallet_service:
-                        try:
-                            wallet_service.consume_for_agent(
-                                user_id=current_user.id,
-                                agent_id=agent_id,
-                                tool_id=tool_id,
-                                analysis_id=analysis_id
-                            )
-                            print(f"[Billing] Debited credits for agent: {agent_id}")
-                        except InsufficientCreditsError as e:
-                            # Return error response with billing details
-                            return {
-                                "analysis_id": analysis_id,
-                                "tool": tool_id,
-                                "status": "error",
-                                "error_code": "BILLING_INSUFFICIENT_CREDITS",
-                                "error": e.detail,
-                                "context": e.context,
-                                "execution_time_ms": int((time.time() - start_time) * 1000),
-                                "partial_results": agent_results
-                            }
-                        except AgentCostNotFoundError as e:
-                            # Agent cost not configured - log warning but continue
-                            print(f"Warning: Agent cost not configured for {agent_id}: {e.detail}")
-                        except UserWalletNotFoundError as e:
-                            # User doesn't have a wallet - return error
-                            return {
-                                "analysis_id": analysis_id,
-                                "tool": tool_id,
-                                "status": "error",
-                                "error_code": "BILLING_WALLET_NOT_FOUND",
-                                "error": e.detail,
-                                "context": e.context,
-                                "execution_time_ms": int((time.time() - start_time) * 1000)
-                            }
+                    billing_error = billing.consume_credits_for_agent(
+                        agent_id=agent_id,
+                        tool_id=tool_id,
+                        analysis_id=analysis_id,
+                        start_time=start_time
+                    )
+                    if billing_error:
+                        # Add partial results to error response
+                        billing_error["partial_results"] = agent_results
+                        return billing_error
                     # ========== END BILLING ==========
                     
                     # Build agent-specific input
@@ -177,10 +135,6 @@ async def run_master_my_data_analysis(
                         "error": str(e),
                         "execution_time_ms": 0
                     }
-        finally:
-            # Clean up database session
-            if db_session:
-                db_session.close()
         
         # Transform results
         return transform_master_my_data_response(
