@@ -3,7 +3,7 @@ Pydantic schemas with built-in validators for input validation.
 All validation logic is centralized here - route handlers stay clean.
 """
 from pydantic import BaseModel, EmailStr, Field, field_validator, model_validator
-from typing import Optional, Literal
+from typing import Optional, Literal, List
 from enum import Enum
 import re
 
@@ -356,6 +356,144 @@ class ErrorResponse(BaseModel):
         "json_schema_extra": {
             "examples": [
                 {"detail": "Invalid credentials", "error_code": "AUTH_001"}
+            ]
+        }
+    }
+
+
+# ============================================================================
+# BILLING SCHEMAS
+# ============================================================================
+
+class CreditPackage(BaseModel):
+    """Credit package schema for purchase options."""
+    package_id: str = Field(..., description="Unique package identifier")
+    credits: int = Field(..., gt=0, description="Number of credits in package")
+    stripe_price_id: str = Field(..., description="Stripe Price ID")
+    amount_cents: int = Field(..., gt=0, description="Price in cents")
+    currency: str = Field(default="usd", description="Currency code")
+
+    model_config = {
+        "json_schema_extra": {
+            "examples": [
+                {
+                    "package_id": "pack_5k",
+                    "credits": 5000,
+                    "stripe_price_id": "price_xxx",
+                    "amount_cents": 4499,
+                    "currency": "usd"
+                }
+            ]
+        }
+    }
+
+
+class PackagesResponse(BaseModel):
+    """Response schema for available credit packages."""
+    packages: List["CreditPackage"]
+
+
+class CheckoutRequest(BaseModel):
+    """Request schema for creating checkout session."""
+    package_id: str = Field(..., description="Package ID to purchase")
+
+    @field_validator("package_id")
+    @classmethod
+    def validate_package_id(cls, v: str) -> str:
+        """Validate package_id is not empty."""
+        if not v or not v.strip():
+            raise ValueError("Package ID is required")
+        return v.strip()
+
+
+class CheckoutResponse(BaseModel):
+    """Response schema for checkout session creation."""
+    checkout_url: str = Field(..., description="Stripe checkout URL")
+    session_id: str = Field(..., description="Stripe session ID")
+
+
+class TransactionResponse(BaseModel):
+    """Response schema for a credit transaction."""
+    id: int
+    delta_credits: int
+    type: str
+    reason: Optional[str] = None
+    agent_id: Optional[str] = None
+    tool_id: Optional[str] = None
+    analysis_id: Optional[str] = None
+    created_at: str
+
+    model_config = {"from_attributes": True}
+
+
+class WalletResponse(BaseModel):
+    """Response schema for wallet information."""
+    balance_credits: int = Field(..., description="Current credit balance")
+    status: str = Field(default="active", description="Wallet status")
+    recent_transactions: List[TransactionResponse] = Field(
+        default_factory=list,
+        description="Recent transactions"
+    )
+
+
+class AgentCostResponse(BaseModel):
+    """Response schema for agent cost."""
+    agent_id: str
+    cost: int
+    description: Optional[str] = None
+
+    model_config = {"from_attributes": True}
+
+
+class AgentCostsListResponse(BaseModel):
+    """Response schema for listing agent costs."""
+    agent_costs: List[AgentCostResponse]
+
+
+class UpdateAgentCostRequest(BaseModel):
+    """Request schema for updating agent cost."""
+    cost: int = Field(..., gt=0, description="New cost in credits")
+
+
+class AdminGrantRequest(BaseModel):
+    """Request schema for admin credit grant."""
+    user_id: int = Field(..., description="User ID to grant credits to")
+    amount_credits: int = Field(..., description="Amount of credits to grant (can be negative for deduction)")
+    reason: str = Field(..., min_length=1, max_length=500, description="Reason for grant")
+
+    @field_validator("reason")
+    @classmethod
+    def validate_reason(cls, v: str) -> str:
+        """Validate reason is not empty."""
+        if not v or not v.strip():
+            raise ValueError("Reason is required")
+        return v.strip()
+
+
+class AdminGrantResponse(BaseModel):
+    """Response schema for admin credit grant."""
+    new_balance: int
+    transaction_id: int
+
+
+class BillingErrorResponse(BaseModel):
+    """Error response schema for billing errors."""
+    detail: str
+    error_code: str
+    context: Optional[dict] = None
+
+    model_config = {
+        "json_schema_extra": {
+            "examples": [
+                {
+                    "detail": "Insufficient credits for agent execution",
+                    "error_code": "BILLING_INSUFFICIENT_CREDITS",
+                    "context": {
+                        "agent_id": "semantic-mapper",
+                        "required": 50,
+                        "available": 10
+                    }
+                }
             ]
         }
     }

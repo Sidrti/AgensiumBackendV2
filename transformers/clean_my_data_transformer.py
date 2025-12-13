@@ -25,6 +25,12 @@ from transformers.transformers_utils import (
     persist_downloads_to_outputs,
 )
 
+# Billing imports
+from billing.wallet_service import WalletService
+from billing.agent_costs_service import AgentCostsService
+from billing.exceptions import InsufficientCreditsError, AgentCostNotFoundError, UserWalletNotFoundError
+from db.database import SessionLocal
+
 
 async def run_clean_my_data_analysis(
     tool_id: str,
@@ -100,25 +106,81 @@ async def run_clean_my_data_analysis(
         
         agent_results = {}
         
-        for agent_id in agents_to_run:
+        # Initialize billing services if user is authenticated
+        billing_enabled = current_user is not None and hasattr(current_user, 'id')
+        db_session = None
+        wallet_service = None
+        
+        if billing_enabled:
             try:
-                # Build agent-specific input
-                agent_input = _build_agent_input(agent_id, files_map, parameters, tool_def)
-                
-                # Execute agent
-                result = _execute_agent(agent_id, agent_input)
-                
-                agent_results[agent_id] = result
-                
-                # Update files map for next agent (chaining)
-                _update_files_from_result(files_map, result)
-                
+                db_session = SessionLocal()
+                wallet_service = WalletService(db_session)
             except Exception as e:
-                agent_results[agent_id] = {
-                    "status": "error",
-                    "error": str(e),
-                    "execution_time_ms": 0
-                }
+                print(f"Warning: Could not initialize billing services: {e}")
+                billing_enabled = False
+        
+        try:
+            for agent_id in agents_to_run:
+                try:
+                    # ========== BILLING: Debit credits before agent execution ==========
+                    if billing_enabled and wallet_service:
+                        try:
+                            wallet_service.consume_for_agent(
+                                user_id=current_user.id,
+                                agent_id=agent_id,
+                                tool_id=tool_id,
+                                analysis_id=analysis_id
+                            )
+                            print(f"[Billing] Debited credits for agent: {agent_id}")
+                        except InsufficientCreditsError as e:
+                            # Return error response with billing details
+                            return {
+                                "analysis_id": analysis_id,
+                                "tool": tool_id,
+                                "status": "error",
+                                "error_code": "BILLING_INSUFFICIENT_CREDITS",
+                                "error": e.detail,
+                                "context": e.context,
+                                "execution_time_ms": int((time.time() - start_time) * 1000),
+                                "partial_results": agent_results
+                            }
+                        except AgentCostNotFoundError as e:
+                            # Agent cost not configured - log warning but continue
+                            print(f"Warning: Agent cost not configured for {agent_id}: {e.detail}")
+                        except UserWalletNotFoundError as e:
+                            # User doesn't have a wallet - return error
+                            return {
+                                "analysis_id": analysis_id,
+                                "tool": tool_id,
+                                "status": "error",
+                                "error_code": "BILLING_WALLET_NOT_FOUND",
+                                "error": e.detail,
+                                "context": e.context,
+                                "execution_time_ms": int((time.time() - start_time) * 1000)
+                            }
+                    # ========== END BILLING ==========
+                    
+                    # Build agent-specific input
+                    agent_input = _build_agent_input(agent_id, files_map, parameters, tool_def)
+                    
+                    # Execute agent
+                    result = _execute_agent(agent_id, agent_input)
+                    
+                    agent_results[agent_id] = result
+                    
+                    # Update files map for next agent (chaining)
+                    _update_files_from_result(files_map, result)
+                    
+                except Exception as e:
+                    agent_results[agent_id] = {
+                        "status": "error",
+                        "error": str(e),
+                        "execution_time_ms": 0
+                    }
+        finally:
+            # Clean up database session
+            if db_session:
+                db_session.close()
         
         # Transform results
         return transform_clean_my_data_response(

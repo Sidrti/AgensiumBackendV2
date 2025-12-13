@@ -1,0 +1,33 @@
+{
+  "packages": [
+    {
+      "package_id": "pack_1k",
+      "credits": 1000,
+      "stripe_price_id": "price_1SdphsCVoGfYO8iQE1kdeQ3M",
+      "amount_cents": 999,
+      "currency": "usd",
+      "description": "1,000 Credits - Starter Pack"
+    },
+    {
+      "package_id": "pack_5k",
+      "credits": 5000,
+      "stripe_price_id": "price_1Sdpk5CVoGfYO8iQECACLoPb",
+      "amount_cents": 4499,
+      "currency": "usd",
+      "description": "5,000 Credits - Standard Pack"
+    },
+    {
+      "package_id": "pack_10k",
+      "credits": 10000,
+      "stripe_price_id": "price_1SdplHCVoGfYO8iQT6f3Es2w",
+      "amount_cents": 8999,
+      "currency": "usd",
+      "description": "10,000 Credits - Professional Pack"
+    }
+  ],
+  "metadata": {
+    "version": "1.0",
+    "last_updated": "2025-01-10",
+    "notes": "Update stripe_price_id values with actual Stripe Price IDs from your Stripe Dashboard"
+  }
+}

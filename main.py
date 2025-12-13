@@ -24,6 +24,8 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from api import router
 from auth.router import router as auth_router
+from billing.router import router as billing_router
+from billing.exceptions import BillingException
 from db import models, database
 from fastapi.responses import JSONResponse
 from auth.exceptions import AuthException
@@ -54,14 +56,13 @@ load_dotenv()
 
 # Configure CORS
 # Use an environment variable for best practice
-# FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:5173") 
-
+FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:5173")
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "http://localhost:5173",  # Local development URL
-        "https://agensium2.netlify.app" # The specific URL causing the error
+        FRONTEND_URL  # Production frontend URL from environment
     ],
     allow_credentials=True,
     allow_methods=["*"],
@@ -105,6 +106,7 @@ if not TOOL_DEFINITIONS:
 # Include API routes
 app.include_router(router)
 app.include_router(auth_router)
+app.include_router(billing_router)
 
 
 # Global handler for AuthException so responses include the configured error_code
@@ -116,6 +118,18 @@ async def handle_auth_exception(request, exc: AuthException):
     # Use the headers if present
     headers = exc.headers if getattr(exc, "headers", None) else None
     return JSONResponse(status_code=exc.status_code, content=content, headers=headers)
+
+
+# Global handler for BillingException so responses include error_code and context
+@app.exception_handler(BillingException)
+async def handle_billing_exception(request, exc: BillingException):
+    content = {
+        "detail": exc.detail,
+        "error_code": exc.error_code,
+    }
+    if exc.context:
+        content["context"] = exc.context
+    return JSONResponse(status_code=exc.status_code, content=content)
 
 
 # ============================================================================
