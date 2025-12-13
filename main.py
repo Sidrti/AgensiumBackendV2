@@ -56,13 +56,13 @@ load_dotenv()
 
 # Configure CORS
 # Use an environment variable for best practice
-FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:5173")
+# FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:5173")
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "http://localhost:5173",  # Local development URL
-        FRONTEND_URL  # Production frontend URL from environment
+        "https://agensium2.netlify.app"  # Production frontend URL from environment
     ],
     allow_credentials=True,
     allow_methods=["*"],
