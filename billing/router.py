@@ -44,6 +44,8 @@ router = APIRouter(prefix="/billing", tags=["billing"])
 
 # Environment variables for URLs
 FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:5173")
+STRIPE_SUCCESS_URL = os.getenv("STRIPE_SUCCESS_URL", f"{FRONTEND_URL}/billing/success")
+STRIPE_CANCEL_URL = os.getenv("STRIPE_CANCEL_URL", f"{FRONTEND_URL}/billing/cancel")
 
 
 # ============================================================================
@@ -236,8 +238,8 @@ async def create_checkout_session(
     stripe_service = StripeService(db)
     
     # Build success/cancel URLs
-    success_url = f"{FRONTEND_URL}/billing/success?session_id={{CHECKOUT_SESSION_ID}}"
-    cancel_url = f"{FRONTEND_URL}/billing/cancel"
+    success_url = f"{STRIPE_SUCCESS_URL}?session_id={{CHECKOUT_SESSION_ID}}"
+    cancel_url = STRIPE_CANCEL_URL
     
     result = stripe_service.create_checkout_session(
         user=current_user,
