@@ -2,13 +2,15 @@
 Authentication API routes.
 All input validation is handled by Pydantic schemas - routes stay clean.
 """
-from fastapi import APIRouter, Depends, status
+import logging
+from fastapi import APIRouter, Depends, status, BackgroundTasks
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 from datetime import timedelta
 
 from db.database import get_db
 from db import models, schemas
+from email_services.email_service import EmailService, get_email_service
 from . import utils, dependencies
 from .exceptions import (
     InvalidCredentialsException,
@@ -21,6 +23,8 @@ from .exceptions import (
     OTPTypeMismatchException,
     PasswordMismatchException
 )
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 
@@ -36,9 +40,11 @@ router = APIRouter(prefix="/auth", tags=["Authentication"])
     summary="Register a new user",
     description="Register a new user account. An OTP will be sent for email verification."
 )
-def register_user(
+async def register_user(
     user: schemas.UserCreate,  # Validation happens here automatically!
-    db: Session = Depends(get_db)
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+    email_service: EmailService = Depends(get_email_service)
 ):
     """
     Register a new user with email verification.
@@ -46,7 +52,7 @@ def register_user(
     - Validates input via Pydantic schema
     - Checks for duplicate email
     - Creates user with is_verified=False
-    - Generates and returns OTP for verification
+    - Sends OTP via email for verification
     """
     # Check if email already exists
     existing_user = db.query(models.User).filter(
@@ -76,16 +82,22 @@ def register_user(
     db.commit()
     db.refresh(db_user)
 
-    # TODO: Send OTP via email service
-    # await send_otp_email(user.email, otp_code)
+    # Send OTP via email (non-blocking)
+    background_tasks.add_task(
+        email_service.send_otp_email,
+        to_email=db_user.email,
+        to_name=db_user.full_name,
+        otp_code=otp_code,
+        otp_type="registration"
+    )
 
     return schemas.RegisterResponse(
         id=db_user.id,
         email=db_user.email,
         full_name=db_user.full_name,
         is_active=db_user.is_active,
-        message="Registration successful. Please verify your email with the OTP sent.",
-        otp=otp_code,  # Remove in production - only for testing
+        message="Registration successful. Please check your email for the OTP.",
+        otp=otp_code,  # TODO: Remove in production - only for testing
         otp_type="registration"
     )
 
@@ -96,9 +108,11 @@ def register_user(
     summary="Verify OTP",
     description="Verify OTP for email verification or password reset."
 )
-def verify_otp(
+async def verify_otp(
     data: schemas.VerifyOTP,  # Validation happens here automatically!
-    db: Session = Depends(get_db)
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+    email_service: EmailService = Depends(get_email_service)
 ):
     """
     Verify OTP for registration or password reset.
@@ -106,7 +120,7 @@ def verify_otp(
     - Validates OTP format via Pydantic
     - Checks OTP existence and expiry
     - Validates OTP type matches expected flow
-    - For registration: marks user as verified
+    - For registration: marks user as verified and sends welcome email
     - For password_reset: confirms OTP is valid for reset
     """
     user = db.query(models.User).filter(
@@ -137,6 +151,13 @@ def verify_otp(
         user.otp_type = None
         db.commit()
 
+        # Send welcome email (non-blocking)
+        background_tasks.add_task(
+            email_service.send_welcome_email,
+            to_email=user.email,
+            to_name=user.full_name
+        )
+
         return schemas.GenericResponse(
             message="Email verified successfully. You can now login."
         )
@@ -156,16 +177,18 @@ def verify_otp(
     summary="Resend OTP",
     description="Resend OTP for email verification or password reset."
 )
-def resend_otp(
+async def resend_otp(
     data: schemas.ResendOTP,
-    db: Session = Depends(get_db)
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+    email_service: EmailService = Depends(get_email_service)
 ):
     """
     Resend OTP to user's email.
 
     - Generates new OTP
     - Updates expiry time
-    - Maintains same OTP type
+    - Sends OTP via email
     """
     user = db.query(models.User).filter(
         models.User.email == data.email
@@ -190,11 +213,18 @@ def resend_otp(
     user.otp_type = data.otp_type
     db.commit()
 
-    # TODO: Send OTP via email service
+    # Send OTP via email (non-blocking)
+    background_tasks.add_task(
+        email_service.send_otp_email,
+        to_email=user.email,
+        to_name=user.full_name,
+        otp_code=otp_code,
+        otp_type=data.otp_type
+    )
 
     return schemas.GenericResponse(
         message="OTP sent to your email.",
-        otp=otp_code,  # Remove in production
+        otp=otp_code,  # TODO: Remove in production
         otp_type=data.otp_type
     )
 
@@ -209,14 +239,17 @@ def resend_otp(
     summary="Request password reset",
     description="Request a password reset OTP."
 )
-def forgot_password(
+async def forgot_password(
     data: schemas.ForgotPassword,
-    db: Session = Depends(get_db)
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+    email_service: EmailService = Depends(get_email_service)
 ):
     """
     Request password reset OTP.
 
     - Generates password_reset type OTP
+    - Sends OTP via email
     - Uses consistent response for security (user enumeration protection)
     """
     user = db.query(models.User).filter(
@@ -236,11 +269,18 @@ def forgot_password(
     user.otp_type = "password_reset"
     db.commit()
 
-    # TODO: Send OTP via email service
+    # Send OTP via email (non-blocking)
+    background_tasks.add_task(
+        email_service.send_otp_email,
+        to_email=user.email,
+        to_name=user.full_name,
+        otp_code=otp_code,
+        otp_type="password_reset"
+    )
 
     return schemas.GenericResponse(
         message="Password reset OTP sent to your email.",
-        otp=otp_code,  # Remove in production
+        otp=otp_code,  # TODO: Remove in production
         otp_type="password_reset"
     )
 
@@ -251,9 +291,11 @@ def forgot_password(
     summary="Reset password",
     description="Reset password using OTP."
 )
-def reset_password(
+async def reset_password(
     data: schemas.ResetPassword,  # Password validation via Pydantic!
-    db: Session = Depends(get_db)
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+    email_service: EmailService = Depends(get_email_service)
 ):
     """
     Reset password using OTP.
@@ -261,6 +303,7 @@ def reset_password(
     - Validates new password via Pydantic schema
     - Verifies OTP is valid and correct type
     - Updates password and clears OTP fields
+    - Sends password changed notification email
     """
     user = db.query(models.User).filter(
         models.User.email == data.email
@@ -289,6 +332,13 @@ def reset_password(
     user.otp_type = None
     db.commit()
 
+    # Send password changed notification (non-blocking)
+    background_tasks.add_task(
+        email_service.send_password_changed_email,
+        to_email=user.email,
+        to_name=user.full_name
+    )
+
     return schemas.GenericResponse(
         message="Password reset successfully. Please login with your new password."
     )
@@ -300,10 +350,12 @@ def reset_password(
     summary="Change password",
     description="Change password for logged-in user."
 )
-def change_password(
+async def change_password(
     data: schemas.ChangePassword,  # Validates old != new via Pydantic!
+    background_tasks: BackgroundTasks,
     current_user: models.User = Depends(dependencies.get_current_user),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    email_service: EmailService = Depends(get_email_service)
 ):
     """
     Change password for authenticated user.
@@ -311,12 +363,20 @@ def change_password(
     - Verifies current password
     - Validates new password via Pydantic (including old != new check)
     - Updates password
+    - Sends password changed notification email
     """
     if not utils.verify_password(data.old_password, current_user.hashed_password):
         raise PasswordMismatchException()
 
     current_user.hashed_password = utils.get_password_hash(data.new_password)
     db.commit()
+
+    # Send password changed notification (non-blocking)
+    background_tasks.add_task(
+        email_service.send_password_changed_email,
+        to_email=current_user.email,
+        to_name=current_user.full_name
+    )
 
     return schemas.GenericResponse(
         message="Password changed successfully."
@@ -333,9 +393,11 @@ def change_password(
     summary="Login",
     description="Login to get access token."
 )
-def login(
+async def login(
     form_data: OAuth2PasswordRequestForm = Depends(),
-    db: Session = Depends(get_db)
+    background_tasks: BackgroundTasks = None,
+    db: Session = Depends(get_db),
+    email_service: EmailService = Depends(get_email_service)
 ):
     """
     Authenticate user and return JWT token.
