@@ -20,6 +20,7 @@ class TransactionType(str, enum.Enum):
     CONSUME = "CONSUME"
     REFUND = "REFUND"
     ADJUSTMENT = "ADJUSTMENT"
+    GRANT = "GRANT"
 
 
 class User(Base):
@@ -99,7 +100,7 @@ class CreditTransaction(Base):
     
     # Transaction details
     delta_credits = Column(Integer, nullable=False)  # Positive for credits in, negative for credits out
-    type = Column(String(50), nullable=False)  # PURCHASE, CONSUME, REFUND, ADJUSTMENT
+    type = Column(String(50), nullable=False)  # PURCHASE, CONSUME, REFUND, ADJUSTMENT, GRANT
     reason = Column(String(500), nullable=True)  # Human-readable reason
     
     # Agent execution context (for CONSUME transactions)

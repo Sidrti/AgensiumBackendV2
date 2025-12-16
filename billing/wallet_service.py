@@ -280,6 +280,56 @@ class WalletService:
         
         return transaction
     
+    def grant_credits(
+        self,
+        user_id: int,
+        amount: int,
+        reason: str
+    ) -> CreditTransaction:
+        """
+        Grant free credits to a user (admin function).
+        
+        This is used for promotional credits, compensation, or admin grants.
+        Always adds credits (amount must be positive).
+        
+        Args:
+            user_id: User ID
+            amount: Amount of credits to grant (must be positive)
+            reason: Reason for grant
+            
+        Returns:
+            CreditTransaction record for the grant
+            
+        Raises:
+            ValueError: If amount is not positive
+        """
+        if amount <= 0:
+            raise ValueError("Grant amount must be positive")
+        
+        # Get or create wallet
+        wallet = self.get_or_create_wallet(user_id)
+        
+        # Lock the wallet row
+        wallet = self.db.query(CreditWallet).filter(
+            CreditWallet.user_id == user_id
+        ).with_for_update().first()
+        
+        # Add credits
+        wallet.balance_credits += amount
+        
+        transaction = CreditTransaction(
+            user_id=user_id,
+            delta_credits=amount,
+            type=TransactionType.GRANT.value,
+            reason=reason
+        )
+        self.db.add(transaction)
+        
+        self.db.commit()
+        self.db.refresh(transaction)
+        
+        return transaction
+    
     def add_adjustment(
         self,
         user_id: int,
@@ -289,7 +339,8 @@ class WalletService:
         """
         Add a manual credit adjustment (admin function).
         
-        Can be positive (grant) or negative (deduct).
+        Can be positive (add) or negative (deduct).
+        For free credit grants, prefer using grant_credits() method.
         
         Args:
             user_id: User ID

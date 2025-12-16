@@ -127,29 +127,38 @@ async def get_balance(
     description="Get paginated transaction history"
 )
 async def get_transactions(
-    limit: int = 20,
-    offset: int = 0,
+    page: int = 1,
+    page_size: int = 20,
     transaction_type: Optional[str] = None,
     current_user: models.User = Depends(get_current_active_verified_user),
     db: Session = Depends(get_db)
 ):
     """
-    Get paginated transaction history.
+    Get paginated transaction history using page-based pagination.
     
     Args:
-        limit: Maximum transactions to return (default 20, max 100)
-        offset: Number of transactions to skip
-        transaction_type: Filter by type (PURCHASE, CONSUME, REFUND, ADJUSTMENT)
+        page: Page number (starting from 1, default 1)
+        page_size: Number of transactions per page (default 20, max 100)
+        transaction_type: Filter by type (PURCHASE, CONSUME, REFUND, ADJUSTMENT, GRANT)
     """
-    # Validate limit
-    if limit > 100:
-        limit = 100
+    # Validate page
+    if page < 1:
+        page = 1
+    
+    # Validate page_size
+    if page_size > 100:
+        page_size = 100
+    if page_size < 1:
+        page_size = 1
+    
+    # Calculate offset from page number
+    offset = (page - 1) * page_size
     
     wallet_service = WalletService(db)
     
     transactions = wallet_service.get_transactions(
         user_id=current_user.id,
-        limit=limit,
+        limit=page_size,
         offset=offset,
         transaction_type=transaction_type
     )
@@ -158,6 +167,9 @@ async def get_transactions(
         user_id=current_user.id,
         transaction_type=transaction_type
     )
+    
+    # Calculate total pages
+    total_pages = (total + page_size - 1) // page_size  # Ceiling division
     
     return {
         "transactions": [
@@ -174,8 +186,9 @@ async def get_transactions(
             for t in transactions
         ],
         "total": total,
-        "limit": limit,
-        "offset": offset
+        "page": page,
+        "page_size": page_size,
+        "total_pages": total_pages
     }
 
 
@@ -452,11 +465,19 @@ async def admin_grant_credits(
     
     wallet_service = WalletService(db)
     
-    transaction = wallet_service.add_adjustment(
-        user_id=request.user_id,
-        amount=request.amount_credits,
-        reason=f"Admin adjustment by {current_user.email}: {request.reason}"
-    )
+    # Use grant_credits for positive amounts, add_adjustment for negative
+    if request.amount_credits > 0:
+        transaction = wallet_service.grant_credits(
+            user_id=request.user_id,
+            amount=request.amount_credits,
+            reason=f"Admin grant by {current_user.email}: {request.reason}"
+        )
+    else:
+        transaction = wallet_service.add_adjustment(
+            user_id=request.user_id,
+            amount=request.amount_credits,
+            reason=f"Admin adjustment by {current_user.email}: {request.reason}"
+        )
     
     new_balance = wallet_service.get_balance(request.user_id)
     

@@ -63,6 +63,7 @@ Every balance change is recorded for audit trails:
 | `CONSUME`        | Agent execution deducted credits  |
 | `REFUND`         | Credits returned (support refund) |
 | `ADJUSTMENT`     | Manual correction by admin        |
+| `GRANT`          | Free credits granted by admin     |
 
 ### 3. Agent Cost Table
 
@@ -156,7 +157,7 @@ credit_wallets
 credit_transactions (ledger)
 ├── user_id (FK)
 ├── delta_credits (signed int)
-├── type (ENUM: PURCHASE, CONSUME, REFUND, ADJUSTMENT)
+├── type (ENUM: PURCHASE, CONSUME, REFUND, ADJUSTMENT, GRANT)
 ├── reason (audit trail)
 ├── agent_id, tool_id, analysis_id (nullable)
 ├── stripe_checkout_session_id (nullable, unique)
@@ -210,7 +211,7 @@ class CreditTransaction(Base):
     id = Column(Integer, primary_key=True)
     user_id = Column(Integer, ForeignKey("users.id"), index=True)
     delta_credits = Column(Integer)  # + for purchase, - for consumption
-    type = Column(String)  # PURCHASE, CONSUME, REFUND, ADJUSTMENT
+    type = Column(String)  # PURCHASE, CONSUME, REFUND, ADJUSTMENT, GRANT
     reason = Column(String)
 
     # Agent execution context (audit)
@@ -372,7 +373,7 @@ class AgentCost(Base):
 
 ### 5. (Optional) POST `/billing/admin/grant`
 
-**Purpose:** Manual credit grant for support/refunds
+**Purpose:** Manual credit grant for support/refunds/promotions
 
 **Request:**
 
@@ -392,6 +393,8 @@ class AgentCost(Base):
   "transaction_id": 2
 }
 ```
+
+**Note:** Positive amounts create GRANT transactions, negative amounts create ADJUSTMENT transactions.
 
 ---
 
