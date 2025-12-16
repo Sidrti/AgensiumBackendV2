@@ -414,7 +414,7 @@ class CheckoutResponse(BaseModel):
 
 class TransactionResponse(BaseModel):
     """Response schema for a credit transaction."""
-    id: int
+    id: str  # ULID format (26 chars)
     delta_credits: int
     type: str
     reason: Optional[str] = None
@@ -473,7 +473,7 @@ class AdminGrantRequest(BaseModel):
 class AdminGrantResponse(BaseModel):
     """Response schema for admin credit grant."""
     new_balance: int
-    transaction_id: int
+    transaction_id: str  # ULID format (26 chars)
 
 
 class BillingErrorResponse(BaseModel):

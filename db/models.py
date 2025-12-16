@@ -6,6 +6,7 @@ from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 from .database import Base
 import enum
+import ulid
 
 
 class OTPType(str, enum.Enum):
@@ -95,7 +96,7 @@ class CreditTransaction(Base):
 
     __tablename__ = "credit_transactions"
 
-    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    id = Column(String(26), primary_key=True, index=True, default=lambda: str(ulid.ULID()))
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
     
     # Transaction details

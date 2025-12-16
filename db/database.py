@@ -48,3 +48,13 @@ def get_db():
         yield db
     finally:
         db.close()
+
+
+def get_db_url():
+    """
+    Get the database URL for migrations and scripts.
+    
+    Returns:
+        str: Database connection URL
+    """
+    return SQLALCHEMY_DATABASE_URL

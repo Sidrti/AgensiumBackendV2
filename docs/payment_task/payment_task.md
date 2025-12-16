@@ -205,10 +205,12 @@ class CreditWallet(Base):
 #### Table: `credit_transactions` (NEW)
 
 ```python
+import ulid
+
 class CreditTransaction(Base):
     __tablename__ = "credit_transactions"
 
-    id = Column(Integer, primary_key=True)
+    id = Column(String(26), primary_key=True, index=True, default=lambda: str(ulid.ULID()))  # ULID format
     user_id = Column(Integer, ForeignKey("users.id"), index=True)
     delta_credits = Column(Integer)  # + for purchase, - for consumption
     type = Column(String)  # PURCHASE, CONSUME, REFUND, ADJUSTMENT, GRANT
@@ -226,6 +228,14 @@ class CreditTransaction(Base):
 
     created_at = Column(DateTime, default=func.now())
 ```
+
+**Transaction ID Format:**
+
+- **Type:** ULID (Universally Unique Lexicographically Sortable Identifier)
+- **Length:** 26 characters
+- **Format:** Base32 encoded, time-sortable
+- **Example:** `01KCB7GSN0X1NGASFX0KV4PZ7Q`
+- **Benefits:** Unpredictable (security), globally unique, time-sorted, no sequential exposure
 
 #### Table: `stripe_webhook_events` (NEW)
 
@@ -275,14 +285,14 @@ class AgentCost(Base):
   "status": "active",
   "recent_transactions": [
     {
-      "id": 1,
+      "id": "01KCB7GSN0X1NGASFX0KV4PZ7Q",
       "delta_credits": -50,
       "type": "CONSUME",
       "agent_id": "semantic-mapper",
       "created_at": "2025-01-10T15:30:00Z"
     },
     {
-      "id": 0,
+      "id": "01KCB7JHA8EDHEFKP3R3C04BJ3",
       "delta_credits": 5000,
       "type": "PURCHASE",
       "reason": "Manual top-up",
@@ -390,7 +400,7 @@ class AgentCost(Base):
 ```json
 {
   "new_balance": 5100,
-  "transaction_id": 2
+  "transaction_id": "01KCB7JZZ0F4FFVFKQKV4GWW38"
 }
 ```
 
@@ -801,12 +811,13 @@ async def create_checkout(request: CheckoutRequest, current_user: User):
 ### DevOps & Docs ✅
 
 - [x] `.env` template created
-- [x] `requirements.txt` updated (stripe, alembic)
+- [x] `requirements.txt` updated (stripe, alembic, **python-ulid**)
 - [x] Migration scripts committed
 - [x] Stripe setup documentation written (`payment_task/STRIPE_SETUP_GUIDE.md`)
 - [x] Runbook for agent cost updates created (`payment_task/BILLING_DEPLOYMENT_RUNBOOK.md`)
 - [x] Complete flow example created (`payment_task/payment_task_flow_example.md`)
 - [x] **DATABASE MIGRATION EXECUTED** - All tables created and verified (2025-12-13)
+- [x] **ULID TRANSACTION ID MIGRATION** - Replaced integer IDs with ULID format (2025-12-16)
 
 ---
 
@@ -829,7 +840,40 @@ async def create_checkout(request: CheckoutRequest, current_user: User):
 
 ---
 
-## Quick Reference: ID Normalization & Package Loading
+## Quick Reference: ID Normalization, ULID Format & Package Loading
+
+### Transaction ID Format (ULID)
+
+**What is ULID?**
+
+ULID (Universally Unique Lexicographically Sortable Identifier) is a modern, secure alternative to sequential integer IDs.
+
+```
+ 01KCB7GSN0X1NGASFX0KV4PZ7Q
+ |-------||---------------|
+  Timestamp  Randomness
+  (48 bits)  (80 bits)
+```
+
+**Characteristics:**
+
+- **Length:** 26 characters (Base32 encoded)
+- **Time-sortable:** Lexicographically sorted by creation time
+- **Secure:** Unpredictable randomness prevents enumeration attacks
+- **Unique:** 2^80 random bits = virtually zero collision probability
+- **Privacy:** No sequential number exposure (no business metrics leak)
+
+**Generation Code:**
+
+```python
+from ulid import ULID
+
+# Automatic (SQLAlchemy default)
+id = Column(String(26), primary_key=True, default=lambda: str(ULID()))
+
+# Manual (if needed)
+new_id = str(ULID())  # "01KCKKKY59FH6G2Q53WJDT5RHP"
+```
 
 ### ID Normalization Function
 
