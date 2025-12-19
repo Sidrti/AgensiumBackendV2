@@ -1,0 +1,134 @@
+[
+  {
+    "test": "Environment: AWS_ENDPOINT_URL",
+    "status": "PASS",
+    "message": "https://s3.us-east-0***",
+    "timestamp": "2025-12-19T13:48:29.914648"
+  },
+  {
+    "test": "Environment: AWS_ACCESS_KEY_ID",
+    "status": "PASS",
+    "message": "005fb2e3bbdac0d00000***",
+    "timestamp": "2025-12-19T13:48:29.915088"
+  },
+  {
+    "test": "Environment: AWS_SECRET_ACCESS_KEY",
+    "status": "PASS",
+    "message": "K005zAnnw2vCoHK0jhT+***",
+    "timestamp": "2025-12-19T13:48:29.915448"
+  },
+  {
+    "test": "Environment: AWS_REGION",
+    "status": "PASS",
+    "message": "us-east-005",
+    "timestamp": "2025-12-19T13:48:29.915741"
+  },
+  {
+    "test": "Environment: S3_BUCKET",
+    "status": "PASS",
+    "message": "agensium-files",
+    "timestamp": "2025-12-19T13:48:29.916101"
+  },
+  {
+    "test": "S3 Client Creation",
+    "status": "PASS",
+    "message": "Client initialized for https://s3.us-east-005.backblazeb2.com",
+    "timestamp": "2025-12-19T13:48:30.297842"
+  },
+  {
+    "test": "B2 Connection",
+    "status": "PASS",
+    "message": "Successfully connected to bucket 'agensium-files'",
+    "timestamp": "2025-12-19T13:48:31.980609"
+  },
+  {
+    "test": "Bucket Response",
+    "status": "PASS",
+    "message": "Bucket contains 0 objects",
+    "timestamp": "2025-12-19T13:48:31.980977"
+  },
+  {
+    "test": "Presigned URL Generation",
+    "status": "PASS",
+    "message": "URL generated successfully",
+    "timestamp": "2025-12-19T13:48:31.997291"
+  },
+  {
+    "test": "Upload Key",
+    "status": "PASS",
+    "message": "users/test-user/tasks/test-task-001/inputs/sample_test_data.csv",
+    "timestamp": "2025-12-19T13:48:31.997642"
+  },
+  {
+    "test": "Expiration",
+    "status": "PASS",
+    "message": "900 seconds (15 minutes)",
+    "timestamp": "2025-12-19T13:48:31.997909"
+  },
+  {
+    "test": "File Upload",
+    "status": "PASS",
+    "message": "File uploaded successfully",
+    "timestamp": "2025-12-19T13:48:33.856922"
+  },
+  {
+    "test": "Upload Location",
+    "status": "PASS",
+    "message": "s3://agensium-files/users/test-user/tasks/test-task-001/inputs/sample_test_data.csv",
+    "timestamp": "2025-12-19T13:48:33.857305"
+  },
+  {
+    "test": "Response Code",
+    "status": "PASS",
+    "message": "200",
+    "timestamp": "2025-12-19T13:48:33.857588"
+  },
+  {
+    "test": "File Verification",
+    "status": "PASS",
+    "message": "File exists in bucket",
+    "timestamp": "2025-12-19T13:48:34.336765"
+  },
+  {
+    "test": "File Size",
+    "status": "PASS",
+    "message": "1251 bytes",
+    "timestamp": "2025-12-19T13:48:34.337153"
+  },
+  {
+    "test": "Last Modified",
+    "status": "PASS",
+    "message": "2025-12-19 08:18:33+00:00",
+    "timestamp": "2025-12-19T13:48:34.337494"
+  },
+  {
+    "test": "Download URL Generation",
+    "status": "PASS",
+    "message": "URL generated successfully",
+    "timestamp": "2025-12-19T13:48:34.339523"
+  },
+  {
+    "test": "Download Key",
+    "status": "PASS",
+    "message": "users/test-user/tasks/test-task-001/outputs/output.csv",
+    "timestamp": "2025-12-19T13:48:34.339835"
+  },
+  {
+    "test": "Expiration",
+    "status": "PASS",
+    "message": "3600 seconds (1 hour)",
+    "timestamp": "2025-12-19T13:48:34.340241"
+  },
+  {
+    "test": "Bucket Listing",
+    "status": "PASS",
+    "message": "Found 1 objects",
+    "timestamp": "2025-12-19T13:48:34.804230"
+  },
+  {
+    "test": "Object 1",
+    "status": "PASS",
+    "message": "users/test-user/tasks/test-task-001/inputs/sample_test_data.csv (1251 bytes)",
+    "timestamp": "2025-12-19T13:48:34.804556"
+  }
+]

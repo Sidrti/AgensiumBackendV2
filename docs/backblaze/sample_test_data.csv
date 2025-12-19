@@ -1,0 +1,16 @@
+customer_id,name,email,phone,country,signup_date,subscription_status,monthly_spend
+C001,Alice Johnson,alice@example.com,+1-555-0101,USA,2023-01-15,active,99.99
+C002,Bob Smith,bob@example.com,+1-555-0102,USA,2023-02-20,active,149.99
+C003,Carol Davis,carol@example.com,+1-555-0103,Canada,2023-03-10,inactive,0.00
+C004,David Wilson,david@example.com,+1-555-0104,USA,2023-04-05,active,79.99
+C005,Emma Martinez,emma@example.com,+1-555-0105,Mexico,2023-05-12,active,59.99
+C006,Frank Brown,frank@example.com,+1-555-0106,USA,2023-06-18,inactive,0.00
+C007,Grace Lee,grace@example.com,+1-555-0107,USA,2023-07-22,active,199.99
+C008,Henry Taylor,henry@example.com,+1-555-0108,Canada,2023-08-30,active,89.99
+C009,Iris Anderson,iris@example.com,+1-555-0109,USA,2023-09-14,active,129.99
+C010,Jack Thomas,jack@example.com,+1-555-0110,USA,2023-10-25,inactive,0.00
+C011,Karen White,karen@example.com,+1-555-0111,Mexico,2023-11-08,active,109.99
+C012,Leo Garcia,leo@example.com,+1-555-0112,USA,2023-12-03,active,169.99
+C013,Mary Rodriguez,mary@example.com,+1-555-0113,USA,2024-01-17,active,74.99
+C014,Nathan Harris,nathan@example.com,+1-555-0114,Canada,2024-02-28,active,144.99
+C015,Olivia Clark,olivia@example.com,+1-555-0115,USA,2024-03-11,active,89.99
