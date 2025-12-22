@@ -1,8 +1,8 @@
 # Task Lifecycle - Status Tracking System
 
-**Document Version:** 2.1  
+**Document Version:** 2.1.1  
 **Created:** December 19, 2025  
-**Updated:** December 19, 2025  
+**Updated:** December 20, 2025  
 **Purpose:** Define the complete task lifecycle from creation to completion/failure
 
 ---
@@ -13,10 +13,11 @@
 2. [Status Definitions](#status-definitions)
 3. [State Transitions](#state-transitions)
 4. [Status Flow Diagrams](#status-flow-diagrams)
-5. [Error Handling](#error-handling)
-6. [Progress Tracking](#progress-tracking)
-7. [Timeout & Cleanup](#timeout--cleanup)
-8. [Frontend Integration](#frontend-integration)
+5. [Async Processing](#async-processing)
+6. [Error Handling](#error-handling)
+7. [Progress Tracking](#progress-tracking)
+8. [Timeout & Cleanup](#timeout--cleanup)
+9. [Frontend Integration](#frontend-integration)
 
 ---
 
@@ -320,18 +321,17 @@ EXPIRED ◄─────────────────── PROCESSING
                           - parameters.json to B2
                                     │
                     POST /tasks/:id/process
+                    (Returns immediately)
                                     │
                                     ▼
-                              ┌─────────┐
-                              │ QUEUED  │
-                              └────┬────┘
-                                   │
-                        (In sync V2.1: immediate)
-                                   │
-                                   ▼
                             ┌────────────┐
-                            │ PROCESSING │
+                            │ PROCESSING │ ◄── Backend executes in background
                             └──────┬─────┘
+                                   │
+                          Frontend navigates to
+                          Tasks List page to track
+                                   │
+                          (Backend continues...)
                                    │
                           All agents complete
                           Outputs uploaded to B2
@@ -340,6 +340,32 @@ EXPIRED ◄─────────────────── PROCESSING
                             ┌───────────┐
                             │ COMPLETED │
                             └───────────┘
+```
+
+### Async Processing Flow (V2.1.1)
+
+```
+Frontend                          Backend
+   │                                 │
+   │  POST /tasks/:id/process        │
+   │─────────────────────────────────►│
+   │                                 │ Verify files ✓
+   │                                 │ Set status = PROCESSING
+   │  200 OK (status: PROCESSING)    │ Start background thread
+   │◄─────────────────────────────────│
+   │                                 │
+   │  Navigate to Tasks List         │ ┌─────────────────────┐
+   │                                 │ │ Background Thread   │
+   │                                 │ │ - Execute agents    │
+   │                                 │ │ - Upload outputs    │
+   │                                 │ │ - Update status     │
+   │                                 │ └─────────────────────┘
+   │                                 │
+   │  GET /tasks (from Tasks List)   │
+   │─────────────────────────────────►│
+   │  Task list with statuses        │
+   │◄─────────────────────────────────│
+   │                                 │
 ```
 
 ### Error Paths
@@ -364,6 +390,69 @@ PROCESSING
     ├── Billing error ───► FAILED (error_code: BILLING_INSUFFICIENT_CREDITS)
     │
     └── User cancels ────► CANCELLED
+```
+
+---
+
+## Async Processing
+
+### V2.1.1 Async Model
+
+In V2.1.1, task processing is **asynchronous**:
+
+1. **Immediate Response**: `POST /tasks/{id}/process` returns immediately with status `PROCESSING`
+2. **Background Execution**: Agent execution happens in a background thread on the backend
+3. **Frontend Redirect**: Frontend navigates user to Tasks List page after triggering
+4. **Progress Tracking**: User tracks task progress from the Tasks List page
+
+### Why Async Processing?
+
+| Benefit               | Description                                                   |
+| --------------------- | ------------------------------------------------------------- |
+| **No Timeout Issues** | Long-running tasks don't cause HTTP timeouts                  |
+| **Better UX**         | User isn't stuck waiting on a loading screen                  |
+| **Resumable**         | User can close browser, task continues                        |
+| **Scalable**          | Backend can process multiple tasks concurrently               |
+| **Visibility**        | Tasks List page shows all tasks with real-time status updates |
+
+### Backend Implementation
+
+```python
+@router.post("/{task_id}/process")
+async def trigger_processing(task_id: str, background_tasks: BackgroundTasks, ...):
+    # 1. Verify files exist
+    # 2. Set status to PROCESSING
+    # 3. Start background thread for execution
+    thread = threading.Thread(target=run_background_task, daemon=True)
+    thread.start()
+
+    # 4. Return immediately
+    return TaskResponse(status="PROCESSING", message="Processing started...")
+```
+
+### Frontend Flow
+
+```typescript
+// Simplified TaskProcessing page
+const result = await executeTaskFlowAsync(
+  {
+    toolId,
+    agents,
+    files,
+    parameters,
+  },
+  token,
+  {
+    onStep: (step) => updateUI(step),
+    onUploadProgress: (key, percent) => updateProgress(percent),
+  }
+);
+
+// After triggering, show success message
+showSuccessMessage("Analysis started! Redirecting to Tasks page...");
+
+// Auto-redirect to Tasks List
+setTimeout(() => navigate("/tasks"), 5000);
 ```
 
 ---
@@ -507,34 +596,59 @@ async def cleanup_expired_tasks():
 
 ## Frontend Integration
 
-### Polling Strategy
+### Simplified Task Processing Flow (V2.1.1)
+
+The TaskProcessing page now follows a simplified flow:
 
 ```typescript
-// Frontend polling for task status
-async function pollTaskStatus(taskId: string): Promise<TaskResult> {
-  const POLL_INTERVALS = {
-    UPLOADING: 2000, // 2 seconds
-    QUEUED: 1000, // 1 second
-    PROCESSING: 3000, // 3 seconds
-  };
+// TaskProcessing.jsx - Simplified Flow
+// 1. Create task
+// 2. Get upload URLs
+// 3. Upload files to S3
+// 4. Trigger processing (returns immediately)
+// 5. Show success message
+// 6. Auto-redirect to Tasks List page
 
-  while (true) {
-    const response = await fetch(`/tasks/${taskId}`);
-    const task = await response.json();
-
-    // Update UI with progress
-    updateProgressUI(task.progress, task.status);
-
-    // Check terminal states
-    if (["COMPLETED", "FAILED", "CANCELLED", "EXPIRED"].includes(task.status)) {
-      return task;
+const executeTask = async () => {
+  const result = await executeTaskFlowAsync(
+    { toolId, agents, files, parameters },
+    token,
+    {
+      onStep: (step, data) => {
+        if (step === "created") setTaskId(data.task_id);
+        if (step === "triggered") setIsComplete(true);
+      },
+      onUploadProgress: (key, percent) => setUploadProgress(percent),
     }
+  );
 
-    // Wait before next poll
-    const interval = POLL_INTERVALS[task.status] || 3000;
-    await sleep(interval);
-  }
-}
+  // Success! Navigate to Tasks page
+  navigate("/tasks");
+};
+```
+
+### No Polling Required
+
+Unlike the previous synchronous approach, the frontend does NOT need to poll for status during task creation:
+
+| Previous (V2.1)                        | Current (V2.1.1)                     |
+| -------------------------------------- | ------------------------------------ |
+| Wait on TaskProcessing page            | Redirect to Tasks List immediately   |
+| Poll `GET /tasks/{id}` every 3 seconds | No polling during creation           |
+| Show downloads on completion           | View downloads from TaskDetails page |
+| User stuck on loading screen           | User can browse, start other tasks   |
+
+### Task Status Tracking
+
+Users track task status from the **Tasks List** page:
+
+```typescript
+// TasksList.jsx
+const { data: tasks } = useListTasks({ limit: 20 });
+
+// Shows all tasks with real-time status
+// PROCESSING tasks can be clicked to view details
+// COMPLETED tasks show download button
 ```
 
 ### Complete Upload Flow (Frontend)
@@ -578,18 +692,16 @@ if (parameters && uploads.parameters) {
   });
 }
 
-// 5. Trigger processing
-await fetch(`/tasks/${task_id}/process`, { method: "POST" });
+// 5. Trigger processing (returns immediately!)
+const processResponse = await fetch(`/tasks/${task_id}/process`, {
+  method: "POST",
+});
+// processResponse.status === "PROCESSING"
 
-// 6. Poll for completion
-const result = await pollTaskStatus(task_id);
+// 6. Navigate to Tasks List
+navigate("/tasks");
 
-// 7. Get download URLs
-if (result.status === "COMPLETED") {
-  const downloadsResponse = await fetch(`/tasks/${task_id}/downloads`);
-  const { downloads } = await downloadsResponse.json();
-  // downloads[0].url is presigned download URL
-}
+// User can later check task status and download results from Tasks List
 ```
 
 ### Status Display Mapping
@@ -665,16 +777,18 @@ const STATUS_DISPLAY = {
 4. **Parameters in S3** - Not stored in database, uploaded like files
 5. **Automatic expiry** - Prevent orphaned tasks
 6. **Simplified tracking** - Removed redundant metadata
+7. **Async processing (V2.1.1)** - Backend processes in background, immediate response to frontend
 
 ### Implementation Priority
 
 1. ✅ Basic statuses: CREATED → UPLOADING → QUEUED → PROCESSING → COMPLETED/FAILED
-2. ⬜ Progress tracking during PROCESSING
-3. ⬜ Timeout & cleanup jobs
-4. ⬜ CANCELLED support
+2. ✅ Async processing: Immediate response, background execution
+3. ⬜ Progress tracking during PROCESSING
+4. ⬜ Timeout & cleanup jobs
+5. ⬜ CANCELLED support
 
 ---
 
 **Document Status:** Complete  
-**Last Updated:** December 19, 2025  
-**Version:** 2.1
+**Last Updated:** December 20, 2025  
+**Version:** 2.1.1

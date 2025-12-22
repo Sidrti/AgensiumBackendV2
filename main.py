@@ -23,6 +23,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from api import router
+from api.task_routes import router as task_router  # V2.1: Task API
 from auth.router import router as auth_router
 from billing.router import router as billing_router
 from billing.exceptions import BillingException
@@ -105,6 +106,7 @@ if not TOOL_DEFINITIONS:
 
 # Include API routes
 app.include_router(router)
+app.include_router(task_router)  # V2.1: Task API endpoints
 app.include_router(auth_router)
 app.include_router(billing_router)
 
