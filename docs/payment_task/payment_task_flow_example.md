@@ -363,7 +363,7 @@ id  | stripe_event_id  | event_type                  | processed_at
 
 ---
 
-## 5. Executing an Agent
+## 5. Executing Agents (Upfront Billing)
 
 ### What Happens
 
@@ -402,163 +402,152 @@ golden-record-builder  | 150
 ... (other agents)
 ```
 
-### Before Each Agent Executes
+### Upfront Billing Check (Before ANY Agent Executes)
 
-The transformer loop runs through each agent. **Before executing each agent**, it debits credits:
+The transformer validates and consumes ALL credits **BEFORE** any agent executes. This is an all-or-nothing approach:
 
-```python
+````python
 # clean_my_data_transformer.py
+from billing import BillingContext, InsufficientCreditsError
 
 async def run_clean_my_data_analysis(...):
     current_user = get_current_user()
     tool_id = "clean-my-data"
     agents_to_run = ["semantic-mapper", "null-handler", "contract-enforcer"]
 
-    for agent_id in agents_to_run:
-
-        # STEP 1: LOOKUP COST
-        agent_cost = agent_costs_service.get_agent_cost(agent_id)
-        # Result: 50 (for semantic-mapper)
-
-        # STEP 2: DEBIT CREDITS ATOMICALLY
+    # ========== UPFRONT BILLING (BEFORE ANY AGENT) ==========
+    with BillingContext(current_user) as billing:
         try:
-            wallet_service.consume_for_agent(
-                user_id=current_user.id,  # 1
-                agent_id=agent_id,        # "semantic-mapper"
-                cost=agent_cost.cost,     # 50
-                tool_id=tool_id           # "clean-my-data"
+            # Calculate total: 50 + 30 + 75 = 155 credits
+            # Check if user can afford ALL agents
+            # If YES: Consume ALL credits upfront
+            billing.validate_and_consume_all(
+                agents=agents_to_run,
+                tool_id=tool_id,
+                task_id=task_id
             )
-            # ✅ Debit successful
-        except InsufficientCreditsError:
-            return {
-                "error": "Insufficient credits",
-                "required": 50,
-                "available": wallet.balance_credits,
-                "agent_id": agent_id
-            }
+        except InsufficientCreditsError as e:
+            # ❌ Not enough credits - NO agents run
+            return billing.get_billing_error_response(
+                error=e,
+                task_id=task_id,
+                tool_id=tool_id,
+                start_time=start_time
+            )
+    # ========== END UPFRONT BILLING ==========
 
-        # STEP 3: EXECUTE AGENT (only if debit succeeded)
+    # ✅ All credits consumed - now execute agents
+    for agent_id in agents_to_run:
+        # No billing check here - already paid upfront
         result = _execute_agent(agent_id, agent_input)
         print(f"Agent {agent_id} completed successfully")
 
-        # Next iteration: null-handler (cost 30), contract-enforcer (cost 75), etc.
-```
-
 ---
 
-## 6. Credit Deduction
+## 6. Credit Deduction (Upfront - All at Once)
 
-### Zoom In: `consume_for_agent()` Function
+### Zoom In: `validate_and_consume_all()` Function
 
-This is the **critical billing function** that guarantees no negative balances:
+This is the **critical billing function** that guarantees:
+- No partial execution (all-or-nothing)
+- No negative balances
+- Predictable behavior for users
 
 ```python
-# wallet_service.py
+# billing/billing_context.py
 
-def consume_for_agent(
-    user_id: int,
-    agent_id: str,
-    cost: int,
-    tool_id: str = None
-):
-    """
-    Atomically debit credits for agent execution.
-    Uses row-level locking to prevent race conditions.
-    """
+class BillingContext:
+    def validate_and_consume_all(
+        self,
+        agents: List[str],
+        tool_id: str,
+        task_id: str = None
+    ):
+        """
+        Check affordability for ALL agents, then consume ALL credits upfront.
+        If user can't afford ALL agents, raises InsufficientCreditsError.
+        """
 
-    # BEGIN TRANSACTION (database automatically)
-    with db.transaction():
+        # STEP 1: Check if user can afford ALL agents
+        affordability = self.wallet_service.can_afford_agents(
+            self.user.id,
+            agents
+        )
 
-        # LOCK the wallet row
-        wallet = db.query(CreditWallet).filter(
-            CreditWallet.user_id == user_id
-        ).with_for_update().first()  # ← LOCK
-
-        if wallet is None:
-            raise UserWalletNotFoundError()
-
-        # CHECK: Is there enough balance?
-        if wallet.balance_credits < cost:
+        if not affordability["can_afford"]:
             raise InsufficientCreditsError(
-                available=wallet.balance_credits,
-                required=cost,
-                agent_id=agent_id
+                available=affordability["available"],
+                required=affordability["total_cost"],
+                shortfall=affordability["shortfall"],
+                breakdown=affordability["breakdown"]
             )
 
-        # DEBIT: Subtract credits
-        wallet.balance_credits -= cost
+        # STEP 2: Consume credits for ALL agents (in single loop)
+        for agent_id in agents:
+            cost = affordability["breakdown"][agent_id]
+            self.wallet_service.consume_for_agent(
+                user_id=self.user.id,
+                agent_id=agent_id,
+                cost=cost,
+                tool_id=tool_id,
+                task_id=task_id
+            )
+````
 
-        # AUDIT: Record transaction
-        transaction = CreditTransaction(
-            user_id=user_id,
-            delta_credits=-cost,  # Negative for consumption
-            type="CONSUME",
-            agent_id=agent_id,
-            tool_id=tool_id,
-            reason=f"Agent execution: {agent_id}",
-        )
-        db.add(transaction)
-
-        # COMMIT (automatic at end of context)
-    # END TRANSACTION
-```
-
-### Step-by-Step Debit Example
+### Step-by-Step Upfront Debit Example
 
 **Initial State:** John's wallet has **5,000 credits**
 
-#### Agent 1: `semantic-mapper` (cost: 50)
+**Agents to run:** semantic-mapper (50) + null-handler (30) + contract-enforcer (75) = **155 total**
+
+#### Step 1: Affordability Check
 
 ```
-BEFORE:
-wallet.balance_credits = 5000
+can_afford_agents(["semantic-mapper", "null-handler", "contract-enforcer"])
 
-DURING TRANSACTION:
+Result:
+{
+    "can_afford": true,
+    "available": 5000,
+    "total_cost": 155,
+    "shortfall": 0,
+    "breakdown": {
+        "semantic-mapper": 50,
+        "null-handler": 30,
+        "contract-enforcer": 75
+    }
+}
+```
+
+#### Step 2: Consume All Credits (Single Transaction Loop)
+
+```
+UPFRONT CONSUMPTION:
 1. Lock wallet row
-2. Check: 5000 >= 50? ✅ YES
-3. Debit: 5000 - 50 = 4950
-4. Record: CreditTransaction(delta=-50, type=CONSUME, agent_id="semantic-mapper")
-5. Commit
-
-AFTER:
-wallet.balance_credits = 4950
-```
-
-#### Agent 2: `null-handler` (cost: 30)
-
-```
-BEFORE:
-wallet.balance_credits = 4950
-
-DURING TRANSACTION:
-1. Lock wallet row
-2. Check: 4950 >= 30? ✅ YES
-3. Debit: 4950 - 30 = 4920
-4. Record: CreditTransaction(delta=-30, type=CONSUME, agent_id="null-handler")
-5. Commit
-
-AFTER:
-wallet.balance_credits = 4920
-```
-
-#### Agent 3: `contract-enforcer` (cost: 75)
-
-```
-BEFORE:
-wallet.balance_credits = 4920
-
-DURING TRANSACTION:
-1. Lock wallet row
-2. Check: 4920 >= 75? ✅ YES
-3. Debit: 4920 - 75 = 4845
-4. Record: CreditTransaction(delta=-75, type=CONSUME, agent_id="contract-enforcer")
-5. Commit
+2. Check: 5000 >= 155? ✅ YES
+3. Debit semantic-mapper: 5000 - 50 = 4950
+   Record: CreditTransaction(delta=-50, agent_id="semantic-mapper")
+4. Debit null-handler: 4950 - 30 = 4920
+   Record: CreditTransaction(delta=-30, agent_id="null-handler")
+5. Debit contract-enforcer: 4920 - 75 = 4845
+   Record: CreditTransaction(delta=-75, agent_id="contract-enforcer")
+6. Commit all
 
 AFTER:
 wallet.balance_credits = 4845
 ```
 
+#### Step 3: Execute Agents (No Billing Checks)
+
+```
+# All credits already consumed - just execute
+for agent_id in agents:
+    result = _execute_agent(agent_id)  # No billing check here
+```
+
 **Final Result:** All 3 agents executed successfully. John now has **4,845 credits remaining**.
+
+**Key Difference from Per-Agent Billing:** If John only had 100 credits (not enough for all 3 agents), NO agents would run at all. He would get an error immediately showing he needs 155 credits but only has 100.
 
 ---
 
@@ -684,7 +673,7 @@ async def get_wallet(current_user: User = Depends(get_current_user)):
 
 ---
 
-## 8. Running Out of Credits
+## 8. Running Out of Credits (Upfront Check)
 
 ### What Happens
 
@@ -695,11 +684,11 @@ John wants to run more agents, but has only 4,845 credits. He wants to run:
 
 **Total needed:** 250 credits  
 **Available:** 4,845 credits  
-✅ **Can execute**
+✅ **Can execute (all agents)**
 
 But let's imagine after running more agents, John only has **40 credits left**.
 
-Now he tries to run `golden-record-builder` (costs 150 credits):
+Now he tries to run `golden-record-builder` AND `duplicate-resolver`:
 
 ### API Request
 
@@ -711,50 +700,56 @@ Content-Type: application/json
 {
   "tool_id": "master-my-data",
   "file_path": "/uploads/john_data.csv",
-  "agents_to_run": ["golden-record-builder"]
+  "agents_to_run": ["golden-record-builder", "duplicate-resolver"]
 }
 ```
 
-### Backend Process
+### Backend Process (Upfront Check)
 
 ```python
-# In transformer loop
-for agent_id in ["golden-record-builder"]:
-    agent_cost = agent_costs_service.get_agent_cost("golden-record-builder")
-    # Result: 150
+# BEFORE any agent runs - upfront billing check
+from billing import BillingContext, InsufficientCreditsError
 
+with BillingContext(current_user) as billing:
     try:
-        wallet_service.consume_for_agent(
-            user_id=1,
-            agent_id="golden-record-builder",
-            cost=150,
-            tool_id="master-my-data"
+        # Check ALL agents upfront: 150 + 100 = 250 credits needed
+        # User only has 40 credits
+        billing.validate_and_consume_all(
+            agents=["golden-record-builder", "duplicate-resolver"],
+            tool_id="master-my-data",
+            task_id=task_id
         )
     except InsufficientCreditsError as e:
-        # ❌ REJECTION - Not enough credits
-        return {
-            "error_code": "BILLING_INSUFFICIENT_CREDITS",
-            "detail": "Insufficient credits for agent execution",
-            "required_credits": 150,
-            "available_credits": 40,
-            "agent_id": "golden-record-builder",
-            "tool_id": "master-my-data"
-        }
+        # ❌ IMMEDIATE REJECTION - NO agents run
+        return billing.get_billing_error_response(
+            error=e,
+            task_id=task_id,
+            tool_id="master-my-data",
+            start_time=start_time
+        )
 
-    # Agent does NOT execute if we reach the exception
+# This code NEVER executes if insufficient credits
+for agent_id in agents:
+    result = _execute_agent(agent_id)
 ```
 
-### API Response (Error)
+### API Response (Error - V2.1 Format)
 
 ```json
 {
+  "status": "error",
   "error_code": "BILLING_INSUFFICIENT_CREDITS",
-  "detail": "Insufficient credits for agent execution",
-  "required_credits": 150,
-  "available_credits": 40,
-  "agent_id": "golden-record-builder",
-  "tool_id": "master-my-data",
-  "status_code": 402
+  "error_message": "Insufficient credits for agent execution. Required: 250, Available: 40",
+  "context": {
+    "available": 40,
+    "required": 250,
+    "shortfall": 210,
+    "breakdown": {
+      "golden-record-builder": 150,
+      "duplicate-resolver": 100
+    }
+  },
+  "execution_time_ms": 45
 }
 ```
 
@@ -765,31 +760,47 @@ HTTP/1.1 402 Payment Required
 Content-Type: application/json
 
 {
+  "status": "error",
   "error_code": "BILLING_INSUFFICIENT_CREDITS",
-  ...
+  "error_message": "Insufficient credits for agent execution. Required: 250, Available: 40",
+  "context": {
+    "available": 40,
+    "required": 250,
+    "shortfall": 210,
+    "breakdown": {
+      "golden-record-builder": 150,
+      "duplicate-resolver": 100
+    }
+  }
 }
 ```
 
 ### What John Sees
 
-Frontend detects `402 Payment Required` and displays:
+Frontend detects `402 Payment Required` and displays the full breakdown:
 
 ```
-┌──────────────────────────────────────┐
-│  ❌ Insufficient Credits             │
-├──────────────────────────────────────┤
-│                                      │
-│  You don't have enough credits.      │
-│                                      │
-│  Agent: golden-record-builder        │
-│  Cost: 150 credits                   │
-│  You have: 40 credits                │
-│  Needed: 110 more credits            │
-│                                      │
-│  [ Buy More Credits ]                │
-│                                      │
-└──────────────────────────────────────┘
+┌──────────────────────────────────────────┐
+│  ❌ Insufficient Credits                 │
+├──────────────────────────────────────────┤
+│                                          │
+│  You don't have enough credits           │
+│  to run ALL selected agents.             │
+│                                          │
+│  Agents Selected:                        │
+│  • golden-record-builder: 150 credits    │
+│  • duplicate-resolver: 100 credits       │
+│  ─────────────────────────────────       │
+│  Total Required: 250 credits             │
+│  You Have: 40 credits                    │
+│  Shortfall: 210 credits                  │
+│                                          │
+│  [ Buy More Credits ] [ Select Fewer ]   │
+│                                          │
+└──────────────────────────────────────────┘
 ```
+
+**Key Point:** With upfront billing, John sees the TOTAL cost for ALL agents before any run. He can either buy more credits or select fewer agents.
 
 John clicks "Buy More Credits" and repeats the flow from **Section 3**.
 
@@ -966,15 +977,16 @@ credit_transactions:
 
 ## Summary: Key Principles
 
-| Principle               | How It Works                                                                        |
-| ----------------------- | ----------------------------------------------------------------------------------- |
-| **Prepaid**             | Credits must be purchased before agents run                                         |
-| **Per-Agent Charging**  | Each agent costs a fixed amount (from `agent_costs` table)                          |
-| **Atomic Debits**       | Credits are deducted inside a database transaction with row-level locking           |
-| **No Negative Balance** | If balance < cost, agent is rejected with 402 status                                |
-| **Audit Trail**         | Every credit change is logged in `credit_transactions` table                        |
-| **Stripe Idempotency**  | Webhooks are checked against `stripe_webhook_events` to prevent double-crediting    |
-| **Partial Execution**   | If agent N fails after debit, agents N+1 don't run (but earlier agents already ran) |
+| Principle                | How It Works                                                                     |
+| ------------------------ | -------------------------------------------------------------------------------- |
+| **Prepaid**              | Credits must be purchased before agents run                                      |
+| **Upfront Billing**      | ALL credits are checked and consumed BEFORE any agent executes                   |
+| **All-or-Nothing**       | Either ALL agents run or NONE run (no partial execution)                         |
+| **Atomic Debits**        | Credits are deducted inside a database transaction with row-level locking        |
+| **No Negative Balance**  | If balance < total cost, ALL agents are rejected with 402 status                 |
+| **Full Cost Visibility** | Error response includes breakdown of cost per agent                              |
+| **Audit Trail**          | Every credit change is logged in `credit_transactions` table                     |
+| **Stripe Idempotency**   | Webhooks are checked against `stripe_webhook_events` to prevent double-crediting |
 
 ---
 
@@ -993,15 +1005,19 @@ Agent Costs (from agent_costs table):
 ├── duplicate-resolver:     100 credits
 └── golden-record-builder:  150 credits
 
-John's Journey:
+John's Journey (with Upfront Billing):
 1. Buys pack_5k → Gets 5,000 credits
-2. Runs semantic-mapper → Uses 50 → Balance: 4,950
-3. Runs null-handler → Uses 30 → Balance: 4,920
-4. Runs contract-enforcer → Uses 75 → Balance: 4,845
-5. Tries golden-record-builder (needs 150) → Rejected (only has 40)
-6. Buys more credits to continue
+2. Selects 3 agents: semantic-mapper + null-handler + contract-enforcer
+3. Upfront check: 50 + 30 + 75 = 155 total → Has 5,000 ✅
+4. ALL credits consumed upfront → Balance: 4,845
+5. Agents execute (billing already done)
+6. Later: Tries 2 agents needing 250 credits but only has 40
+7. IMMEDIATE rejection (before any agent runs) with full breakdown
+8. Buys more credits to continue
 ```
+
+**Key Difference:** With upfront billing, John knows the TOTAL cost before ANY agent runs. No partial results, no surprises mid-execution.
 
 ---
 
-**This walkthrough shows the complete user journey from signup through agent execution!**
+**This walkthrough shows the complete user journey from signup through agent execution with upfront billing!**

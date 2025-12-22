@@ -8,7 +8,7 @@ Transformer aggregates these outputs and generates downloads.
 
 import time
 import json
-from typing import Dict, List, Any, Optional
+from typing import Dict, List, Any, Optional, TYPE_CHECKING
 from datetime import datetime
 from fastapi import UploadFile, HTTPException
 
@@ -20,9 +20,12 @@ from transformers.transformers_utils import (
     validate_files,
     read_uploaded_files,
     convert_files_to_csv,
-    persist_downloads_to_outputs,
-    BillingContext,
 )
+from billing import BillingContext, InsufficientCreditsError, UserWalletNotFoundError, AgentCostNotFoundError
+from services.s3_service import s3_service
+
+if TYPE_CHECKING:
+    from db import models
 
 
 async def run_profile_my_data_analysis(
@@ -99,37 +102,41 @@ async def run_profile_my_data_analysis(
         
         agent_results = {}
         
-        # Initialize billing context
+        # ========== UPFRONT BILLING: Check and consume ALL credits before execution ==========
         with BillingContext(current_user) as billing:
-            for agent_id in agents_to_run:
-                try:
-                    # ========== BILLING: Debit credits before agent execution ==========
-                    billing_error = billing.consume_credits_for_agent(
-                        agent_id=agent_id,
-                        tool_id=tool_id,
-                        analysis_id=analysis_id,
-                        start_time=start_time
-                    )
-                    if billing_error:
-                        # Add partial results to error response
-                        billing_error["partial_results"] = agent_results
-                        return billing_error
-                    # ========== END BILLING ==========
-                    
-                    # Build agent-specific input
-                    agent_input = _build_agent_input(agent_id, files_map, parameters, tool_def)
-                    
-                    # Execute agent
-                    result = _execute_agent(agent_id, agent_input)
-                    
-                    agent_results[agent_id] = result
-                    
-                except Exception as e:
-                    agent_results[agent_id] = {
-                        "status": "error",
-                        "error": str(e),
-                        "execution_time_ms": 0
-                    }
+            try:
+                billing_result = billing.validate_and_consume_all(
+                    agents=agents_to_run,
+                    tool_id=tool_id,
+                    task_id=analysis_id
+                )
+                print(f"[Billing] Consumed {billing_result.get('total_consumed', 0)} credits upfront for {len(agents_to_run)} agents")
+            except (InsufficientCreditsError, UserWalletNotFoundError, AgentCostNotFoundError) as e:
+                return billing.get_billing_error_response(
+                    error=e,
+                    task_id=analysis_id,
+                    tool_id=tool_id,
+                    start_time=start_time
+                )
+        # ========== END UPFRONT BILLING ==========
+        
+        # Execute agents (billing already handled)
+        for agent_id in agents_to_run:
+            try:
+                # Build agent-specific input
+                agent_input = _build_agent_input(agent_id, files_map, parameters, tool_def)
+                
+                # Execute agent
+                result = _execute_agent(agent_id, agent_input)
+                
+                agent_results[agent_id] = result
+                
+            except Exception as e:
+                agent_results[agent_id] = {
+                    "status": "error",
+                    "error": str(e),
+                    "execution_time_ms": 0
+                }
         
         # Transform results
         return transform_profile_my_data_response(
@@ -148,6 +155,200 @@ async def run_profile_my_data_analysis(
             "error": str(e),
             "execution_time_ms": int((time.time() - start_time) * 1000)
         }
+
+
+# ============================================================================
+# V2.1 FUNCTION - Read files and parameters from S3
+# ============================================================================
+
+async def run_profile_my_data_analysis_v2_1(
+    task: "models.Task",
+    current_user: Any,
+    db: Any
+) -> Dict[str, Any]:
+    """
+    Execute profile-my-data analysis using S3 files (V2.1).
+    
+    This function reads files AND parameters from Backblaze B2 storage
+    instead of receiving them in the request body.
+    
+    Args:
+        task: Task model with task_id, user_id, tool_id, agents
+        current_user: Current user object
+        db: Database session for updating task progress
+        
+    Returns:
+        Result dict with status and optional error info
+    """
+    from main import TOOL_DEFINITIONS
+    from db.models import TaskStatus
+    import base64
+    
+    start_time = time.time()
+    
+    try:
+        tool_def = TOOL_DEFINITIONS[task.tool_id]
+        
+        # Read input files from S3
+        print(f"[V2.1] Reading input files from S3 for task {task.task_id}")
+        input_files = s3_service.list_input_files(task.user_id, task.task_id)
+        
+        if not input_files:
+            return {
+                "status": "error",
+                "error": "No input files found in S3",
+                "error_code": "NO_INPUT_FILES"
+            }
+        
+        # Build files_map from S3 files
+        files_map = {}
+        for file_info in input_files:
+            filename = file_info['filename']
+            
+            # Determine file key (primary, baseline)
+            file_key = _determine_file_key_v2_1(filename)
+            
+            # Download file content
+            content = s3_service.get_file_bytes(file_info['key'])
+            files_map[file_key] = (content, filename)
+            print(f"[V2.1] Loaded {file_key}: {filename} ({len(content)} bytes)")
+        
+        # Convert files to CSV if needed
+        files_map = convert_files_to_csv(files_map)
+        
+        # Read parameters from S3
+        parameters = s3_service.get_parameters(task.user_id, task.task_id) or {}
+        print(f"[V2.1] Parameters loaded: {list(parameters.keys())}")
+        
+        agent_results = {}
+        agents_completed = 0
+        total_agents = len(task.agents)
+        
+        # ========== UPFRONT BILLING: Check and consume ALL credits before execution ==========
+        with BillingContext(current_user) as billing:
+            try:
+                billing_result = billing.validate_and_consume_all(
+                    agents=task.agents,
+                    tool_id=task.tool_id,
+                    task_id=task.task_id
+                )
+                print(f"[V2.1] Billing: Consumed {billing_result.get('total_consumed', 0)} credits upfront for {len(task.agents)} agents")
+            except (InsufficientCreditsError, UserWalletNotFoundError, AgentCostNotFoundError) as e:
+                return billing.get_billing_error_response(
+                    error=e,
+                    task_id=task.task_id,
+                    tool_id=task.tool_id,
+                    start_time=start_time
+                )
+        # ========== END UPFRONT BILLING ==========
+        
+        # Execute agents (billing already handled)
+        for agent_id in task.agents:
+            try:
+                # Update task progress
+                task.current_agent = agent_id
+                task.progress = 15 + int((agents_completed / total_agents) * 80)
+                db.commit()
+                
+                # Build agent input
+                agent_input = _build_agent_input(agent_id, files_map, parameters, tool_def)
+                
+                # Execute agent
+                result = _execute_agent(agent_id, agent_input)
+                agent_results[agent_id] = result
+                
+                agents_completed += 1
+                print(f"[V2.1] Agent {agent_id} completed ({agents_completed}/{total_agents})")
+                
+            except Exception as e:
+                agent_results[agent_id] = {
+                    "status": "error",
+                    "error": str(e),
+                    "execution_time_ms": 0
+                }
+        
+        # Transform results
+        final_result = transform_profile_my_data_response(
+            agent_results,
+            int((time.time() - start_time) * 1000),
+            task.task_id,
+            current_user
+        )
+        
+        # Upload outputs to S3
+        await _upload_outputs_to_s3_v2_1(
+            task=task,
+            downloads=final_result.get("report", {}).get("downloads", [])
+        )
+        
+        return {"status": "success"}
+        
+    except Exception as e:
+        print(f"[V2.1] Error in profile analysis: {str(e)}")
+        return {
+            "status": "error",
+            "error": str(e),
+            "error_code": "PROCESSING_ERROR"
+        }
+
+
+def _determine_file_key_v2_1(filename: str) -> str:
+    """Determine file key from filename."""
+    lower = filename.lower()
+    if 'baseline' in lower:
+        return 'baseline'
+    return 'primary'
+
+
+async def _upload_outputs_to_s3_v2_1(
+    task: "models.Task",
+    downloads: List[Dict]
+) -> int:
+    """
+    Upload download files to S3.
+    
+    Args:
+        task: Task model
+        downloads: List of download dicts with content_base64 and file_name
+        
+    Returns:
+        Number of files uploaded
+    """
+    import base64
+    
+    uploaded_count = 0
+    
+    for download in downloads:
+        content_b64 = download.get("content_base64")
+        filename = download.get("file_name")
+        
+        if not content_b64 or not filename:
+            continue
+        
+        try:
+            # Decode content
+            content = base64.b64decode(content_b64)
+            
+            # Determine content type
+            if filename.endswith('.xlsx'):
+                content_type = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            elif filename.endswith('.json'):
+                content_type = "application/json"
+            else:
+                content_type = "text/csv"
+            
+            # Build S3 key
+            key = f"{task.get_output_prefix()}{filename}"
+            
+            # Upload
+            s3_service.upload_file(key, content, content_type)
+            uploaded_count += 1
+            print(f"[V2.1] Uploaded output: {filename} ({len(content)} bytes)")
+            
+        except Exception as e:
+            print(f"[V2.1] Error uploading {filename}: {str(e)}")
+    
+    return uploaded_count
 
 
 def _build_agent_input(
@@ -476,16 +677,6 @@ def transform_profile_my_data_response(
         routing_decisions=routing_decisions
     )
 
-    # Persist downloads to disk (best-effort; does not affect API response)
-    # try:
-    #     if current_user is not None and hasattr(current_user, "id"):
-    #         persist_downloads_to_outputs(
-    #             downloads=downloads,
-    #             user_id=current_user.id,
-    #             analysis_id=analysis_id,
-    #         )
-    # except Exception as e:
-    #     print(f"Warning: failed to persist downloads for analysis {analysis_id}: {str(e)}")
     
     # ==================== BUILD FINAL RESPONSE ====================
 

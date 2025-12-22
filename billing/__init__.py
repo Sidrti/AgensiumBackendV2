@@ -6,6 +6,7 @@ This module provides:
 - Stripe integration for payments
 - Agent cost tracking
 - Transaction ledger for audit trails
+- Billing context for task execution
 """
 
 from .exceptions import (
@@ -21,6 +22,7 @@ from .exceptions import (
 from .agent_costs_service import AgentCostsService, normalize_agent_id
 from .wallet_service import WalletService
 from .stripe_service import StripeService, load_credit_packages
+from .billing_context import BillingContext
 
 __all__ = [
     # Exceptions
@@ -35,6 +37,8 @@ __all__ = [
     "AgentCostsService",
     "WalletService",
     "StripeService",
+    # Context
+    "BillingContext",
     # Utilities
     "normalize_agent_id",
     "load_credit_packages",

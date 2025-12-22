@@ -543,14 +543,34 @@ except Exception:
 
 **Deliverables:**
 
-- [x] Billing check added to agent loop
+- [x] Upfront billing check added before agent loop
 - [x] Clear error messages on insufficient credits
 - [x] Atomic wallet debiting with row-level locking implemented
 - [x] 402 Payment Required error handling in place
+- [x] **NO PARTIAL RESULTS** - All-or-nothing billing approach
+
+**Billing Flow:**
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  BEFORE Agent Loop                                               │
+├─────────────────────────────────────────────────────────────────┤
+│  1. Calculate total cost for ALL agents                          │
+│  2. Check if user can afford (WalletService.can_afford_agents)   │
+│  3. If NO: Return BILLING_INSUFFICIENT_CREDITS error immediately │
+│  4. If YES: Consume credits for ALL agents upfront               │
+├─────────────────────────────────────────────────────────────────┤
+│  DURING Agent Loop                                               │
+├─────────────────────────────────────────────────────────────────┤
+│  5. Execute agents one by one (billing already done)             │
+│  6. No billing checks per agent                                  │
+└─────────────────────────────────────────────────────────────────┘
+```
 
 **File to Edit:**
 
 ```
+backend/billing/billing_context.py ✅ (NEW - moved from transformers_utils)
 backend/transformers/clean_my_data_transformer.py ✅
 backend/transformers/master_my_data_transformer.py ✅
 backend/transformers/profile_my_data_transformer.py ✅
@@ -559,20 +579,27 @@ backend/transformers/profile_my_data_transformer.py ✅
 **Code Pattern:**
 
 ```python
-# In _execute_agent loop
-for agent_id in agents_to_run:
-    # Debit before execution
+from billing import BillingContext, InsufficientCreditsError
+
+# BEFORE the agent loop - check and consume ALL credits upfront
+with BillingContext(current_user) as billing:
     try:
-        wallet_service.consume_for_agent(
-            user_id=current_user.id,
-            agent_id=agent_id,
-            tool_id=tool_id
+        billing.validate_and_consume_all(
+            agents=task.agents,
+            tool_id=task.tool_id,
+            task_id=task.task_id
         )
     except InsufficientCreditsError as e:
-        return {"error": "Insufficient credits", "details": e}
+        return billing.get_billing_error_response(
+            error=e,
+            task_id=task.task_id,
+            tool_id=task.tool_id,
+            start_time=start_time
+        )
 
-    # Execute agent
-    _execute_agent(agent_id, agent_input)
+# Execute agents (billing already handled - no per-agent checks)
+for agent_id in task.agents:
+    result = execute_agent(agent_id)
 ```
 
 ---
@@ -609,7 +636,8 @@ for agent_id in agents_to_run:
 backend/
 ├── billing/
 │   ├── __init__.py
-│   ├── credit_packages.json         # Package configuration (NEW)
+│   ├── billing_context.py           # BillingContext for upfront validation (NEW)
+│   ├── credit_packages.json         # Package configuration
 │   ├── router.py                    # FastAPI endpoints
 │   ├── agent_costs_service.py       # Pricing lookup
 │   ├── wallet_service.py            # Wallet & ledger ops
@@ -620,9 +648,10 @@ backend/
 │   ├── schemas.py                   # Pydantic schemas (EDIT)
 │   └── database.py
 ├── transformers/
-│   ├── clean_my_data_transformer.py      # (EDIT)
-│   ├── master_my_data_transformer.py     # (EDIT)
-│   └── profile_my_data_transformer.py    # (EDIT)
+│   ├── clean_my_data_transformer.py      # Uses BillingContext
+│   ├── master_my_data_transformer.py     # Uses BillingContext
+│   ├── profile_my_data_transformer.py    # Uses BillingContext
+│   └── transformers_utils.py             # File utilities only (billing removed)
 ├── api/
 │   └── routes.py                    # Include billing router
 └── main.py                          # (EDIT: include billing router)
