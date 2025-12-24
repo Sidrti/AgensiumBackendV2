@@ -91,15 +91,15 @@ pip install flower==2.0.1
 
 ```powershell
 # Basic startup
-celery -A queue.celery_app flower --port=5555
+celery -A celery_queue.celery_app flower --port=5555
 
 # With authentication
-celery -A queue.celery_app flower \
+celery -A celery_queue.celery_app flower \
     --port=5555 \
     --basic_auth=admin:password
 
 # With broker URL
-celery -A queue.celery_app flower \
+celery -A celery_queue.celery_app flower \
     --port=5555 \
     --broker=redis://localhost:6379/0
 ```
@@ -179,7 +179,7 @@ volumes:
 pip install celery-exporter
 ```
 
-**File:** `queue/metrics.py`
+**File:** `celery_queue/metrics.py`
 
 ```python
 """
@@ -273,7 +273,7 @@ def start_metrics_server(port: int = 9999):
 
 ### Celery Signals for Metrics
 
-**File:** `queue/signals.py`
+**File:** `celery_queue/signals.py`
 
 ```python
 """
@@ -600,7 +600,7 @@ SLOWLOG GET 10
 
 ### Python Redis Health Check
 
-**File:** `queue/health.py`
+**File:** `celery_queue/health.py`
 
 ```python
 """
@@ -755,7 +755,7 @@ def get_queue_stats() -> Dict[str, Any]:
 
 ### Structured Logging Configuration
 
-**File:** `queue/logging_config.py`
+**File:** `celery_queue/logging_config.py`
 
 ```python
 """
@@ -1086,13 +1086,13 @@ app.include_router(health_router)
 
 ```powershell
 # Check if workers are running
-celery -A queue.celery_app status
+celery -A celery_queue.celery_app status
 
 # Check queue depth
 redis-cli LLEN celery
 
 # Check worker logs
-celery -A queue.celery_app worker --loglevel=debug
+celery -A celery_queue.celery_app worker --loglevel=debug
 ```
 
 **Solutions:**
@@ -1149,7 +1149,7 @@ netstat -an | findstr 6379
 
 ```powershell
 # Check worker stats
-celery -A queue.celery_app inspect stats
+celery -A celery_queue.celery_app inspect stats
 ```
 
 **Solutions:**
@@ -1182,3 +1182,4 @@ celery -A queue.celery_app inspect stats
 3. → Configure Grafana dashboards
 4. → Set up alerting
 5. → Proceed to [07_DEPLOYMENT.md](07_DEPLOYMENT.md)
+

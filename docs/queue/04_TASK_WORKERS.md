@@ -82,7 +82,7 @@ async def run_*_analysis_v2_1(task, current_user, db):
 ### Module Structure
 
 ```
-queue/
+celery_queue/
 ├── __init__.py              # Package initialization
 ├── celery_app.py            # Celery application configuration
 ├── celery_config.py         # Celery settings
@@ -135,7 +135,7 @@ queue/
 
 ## Unified Worker Implementation
 
-### File: `queue/celery_app.py`
+### File: `celery_celery_queue/celery_app.py`
 
 ```python
 """
@@ -157,7 +157,7 @@ app.config_from_object('queue.celery_config')
 app.autodiscover_tasks(['queue'])
 ```
 
-### File: `queue/celery_config.py`
+### File: `celery_queue/celery_config.py`
 
 ```python
 """
@@ -204,7 +204,7 @@ broker_transport_options = {
 }
 ```
 
-### File: `queue/tasks.py`
+### File: `celery_queue/tasks.py`
 
 ```python
 """
@@ -226,7 +226,7 @@ from typing import Dict, Any
 from celery import current_task
 from celery.exceptions import SoftTimeLimitExceeded
 
-from queue.celery_app import app
+from celery_queue.celery_app import app
 from db.database import SessionLocal
 from db import models
 from db.models import TaskStatus
@@ -429,7 +429,7 @@ for i, agent_id in enumerate(task.agents):
 
 If you want to report progress to Celery as well (for Flower monitoring):
 
-### File: `queue/progress.py`
+### File: `celery_queue/progress.py`
 
 ```python
 """
@@ -468,7 +468,7 @@ def report_to_celery(
 
 ## Error Handling
 
-### File: `queue/error_handlers.py`
+### File: `celery_queue/error_handlers.py`
 
 ```python
 """
@@ -541,7 +541,7 @@ def classify_error(error: Exception) -> Dict[str, Any]:
 
 ## Callbacks & Hooks
 
-### File: `queue/callbacks.py`
+### File: `celery_queue/callbacks.py`
 
 ````python
 """
@@ -583,13 +583,13 @@ def on_task_retry(sender=None, reason=None, **kwargs):
 
 ## Testing Workers
 
-### File: `tests/queue/test_tasks.py`
+### File: `tests/celery_queue/test_tasks.py`
 
 ```python
 """
 Unit tests for the unified Celery task.
 
-Run with: pytest tests/queue/test_tasks.py -v
+Run with: pytest tests/celery_queue/test_tasks.py -v
 """
 
 import pytest
@@ -673,17 +673,17 @@ cd "c:\Users\VIVEK BANSAL\Desktop\Agensium\Agensium-V2\backend"
 uvicorn main:app --reload --port 8000
 
 # Terminal 2: Start Celery Worker (use --pool=solo on Windows)
-celery -A queue.celery_app worker --loglevel=info --pool=solo
+celery -A celery_queue.celery_app worker --loglevel=info --pool=solo
 
 # Terminal 3: Start Flower (optional, for monitoring)
-celery -A queue.celery_app flower --port=5555
+celery -A celery_queue.celery_app flower --port=5555
 ```
 
 ### Production
 
 ```bash
 # Run multiple workers with concurrency
-celery -A queue.celery_app worker \
+celery -A celery_queue.celery_app worker \
     --loglevel=info \
     --concurrency=4 \
     --max-memory-per-child=400000
@@ -706,7 +706,8 @@ celery -A queue.celery_app worker \
 ## Next Steps
 
 1. ✅ Review unified worker specification
-2. → Create `queue/` directory structure
+2. → Create `celery_queue/` directory structure
 3. → Implement `celery_app.py`, `celery_config.py`, `tasks.py`
 4. → Update `api/task_routes.py` to use Celery
 5. → Proceed to [05_MIGRATION_GUIDE.md](05_MIGRATION_GUIDE.md)
+

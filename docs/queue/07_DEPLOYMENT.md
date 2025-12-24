@@ -102,10 +102,10 @@ pip install -r requirements.txt
 uvicorn main:app --reload --port 8000
 
 # 6. Start Celery Worker (Terminal 2)
-celery -A queue.celery_app worker --loglevel=info --pool=solo
+celery -A celery_queue.celery_app worker --loglevel=info --pool=solo
 
 # 7. Start Flower (Optional, Terminal 3)
-celery -A queue.celery_app flower --port=5555
+celery -A celery_queue.celery_app flower --port=5555
 ```
 
 ### Windows Note
@@ -113,7 +113,7 @@ celery -A queue.celery_app flower --port=5555
 On Windows, use `--pool=solo` for Celery because Windows doesn't support forking:
 
 ```powershell
-celery -A queue.celery_app worker --loglevel=info --pool=solo
+celery -A celery_queue.celery_app worker --loglevel=info --pool=solo
 ```
 
 ---
@@ -145,7 +145,7 @@ Start Command: uvicorn main:app --host 0.0.0.0 --port $PORT
 
 ```
 # Settings
-Start Command: celery -A queue.celery_app worker --loglevel=info --concurrency=4
+Start Command: celery -A celery_queue.celery_app worker --loglevel=info --concurrency=4
 ```
 
 #### Step 3: Add Environment Variables
@@ -195,7 +195,7 @@ If your hosting uses Procfile:
 
 ```procfile
 web: uvicorn main:app --host 0.0.0.0 --port $PORT
-worker: celery -A queue.celery_app worker --loglevel=info --concurrency=4
+worker: celery -A celery_queue.celery_app worker --loglevel=info --concurrency=4
 ```
 
 ---
@@ -269,10 +269,10 @@ ENVIRONMENT=production
 
 ```bash
 # Run 2 worker processes, each with 4 concurrent tasks
-celery -A queue.celery_app worker --loglevel=info --concurrency=4
+celery -A celery_queue.celery_app worker --loglevel=info --concurrency=4
 
 # In another terminal/service
-celery -A queue.celery_app worker --loglevel=info --concurrency=4
+celery -A celery_queue.celery_app worker --loglevel=info --concurrency=4
 ```
 
 ### Recommended Configuration
@@ -293,7 +293,7 @@ Flower provides a web UI to monitor Celery tasks.
 
 ```powershell
 # Start Flower on port 5555
-celery -A queue.celery_app flower --port=5555
+celery -A celery_queue.celery_app flower --port=5555
 
 # Open in browser
 start http://localhost:5555
@@ -306,7 +306,7 @@ start http://localhost:5555
 Railway/Render:
 
 ```
-Start Command: celery -A queue.celery_app flower --port=$PORT --basic_auth=admin:password
+Start Command: celery -A celery_queue.celery_app flower --port=$PORT --basic_auth=admin:password
 ```
 
 **Option 2: Use Flower Cloud** (if available)
@@ -326,7 +326,7 @@ Start Command: celery -A queue.celery_app flower --port=$PORT --basic_auth=admin
 
 ```powershell
 # Check for errors
-celery -A queue.celery_app worker --loglevel=debug --pool=solo
+celery -A celery_queue.celery_app worker --loglevel=debug --pool=solo
 ```
 
 **Common issues:**
@@ -382,10 +382,10 @@ print(r.ping())  # Should print True
 uvicorn main:app --reload --port 8000
 
 # Terminal 2: Celery Worker
-celery -A queue.celery_app worker --loglevel=info --pool=solo
+celery -A celery_queue.celery_app worker --loglevel=info --pool=solo
 
 # Terminal 3 (optional): Flower
-celery -A queue.celery_app flower --port=5555
+celery -A celery_queue.celery_app flower --port=5555
 ```
 
 ### Production Checklist

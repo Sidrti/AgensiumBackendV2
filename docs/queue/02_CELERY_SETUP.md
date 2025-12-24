@@ -319,7 +319,7 @@ if __name__ == "__main__":
 
 ## Task Definitions
 
-### File: `queue/__init__.py`
+### File: `celery_queue/__init__.py`
 
 ```python
 """
@@ -338,7 +338,7 @@ __all__ = [
 ]
 ```
 
-### File: `queue/tasks.py`
+### File: `celery_queue/tasks.py`
 
 ```python
 """
@@ -828,3 +828,4 @@ worker_max_tasks_per_child = 50  # Restart worker after 50 tasks
 1. ✅ Complete Celery setup
 2. → Proceed to [03_REDIS_SETUP.md](03_REDIS_SETUP.md) for Redis installation
 3. → Proceed to [05_MIGRATION_GUIDE.md](05_MIGRATION_GUIDE.md) for code migration
+

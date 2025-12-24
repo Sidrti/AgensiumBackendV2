@@ -4,10 +4,11 @@ Task API Routes for V2.1 Architecture
 Endpoints for task-based file processing with Backblaze B2 integration.
 Key changes:
 - Skip QUEUED status, go directly to PROCESSING after trigger
-- Processing happens in background thread, immediate response returned to frontend
+- Processing happens in background thread OR Celery queue (based on USE_CELERY env var)
 - Frontend should poll /tasks/{id} or track from tasks list page
 """
 
+import os
 import uuid
 import asyncio
 import threading
@@ -25,6 +26,29 @@ from services.s3_service import s3_service
 
 
 router = APIRouter(prefix="/tasks", tags=["tasks"])
+
+
+# =============================================================================
+# CELERY CONFIGURATION
+# =============================================================================
+
+def use_celery() -> bool:
+    """Check if Celery queue should be used for task processing."""
+    return os.getenv("USE_CELERY", "false").lower() in ("true", "1", "yes")
+
+
+def send_to_celery(task_id: str, user_id: int) -> str:
+    """
+    Send task to Celery queue for processing.
+    
+    Returns:
+        Celery task ID
+    """
+    from celery_queue.tasks import process_analysis
+    
+    celery_task = process_analysis.delay(task_id, user_id)
+    print(f"[Celery] Task {task_id} queued with Celery task ID: {celery_task.id}")
+    return celery_task.id
 
 
 # ============================================================================
@@ -249,7 +273,11 @@ async def trigger_processing(
         )
 
     # Skip QUEUED - go directly to PROCESSING (V2.1 simplification)
-    task.status = TaskStatus.PROCESSING.value
+    # Note: When using Celery, we set QUEUED first, then Celery worker sets PROCESSING
+    if use_celery():
+        task.status = TaskStatus.QUEUED.value
+    else:
+        task.status = TaskStatus.PROCESSING.value
     task.processing_started_at = datetime.now(timezone.utc)
     task.progress = 15  # Files verified
     db.commit()
@@ -258,21 +286,45 @@ async def trigger_processing(
     # Store user ID for background task (we can't use current_user in background)
     user_id = current_user.id
 
-    # Execute processing in background thread
-    def run_background_task():
-        """Run the task execution in a separate thread with its own DB session."""
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
+    # Choose processing method based on USE_CELERY flag
+    if use_celery():
+        # Use Celery queue for processing
         try:
-            loop.run_until_complete(_execute_task_background(task_id, user_id))
-        finally:
-            loop.close()
+            celery_task_id = send_to_celery(task_id, user_id)
+            message = f"Task queued for processing. Celery task ID: {celery_task_id}"
+        except Exception as e:
+            print(f"[Celery] Failed to queue task: {e}. Falling back to threading.")
+            # Fallback to threading if Celery fails
+            task.status = TaskStatus.PROCESSING.value
+            db.commit()
+            
+            def run_background_task():
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+                try:
+                    loop.run_until_complete(_execute_task_background(task_id, user_id))
+                finally:
+                    loop.close()
 
-    # Start background thread
-    thread = threading.Thread(target=run_background_task, daemon=True)
-    thread.start()
+            thread = threading.Thread(target=run_background_task, daemon=True)
+            thread.start()
+            message = "Processing started (fallback to threading)."
+    else:
+        # Use threading for processing (original behavior)
+        def run_background_task():
+            """Run the task execution in a separate thread with its own DB session."""
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            try:
+                loop.run_until_complete(_execute_task_background(task_id, user_id))
+            finally:
+                loop.close()
 
-    # Return immediately with PROCESSING status
+        thread = threading.Thread(target=run_background_task, daemon=True)
+        thread.start()
+        message = "Processing started. Track progress from the Tasks page."
+
+    # Return immediately with current status
     return schemas.TaskResponse(
         task_id=task.task_id,
         status=schemas.TaskStatusEnum(task.status),
@@ -282,7 +334,7 @@ async def trigger_processing(
         created_at=task.created_at,
         processing_started_at=task.processing_started_at,
         downloads_available=False,
-        message="Processing started. Track progress from the Tasks page."
+        message=message
     )
 
 

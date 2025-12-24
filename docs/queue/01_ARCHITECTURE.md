@@ -196,7 +196,7 @@ So instead of creating separate worker classes, the unified worker:
 
 ## Component Design
 
-### 1. Celery Application (`queue/celery_app.py`)
+### 1. Celery Application (`celery_celery_queue/celery_app.py`)
 
 Central configuration for Celery workers:
 
@@ -227,12 +227,12 @@ app.conf.update(
 app.autodiscover_tasks(['queue'])
 ```
 
-### 2. Task Definition (`queue/tasks.py`)
+### 2. Task Definition (`celery_queue/tasks.py`)
 
 Single unified task that routes to existing transformers:
 
 ```python
-from queue.celery_app import app
+from celery_queue.celery_app import app
 from db.database import get_db
 from db.models import Task
 from transformers.profile_my_data_transformer import run_profile_analysis_v2_1
@@ -297,7 +297,7 @@ def process_analysis(self, task_id: str, user_id: int):
 ### 3. Queue Module Structure (Simplified)
 
 ```
-queue/
+celery_queue/
 ├── __init__.py           # Module initialization
 ├── celery_app.py         # Celery application config
 ├── celery_config.py      # Settings (optional, can be in celery_app)
@@ -457,11 +457,11 @@ Example:
 
 ```powershell
 # Start with 1 worker
-celery -A queue.celery_app worker --loglevel=info --concurrency=4
+celery -A celery_queue.celery_app worker --loglevel=info --concurrency=4
 
 # Add more workers as needed (run in separate terminals/services)
-celery -A queue.celery_app worker --loglevel=info --concurrency=4
-celery -A queue.celery_app worker --loglevel=info --concurrency=4
+celery -A celery_queue.celery_app worker --loglevel=info --concurrency=4
+celery -A celery_queue.celery_app worker --loglevel=info --concurrency=4
 ```
 
 On Railway/Render, just add more worker service instances.
@@ -583,3 +583,4 @@ REDIS_URL=rediss://default:PASSWORD@host.upstash.io:6379
 - [Upstash Redis](https://upstash.com/)
 - [Railway](https://railway.app/)
 - [V2_USER_JOURNEY.md](../V2_USER_JOURNEY.md) - Original vision document
+

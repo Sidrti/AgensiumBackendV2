@@ -68,18 +68,18 @@ celery_task_id = result.id
 
 ```powershell
 # Create directory structure
-mkdir -p queue/workers
-touch queue/__init__.py
-touch queue/tasks.py
-touch queue/celery_app.py
-touch queue/celery_config.py
-touch queue/progress.py
-touch queue/error_handlers.py
-touch queue/workers/__init__.py
-touch queue/workers/base_worker.py
-touch queue/workers/profile_worker.py
-touch queue/workers/clean_worker.py
-touch queue/workers/master_worker.py
+mkdir -p celery_queue/workers
+touch celery_queue/__init__.py
+touch celery_queue/tasks.py
+touch celery_celery_queue/celery_app.py
+touch celery_queue/celery_config.py
+touch celery_queue/progress.py
+touch celery_queue/error_handlers.py
+touch celery_queue/workers/__init__.py
+touch celery_queue/workers/base_worker.py
+touch celery_queue/workers/profile_worker.py
+touch celery_queue/workers/clean_worker.py
+touch celery_queue/workers/master_worker.py
 ```
 
 ### Step 1.2: Update requirements.txt
@@ -143,7 +143,7 @@ CELERY_TASK_SOFT_TIME_LIMIT=1500
 
 ### Step 1.5: Create Celery Application
 
-**File:** `queue/celery_app.py`
+**File:** `celery_celery_queue/celery_app.py`
 
 ```python
 """
@@ -184,7 +184,7 @@ if __name__ == "__main__":
 # See 03_REDIS_SETUP.md for installation
 
 # Test Celery worker starts
-celery -A queue.celery_app worker --loglevel=info
+celery -A celery_queue.celery_app worker --loglevel=info
 
 # You should see:
 # [config]
@@ -206,7 +206,7 @@ celery -A queue.celery_app worker --loglevel=info
 
 Create a new module that encapsulates the current execution logic:
 
-**File:** `queue/execution.py`
+**File:** `celery_queue/execution.py`
 
 ```python
 """
@@ -406,7 +406,7 @@ class TaskExecutor:
 
 ### Step 2.2: Create Celery Tasks
 
-**File:** `queue/tasks.py`
+**File:** `celery_queue/tasks.py`
 
 ```python
 """
@@ -535,7 +535,7 @@ def process_master_task(self, task_id: str, user_id: int) -> Dict[str, Any]:
 
 ### Step 3.1: Create Configuration Module
 
-**File:** `queue/config.py`
+**File:** `celery_queue/config.py`
 
 ```python
 """
@@ -595,7 +595,7 @@ def get_queue_config() -> QueueConfig:
 
 ### Step 3.2: Create Dispatcher
 
-**File:** `queue/dispatcher.py`
+**File:** `celery_queue/dispatcher.py`
 
 ```python
 """
@@ -782,7 +782,7 @@ CREATE INDEX idx_tasks_celery_task_id ON tasks(celery_task_id);
 
 ### Step 5.1: Unit Tests
 
-**File:** `tests/queue/test_dispatcher.py`
+**File:** `tests/celery_queue/test_dispatcher.py`
 
 ```python
 """Test task dispatcher."""
@@ -837,16 +837,16 @@ class TestDispatcher:
 docker run -d -p 6379:6379 redis:7-alpine
 
 # Start Celery worker in test mode
-celery -A queue.celery_app worker --loglevel=info --pool=solo
+celery -A celery_queue.celery_app worker --loglevel=info --pool=solo
 
 # Run integration tests
-pytest tests/queue/test_integration.py -v
+pytest tests/celery_queue/test_integration.py -v
 ```
 
 ### Step 5.3: Load Tests
 
 ```python
-# tests/queue/load_test.py
+# tests/celery_queue/load_test.py
 """Load test for queue system."""
 
 import asyncio
@@ -885,7 +885,7 @@ if __name__ == "__main__":
 
 ### Step 6.1: Percentage-Based Rollout
 
-**File:** `queue/config.py` (update)
+**File:** `celery_queue/config.py` (update)
 
 ```python
 import random
@@ -965,7 +965,7 @@ $env:USE_CELERY = "false"
 
 ```python
 # Drain pending tasks before rollback
-from queue.celery_app import celery_app
+from celery_queue.celery_app import celery_app
 
 # Purge all pending tasks (destructive!)
 celery_app.control.purge()
@@ -1053,3 +1053,4 @@ def dispatch_task(task_id: str, user_id: int, tool_id: str):
 1. ✅ Review migration guide
 2. → Implement Phase 1 (infrastructure)
 3. → Proceed to [06_MONITORING.md](06_MONITORING.md) for observability
+
