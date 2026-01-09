@@ -1,0 +1,14 @@
+{
+  "tool": {
+    "id": "workforce-scheduler",
+    "name": "Workforce Scheduler",
+    "description": "",
+    "icon": "📅",
+    "category": "analyze",
+    "isAvailable": false,
+    "version": "1.0.0",
+    "available_agents": [],
+    "files": {}
+  },
+  "agents": {}
+}

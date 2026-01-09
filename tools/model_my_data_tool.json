@@ -1,0 +1,14 @@
+{
+  "tool": {
+    "id": "model-my-data",
+    "name": "Model My Data",
+    "description": "",
+    "icon": "📈",
+    "category": "shape",
+    "isAvailable": false,
+    "version": "1.0.0",
+    "available_agents": [],
+    "files": {}
+  },
+  "agents": {}
+}

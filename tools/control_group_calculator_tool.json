@@ -1,0 +1,14 @@
+{
+  "tool": {
+    "id": "control-group-calculator",
+    "name": "Control Group Calculator",
+    "description": "",
+    "icon": "🧮",
+    "category": "analyze",
+    "isAvailable": false,
+    "version": "1.0.0",
+    "available_agents": [],
+    "files": {}
+  },
+  "agents": {}
+}

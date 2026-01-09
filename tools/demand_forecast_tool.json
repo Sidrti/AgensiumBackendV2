@@ -1,0 +1,14 @@
+{
+  "tool": {
+    "id": "demand-forecast",
+    "name": "Demand Forecast",
+    "description": "",
+    "icon": "📊",
+    "category": "analyze",
+    "isAvailable": false,
+    "version": "1.0.0",
+    "available_agents": [],
+    "files": {}
+  },
+  "agents": {}
+}

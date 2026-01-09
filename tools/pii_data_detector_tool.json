@@ -1,0 +1,14 @@
+{
+  "tool": {
+    "id": "pii-data-detector",
+    "name": "PII Data Detector",
+    "description": "",
+    "icon": "🔒",
+    "category": "govern",
+    "isAvailable": false,
+    "version": "1.0.0",
+    "available_agents": [],
+    "files": {}
+  },
+  "agents": {}
+}

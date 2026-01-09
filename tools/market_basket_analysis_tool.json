@@ -1,0 +1,14 @@
+{
+  "tool": {
+    "id": "market-basket-analysis",
+    "name": "Market Basket Analysis",
+    "description": "",
+    "icon": "🛒",
+    "category": "analyze",
+    "isAvailable": false,
+    "version": "1.0.0",
+    "available_agents": [],
+    "files": {}
+  },
+  "agents": {}
+}

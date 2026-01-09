@@ -1,0 +1,14 @@
+{
+  "tool": {
+    "id": "data-risk-detector",
+    "name": "Data Risk Detector",
+    "description": "",
+    "icon": "⚠️",
+    "category": "govern",
+    "isAvailable": false,
+    "version": "1.0.0",
+    "available_agents": [],
+    "files": {}
+  },
+  "agents": {}
+}

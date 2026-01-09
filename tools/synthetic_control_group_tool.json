@@ -1,0 +1,14 @@
+{
+  "tool": {
+    "id": "synthetic-control-group",
+    "name": "Synthetic Control Group",
+    "description": "",
+    "icon": "🔬",
+    "category": "analyze",
+    "isAvailable": false,
+    "version": "1.0.0",
+    "available_agents": [],
+    "files": {}
+  },
+  "agents": {}
+}
