@@ -1,0 +1,457 @@
+{
+  "tool": {
+    "id": "analyze-my-data",
+    "name": "Analyze My Data",
+    "description": "Business analytics tool for segmentation, market basket & sequence insights, and experimental design. Helps turn transaction datasets into actionable cohorts, product affinities, and test plans.",
+    "icon": "🧭",
+    "category": "analyze",
+    "isAvailable": true,
+    "version": "1.0.0",
+    "available_agents": [
+      "customer-segmentation-agent",
+      "market-basket-sequence-agent",
+      "experimental-design-agent"
+    ],
+    "files": {
+      "primary": {
+        "description": "Transaction-level dataset (required for segmentation and market basket; optional for experimental design)",
+        "required": false,
+        "formats": ["csv", "xlsx", "json"],
+        "max_size_mb": 500
+      }
+    }
+  },
+  "agents": {
+    "customer-segmentation-agent": {
+      "id": "customer-segmentation-agent",
+      "name": "Customer Segmentation Agent",
+      "description": "Classifies customers into value-based or behavior-based segments using decile logic or weighted RFM modeling for targeted strategy and prioritization.",
+      "icon": "👥",
+      "category": "Segmentation",
+      "accuracy": "97%",
+      "features": [
+        "Value Segmentation (Deciles / Quantiles)",
+        "RFM Scoring (Weighted)",
+        "Segment Label Generation",
+        "Contribution Metrics per Segment",
+        "Segment Health Indicators"
+      ],
+      "input": {
+        "type": "CSV, JSON, XLSX"
+      },
+      "version": "1.0.0",
+      "required_files": ["primary"],
+      "parameters": {
+        "mode": {
+          "type": "string",
+          "description": "Segmentation mode",
+          "default": "rfm",
+          "allowed": ["value", "rfm"],
+          "example": "rfm",
+          "show": true,
+          "required": false
+        },
+        "timeframe": {
+          "type": "string",
+          "description": "Time window to analyze",
+          "default": "last_12_months",
+          "allowed": ["ytd", "last_12_months", "custom"],
+          "example": "last_12_months",
+          "show": true,
+          "required": false
+        },
+        "custom_start_date": {
+          "type": "string",
+          "description": "Custom start date (ISO format YYYY-MM-DD). Used only when timeframe=custom.",
+          "default": null,
+          "example": "2025-01-01",
+          "show": true,
+          "required": false
+        },
+        "custom_end_date": {
+          "type": "string",
+          "description": "Custom end date (ISO format YYYY-MM-DD). Used only when timeframe=custom.",
+          "default": null,
+          "example": "2025-12-31",
+          "show": true,
+          "required": false
+        },
+        "metric": {
+          "type": "string",
+          "description": "Value metric to use for value-mode ranking and for the Monetary component in RFM (if present as a column)",
+          "default": "revenue",
+          "allowed": ["revenue", "gross_profit", "margin"],
+          "example": "revenue",
+          "show": true,
+          "required": false
+        },
+        "segment_count": {
+          "type": "integer",
+          "description": "Number of segments to produce",
+          "default": 5,
+          "min": 2,
+          "max": 10,
+          "show": true,
+          "required": false
+        },
+        "customer_id_column": {
+          "type": "string",
+          "description": "Customer identifier column",
+          "default": null,
+          "example": "customer_id",
+          "show": true,
+          "required": true,
+          "columnSelection": true
+        },
+        "transaction_date_column": {
+          "type": "string",
+          "description": "Transaction/order date column",
+          "default": null,
+          "example": "order_date",
+          "show": true,
+          "required": true,
+          "columnSelection": true
+        },
+        "value_column": {
+          "type": "string",
+          "description": "Numeric value column used for Monetary (RFM) and/or Value ranking (e.g., revenue per order)",
+          "default": null,
+          "example": "revenue",
+          "show": true,
+          "required": true,
+          "columnSelection": true
+        },
+        "rfm_recency_weight": {
+          "type": "integer",
+          "description": "Recency weight (0-100). Weights should sum to 100 when mode=rfm.",
+          "default": 33,
+          "min": 0,
+          "max": 100,
+          "show": true,
+          "required": false
+        },
+        "rfm_frequency_weight": {
+          "type": "integer",
+          "description": "Frequency weight (0-100). Weights should sum to 100 when mode=rfm.",
+          "default": 33,
+          "min": 0,
+          "max": 100,
+          "show": true,
+          "required": false
+        },
+        "rfm_monetary_weight": {
+          "type": "integer",
+          "description": "Monetary weight (0-100). Weights should sum to 100 when mode=rfm.",
+          "default": 34,
+          "min": 0,
+          "max": 100,
+          "show": true,
+          "required": false
+        },
+        "rfm_bins": {
+          "type": "integer",
+          "description": "Number of bins (quantiles) for each R/F/M component before weighting",
+          "default": 5,
+          "min": 2,
+          "max": 10,
+          "show": false,
+          "required": false
+        },
+        "excellent_threshold": {
+          "type": "integer",
+          "description": "Score threshold for excellent quality status",
+          "default": 90,
+          "min": 0,
+          "max": 100,
+          "show": false,
+          "required": false
+        },
+        "good_threshold": {
+          "type": "integer",
+          "description": "Score threshold for good quality status",
+          "default": 75,
+          "min": 0,
+          "max": 100,
+          "show": false,
+          "required": false
+        }
+      }
+    },
+    "market-basket-sequence-agent": {
+      "id": "market-basket-sequence-agent",
+      "name": "Market Basket & Sequence Agent",
+      "description": "Finds product co-purchase rules (within basket) and next-purchase sequences (cross transaction) to support bundling, promotions, and intent prediction.",
+      "icon": "🛒",
+      "category": "Association & Sequence",
+      "accuracy": "96%",
+      "features": [
+        "Frequent Itemsets (Apriori / FP-Growth)",
+        "Association Rules (Support/Confidence/Lift)",
+        "Cross-Transaction Sequence Mining",
+        "Next Purchase Prediction",
+        "Graph-ready Output Formatting"
+      ],
+      "input": {
+        "type": "CSV, JSON, XLSX"
+      },
+      "version": "1.0.0",
+      "required_files": ["primary"],
+      "parameters": {
+        "industry": {
+          "type": "string",
+          "description": "Optional industry context to improve recommendations",
+          "default": null,
+          "example": "hardware",
+          "show": true,
+          "required": false
+        },
+        "mode": {
+          "type": "string",
+          "description": "Analysis mode",
+          "default": "within_basket",
+          "allowed": ["within_basket", "cross_transaction"],
+          "example": "within_basket",
+          "show": true,
+          "required": false
+        },
+        "algorithm": {
+          "type": "string",
+          "description": "Frequent itemset mining algorithm",
+          "default": "fp_growth",
+          "allowed": ["apriori", "fp_growth"],
+          "show": false,
+          "required": false
+        },
+        "support": {
+          "type": "float",
+          "description": "Minimum support threshold (0-1)",
+          "default": 0.02,
+          "min": 0,
+          "max": 1,
+          "show": true,
+          "required": false
+        },
+        "confidence": {
+          "type": "float",
+          "description": "Minimum confidence threshold (0-1)",
+          "default": 0.3,
+          "min": 0,
+          "max": 1,
+          "show": true,
+          "required": false
+        },
+        "lift": {
+          "type": "float",
+          "description": "Minimum lift threshold (>= 0)",
+          "default": 1.2,
+          "min": 0,
+          "max": 100,
+          "show": true,
+          "required": false
+        },
+        "gap_days": {
+          "type": "integer",
+          "description": "Maximum time gap (days) between transactions to consider a sequence step (used when mode=cross_transaction)",
+          "default": 14,
+          "min": 0,
+          "max": 365,
+          "show": true,
+          "required": false
+        },
+        "top_n_rules": {
+          "type": "integer",
+          "description": "Max number of rules to return",
+          "default": 50,
+          "min": 1,
+          "max": 500,
+          "show": false,
+          "required": false
+        },
+        "transaction_id_column": {
+          "type": "string",
+          "description": "Transaction/order identifier column (required for within basket)",
+          "default": null,
+          "example": "order_id",
+          "show": true,
+          "required": true,
+          "columnSelection": true
+        },
+        "product_id_column": {
+          "type": "string",
+          "description": "Product identifier column",
+          "default": null,
+          "example": "product_sku",
+          "show": true,
+          "required": true,
+          "columnSelection": true
+        },
+        "customer_id_column": {
+          "type": "string",
+          "description": "Customer identifier column (required for cross_transaction sequences)",
+          "default": null,
+          "example": "customer_id",
+          "show": true,
+          "required": false,
+          "columnSelection": true
+        },
+        "timestamp_column": {
+          "type": "string",
+          "description": "Transaction timestamp/date column (recommended; required for cross_transaction)",
+          "default": null,
+          "example": "order_date",
+          "show": true,
+          "required": false,
+          "columnSelection": true
+        },
+        "min_items_per_transaction": {
+          "type": "integer",
+          "description": "Minimum items per transaction to include in within-basket analysis",
+          "default": 1,
+          "min": 1,
+          "max": 100,
+          "show": false,
+          "required": false
+        },
+        "max_itemset_length": {
+          "type": "integer",
+          "description": "Maximum itemset length to consider",
+          "default": 3,
+          "min": 2,
+          "max": 10,
+          "show": false,
+          "required": false
+        },
+        "excellent_threshold": {
+          "type": "integer",
+          "description": "Score threshold for excellent quality status",
+          "default": 90,
+          "min": 0,
+          "max": 100,
+          "show": false,
+          "required": false
+        },
+        "good_threshold": {
+          "type": "integer",
+          "description": "Score threshold for good quality status",
+          "default": 75,
+          "min": 0,
+          "max": 100,
+          "show": false,
+          "required": false
+        }
+      }
+    },
+    "experimental-design-agent": {
+      "id": "experimental-design-agent",
+      "name": "Experimental Design Agent",
+      "description": "Calculates sample size and power for A/B tests and experimental design. Provides recommended group sizes, minimum detectable effects, and duration guidance.",
+      "icon": "⚗️",
+      "category": "Experimentation",
+      "accuracy": "98%",
+      "features": [
+        "Two-sample Proportions Power Analysis",
+        "Sample Size Recommendations",
+        "Minimum Detectable Effect Estimation",
+        "Allocation Ratio Support"
+      ],
+      "input": {
+        "type": "Numeric inputs (file optional)"
+      },
+      "version": "1.0.0",
+      "required_files": [],
+      "parameters": {
+        "baseline_rate": {
+          "type": "float",
+          "description": "Baseline conversion/response rate (0-1)",
+          "default": 0.032,
+          "min": 0,
+          "max": 1,
+          "example": 0.032,
+          "show": true,
+          "required": true
+        },
+        "effect_size_type": {
+          "type": "string",
+          "description": "Whether the effect size is relative lift or absolute delta",
+          "default": "relative",
+          "allowed": ["relative", "absolute"],
+          "show": true,
+          "required": false
+        },
+        "effect_size": {
+          "type": "float",
+          "description": "Effect size. If relative: 0.15 means +15% lift; if absolute: 0.01 means +1 percentage point.",
+          "default": 0.15,
+          "min": 0,
+          "max": 1,
+          "example": 0.15,
+          "show": true,
+          "required": true
+        },
+        "significance_level": {
+          "type": "float",
+          "description": "Significance level alpha (commonly 0.05 for 95% confidence)",
+          "default": 0.05,
+          "min": 0.0001,
+          "max": 0.2,
+          "example": 0.05,
+          "show": true,
+          "required": false
+        },
+        "power": {
+          "type": "float",
+          "description": "Statistical power (commonly 0.8)",
+          "default": 0.8,
+          "min": 0.5,
+          "max": 0.99,
+          "example": 0.8,
+          "show": true,
+          "required": false
+        },
+        "two_tailed": {
+          "type": "boolean",
+          "description": "Use a two-tailed hypothesis test",
+          "default": true,
+          "show": false,
+          "required": false
+        },
+        "allocation_ratio_test_to_control": {
+          "type": "float",
+          "description": "Allocation ratio (test/control). 1 means equal split.",
+          "default": 1.0,
+          "min": 0.1,
+          "max": 10,
+          "show": false,
+          "required": false
+        },
+        "min_duration_days": {
+          "type": "integer",
+          "description": "Optional minimum test duration guidance (days). If provided with traffic, can estimate feasibility.",
+          "default": null,
+          "min": 1,
+          "max": 365,
+          "show": false,
+          "required": false
+        },
+        "excellent_threshold": {
+          "type": "integer",
+          "description": "Score threshold for excellent quality status",
+          "default": 90,
+          "min": 0,
+          "max": 100,
+          "show": false,
+          "required": false
+        },
+        "good_threshold": {
+          "type": "integer",
+          "description": "Score threshold for good quality status",
+          "default": 75,
+          "min": 0,
+          "max": 100,
+          "show": false,
+          "required": false
+        }
+      }
+    }
+  }
+}
