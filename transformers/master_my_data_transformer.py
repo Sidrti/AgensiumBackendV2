@@ -22,6 +22,10 @@ from transformers.transformers_utils import (
     validate_files,
     read_uploaded_files,
     convert_files_to_csv,
+    determine_file_key,
+    upload_outputs_to_s3,
+    build_agent_input,
+    update_files_from_result
 )
 from billing import BillingContext, InsufficientCreditsError, UserWalletNotFoundError, AgentCostNotFoundError
 from services.s3_service import s3_service
@@ -126,7 +130,7 @@ async def run_master_my_data_analysis(
         for agent_id in agents_to_run:
             try:
                 # Build agent-specific input
-                agent_input = _build_agent_input(agent_id, files_map, parameters, tool_def)
+                agent_input = build_agent_input(agent_id, files_map, parameters, tool_def)
                 
                 # Execute agent
                 result = _execute_agent(agent_id, agent_input)
@@ -134,7 +138,7 @@ async def run_master_my_data_analysis(
                 agent_results[agent_id] = result
                 
                 # Update files map for next agent (chaining)
-                _update_files_from_result(files_map, result)
+                update_files_from_result(files_map, result)
                 
             except Exception as e:
                 agent_results[agent_id] = {
@@ -208,7 +212,7 @@ async def run_master_my_data_analysis_v2_1(
         files_map = {}
         for file_info in input_files:
             filename = file_info['filename']
-            file_key = _determine_file_key_v2_1(filename)
+            file_key = determine_file_key(filename)
             content = s3_service.get_file_bytes(file_info['key'])
             files_map[file_key] = (content, filename)
             print(f"[V2.1] Loaded {file_key}: {filename} ({len(content)} bytes)")
@@ -251,14 +255,14 @@ async def run_master_my_data_analysis_v2_1(
                 db.commit()
                 
                 # Build agent input
-                agent_input = _build_agent_input(agent_id, files_map, parameters, tool_def)
+                agent_input = build_agent_input(agent_id, files_map, parameters, tool_def)
                 
                 # Execute agent
                 result = _execute_agent(agent_id, agent_input)
                 agent_results[agent_id] = result
                 
                 # Update files map for next agent (chaining)
-                _update_files_from_result(files_map, result)
+                update_files_from_result(files_map, result)
                 
                 agents_completed += 1
                 print(f"[V2.1] Agent {agent_id} completed ({agents_completed}/{total_agents})")
@@ -279,7 +283,7 @@ async def run_master_my_data_analysis_v2_1(
         )
         
         # Upload outputs to S3
-        await _upload_outputs_to_s3_v2_1(
+        await upload_outputs_to_s3(
             task=task,
             downloads=final_result.get("report", {}).get("downloads", [])
         )
@@ -293,101 +297,6 @@ async def run_master_my_data_analysis_v2_1(
             "error": str(e),
             "error_code": "PROCESSING_ERROR"
         }
-
-
-def _determine_file_key_v2_1(filename: str) -> str:
-    """Determine file key from filename."""
-    lower = filename.lower()
-    if 'baseline' in lower:
-        return 'baseline'
-    return 'primary'
-
-
-async def _upload_outputs_to_s3_v2_1(
-    task: "models.Task",
-    downloads: List[Dict]
-) -> int:
-    """Upload download files to S3."""
-    uploaded_count = 0
-    
-    for download in downloads:
-        content_b64 = download.get("content_base64")
-        filename = download.get("file_name")
-        
-        if not content_b64 or not filename:
-            continue
-        
-        try:
-            content = base64.b64decode(content_b64)
-            
-            if filename.endswith('.xlsx'):
-                content_type = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-            elif filename.endswith('.json'):
-                content_type = "application/json"
-            else:
-                content_type = "text/csv"
-            
-            key = f"{task.get_output_prefix()}{filename}"
-            s3_service.upload_file(key, content, content_type)
-            uploaded_count += 1
-            print(f"[V2.1] Uploaded output: {filename} ({len(content)} bytes)")
-            
-        except Exception as e:
-            print(f"[V2.1] Error uploading {filename}: {str(e)}")
-    
-    return uploaded_count
-
-
-def _build_agent_input(
-    agent_id: str,
-    files_map: Dict[str, tuple],
-    parameters: Dict[str, Any],
-    tool_def: Dict[str, Any]
-) -> Dict[str, Any]:
-    """Build agent-specific input based on tool definition."""
-    agent_def = tool_def.get("agents", {}).get(agent_id, {})
-    required_files = agent_def.get("required_files", [])
-    
-    # Build files dictionary for agent
-    agent_files = {}
-    for file_key in required_files:
-        if file_key in files_map:
-            agent_files[file_key] = files_map[file_key]
-    
-    # Get agent parameters
-    agent_params = parameters.get(agent_id, {})
-    
-    return {
-        "agent_id": agent_id,
-        "files": agent_files,
-        "parameters": agent_params
-    }
-
-
-def _update_files_from_result(
-    files_map: Dict[str, tuple],
-    result: Dict[str, Any]
-) -> None:
-    """Update files map with cleaned file from agent result."""
-    agent_id = result.get("agent_id", "unknown_agent")
-    
-    if result.get("status") == "success" and "cleaned_file" in result:
-        cleaned_file = result["cleaned_file"]
-        if cleaned_file and "content" in cleaned_file:
-            try:
-                # Decode base64 content
-                new_content = base64.b64decode(cleaned_file["content"])
-                new_filename = cleaned_file.get("filename", "cleaned_data.csv")
-                
-                # Update primary file for next agent
-                files_map["primary"] = (new_content, new_filename)
-                print(f"[{agent_id}] Successfully updated primary file: {new_filename}. New size: {len(new_content)} bytes")
-            except Exception as e:
-                print(f"[{agent_id}] Error updating file from result: {str(e)}")
-                pass
-    else:
-        print(f"[{agent_id}] No cleaned file produced. Continuing with previous file.")
-
 
 def _execute_agent(
     agent_id: str,
@@ -531,7 +440,6 @@ def _execute_agent(
             "error": f"Unknown agent for master-my-data: {agent_id}",
             "execution_time_ms": 0
         }
-
 
 def transform_master_my_data_response(
     agent_results: Dict[str, Any],

@@ -12,7 +12,7 @@ import time
 import numpy as np
 from typing import Dict, Any, Optional
 
-def rate_readiness(
+def execute_readiness_rater(
     file_contents: bytes,
     filename: str,
     parameters: Optional[Dict[str, Any]] = None

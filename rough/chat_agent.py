@@ -1,9 +1,8 @@
 """
-Chat Agent AI - Intelligent Q&A System (OpenRouter Version)
+Chat Agent AI - Intelligent Q&A System
 
-Answers user questions about analysis reports using OpenRouter API.
+Answers user questions about analysis reports using OpenAI's language models.
 Maintains conversation context and provides data-driven insights.
-Supports multiple AI models through OpenRouter's unified interface.
 """
 
 import os
@@ -21,51 +20,41 @@ except ImportError:
 
 
 class ChatAgent:
-    """Intelligent chat agent for answering questions about analysis reports using OpenRouter."""
+    """Intelligent chat agent for answering questions about analysis reports."""
 
     def __init__(
         self,
         api_key: Optional[str] = None,
-        model: str = "xiaomi/mimo-v2-flash:free",
-        site_url: Optional[str] = None,
-        site_name: Optional[str] = None,
+        model: str = "gpt-4o-mini",
     ):
         """
-        Initialize the Chat Agent with OpenRouter.
+        Initialize the Chat Agent.
 
         Args:
-            api_key: OpenRouter API key (defaults to OPENROUTER_API_KEY env var)
-            model: Model name to use (default: xiaomi/mimo-v2-flash:free)
-            site_url: Your site URL for OpenRouter rankings (optional)
-            site_name: Your site name for OpenRouter rankings (optional)
+            api_key: OpenAI API key (defaults to environment variable)
+            model: Model name to use (default: gpt-4o-mini - fast and cost-effective)
         """
         # Prefer provided api_key, fall back to environment variable
-        self.api_key = api_key or os.getenv("OPENROUTER_API_KEY")
+        self.api_key = api_key or os.getenv("OPENAI_API_KEY")
         self.model = model
-        self.site_url = site_url or os.getenv("OPENROUTER_SITE_URL", "https://agensium.app")
-        self.site_name = site_name or os.getenv("OPENROUTER_SITE_NAME", "Agensium")
         self.client = None
         self.use_ai = False
 
         if not self.api_key:
             print(
-                "Info: OPENROUTER_API_KEY not set. Chat will use rule-based responses."
+                "Info: OPENAI_API_KEY not set. Chat will use rule-based responses."
             )
         elif not OPENAI_AVAILABLE:
             print(
-                "Warning: OpenAI package not installed. To enable chat, install 'openai' and set OPENROUTER_API_KEY."
+                "Warning: OpenAI package not installed. To enable chat, install 'openai' and set OPENAI_API_KEY."
             )
         else:
             try:
-                # Initialize OpenAI client with OpenRouter base URL
-                self.client = OpenAI(
-                    base_url="https://openrouter.ai/api/v1",
-                    api_key=self.api_key,
-                )
+                self.client = OpenAI(api_key=self.api_key)
                 self.use_ai = True
-                print(f"Info: OpenRouter client initialized successfully for chat agent with model: {self.model}")
+                print("Info: OpenAI client initialized successfully for chat agent.")
             except Exception as e:
-                print(f"Warning: Failed to initialize OpenRouter client: {str(e)}. Using fallback responses.")
+                print(f"Warning: Failed to initialize OpenAI client: {str(e)}. Using fallback responses.")
                 self.client = None
                 self.use_ai = False
 
@@ -122,7 +111,7 @@ class ChatAgent:
         conversation_history: List[Dict[str, str]],
         start_time: float,
     ) -> Dict[str, Any]:
-        """Get AI-powered answer using OpenRouter API."""
+        """Get AI-powered answer using OpenAI API."""
         try:
             system_prompt = """You are Agensium Co-Pilot, an expert data analyst assistant.
 Analyze the provided report and conversation history to answer questions accurately and concisely.
@@ -144,12 +133,7 @@ Base your answers strictly on the data provided. Be direct, helpful, and brief."
                 }
             )
 
-            # Call OpenRouter API with extra headers
             response = self.client.chat.completions.create(
-                extra_headers={
-                    "HTTP-Referer": self.site_url,  # For rankings on openrouter.ai
-                    "X-Title": self.site_name,       # For rankings on openrouter.ai
-                },
                 model=self.model,
                 messages=messages,
                 temperature=0.3,
@@ -167,7 +151,7 @@ Base your answers strictly on the data provided. Be direct, helpful, and brief."
             }
 
         except Exception as e:
-            print(f"Warning: OpenRouter API call failed in chat agent: {str(e)}. Using fallback response.")
+            print(f"Warning: OpenAI API call failed in chat agent: {str(e)}. Using fallback response.")
             return self._get_fallback_answer(question, report, start_time)
 
     def _get_fallback_answer(

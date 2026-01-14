@@ -9,136 +9,6 @@ from typing import Dict, List, Any, Optional, Union
 from fastapi import UploadFile, HTTPException
 
 
-# ----------------------------
-# Analysis storage helpers
-# ----------------------------
-
-def _uploads_root() -> Path:
-    """Root folder used for persisting inputs/outputs.
-
-    Can be overridden via env var AGENSIUM_UPLOADS_DIR.
-    """
-    root = os.getenv("AGENSIUM_UPLOADS_DIR", "uploads")
-    return Path(root)
-
-
-def _safe_filename(filename: Optional[str], fallback: str = "file") -> str:
-    """Prevent path traversal and normalize empty names."""
-    if not filename:
-        return fallback
-    name = Path(filename).name
-    return name if name else fallback
-
-
-def get_analysis_dirs(
-    user_id: Union[str, int],
-    analysis_id: str,
-    root_dir: Optional[Union[str, Path]] = None
-) -> Dict[str, Path]:
-    """Create (if needed) and return analysis directory paths.
-
-    Layout:
-      uploads/<user_id>/<analysis_id>/inputs
-      uploads/<user_id>/<analysis_id>/outputs
-    """
-    root = Path(root_dir) if root_dir is not None else _uploads_root()
-    analysis_dir = root / str(user_id) / str(analysis_id)
-    inputs_dir = analysis_dir / "inputs"
-    outputs_dir = analysis_dir / "outputs"
-
-    inputs_dir.mkdir(parents=True, exist_ok=True)
-    outputs_dir.mkdir(parents=True, exist_ok=True)
-
-    return {
-        "root": root,
-        "analysis_dir": analysis_dir,
-        "inputs": inputs_dir,
-        "outputs": outputs_dir,
-    }
-
-
-async def save_upload_file(
-    upload_file: UploadFile,
-    dest_path: Union[str, Path],
-    *,
-    chunk_size: int = 1024 * 1024,
-    reset_pointer: bool = True
-) -> int:
-    """Persist an UploadFile to disk efficiently and (optionally) reset its pointer.
-
-    Returns number of bytes written.
-    """
-    dest = Path(dest_path)
-    dest.parent.mkdir(parents=True, exist_ok=True)
-
-    # Ensure we copy from the start.
-    try:
-        await upload_file.seek(0)
-    except Exception:
-        # Some implementations might not support seek; ignore.
-        pass
-
-    bytes_written = 0
-    with open(dest, "wb") as f:
-        while True:
-            chunk = await upload_file.read(chunk_size)
-            if not chunk:
-                break
-            f.write(chunk)
-            bytes_written += len(chunk)
-
-    if reset_pointer:
-        try:
-            await upload_file.seek(0)
-        except Exception:
-            pass
-
-    return bytes_written
-
-
-async def persist_analysis_inputs(
-    *,
-    user_id: Union[str, int],
-    analysis_id: str,
-    primary: Optional[UploadFile] = None,
-    baseline: Optional[UploadFile] = None,
-    parameters_json: Optional[str] = None,
-    root_dir: Optional[Union[str, Path]] = None
-) -> Dict[str, Any]:
-    """Store incoming request inputs under uploads/<user_id>/<analysis_id>/inputs."""
-    dirs = get_analysis_dirs(user_id=user_id, analysis_id=analysis_id, root_dir=root_dir)
-    inputs_dir = dirs["inputs"]
-
-    result: Dict[str, Any] = {
-        "inputs_dir": str(inputs_dir),
-        "primary_path": None,
-        "baseline_path": None,
-        "parameters_path": None,
-        "primary_size": 0,
-        "baseline_size": 0,
-    }
-
-    if primary:
-        primary_name = _safe_filename(primary.filename, "primary")
-        primary_path = inputs_dir / primary_name
-        result["primary_size"] = await save_upload_file(primary, primary_path)
-        result["primary_path"] = str(primary_path)
-
-    if baseline:
-        baseline_name = _safe_filename(baseline.filename, "baseline")
-        baseline_path = inputs_dir / baseline_name
-        result["baseline_size"] = await save_upload_file(baseline, baseline_path)
-        result["baseline_path"] = str(baseline_path)
-
-    if parameters_json is not None:
-        params_path = inputs_dir / "parameters.json"
-        with open(params_path, "w", encoding="utf-8") as f:
-            f.write(parameters_json)
-        result["parameters_path"] = str(params_path)
-
-    return result
-
-
 def get_required_files(tool_id: str, agents: List[str]) -> Dict[str, Dict[str, Any]]:
     """
     Get required files for a tool and agents.
@@ -171,6 +41,116 @@ def get_required_files(tool_id: str, agents: List[str]) -> Dict[str, Dict[str, A
                     required_files[file_key] = tool_files[file_key]
     
     return required_files
+
+
+def determine_file_key(filename: str) -> str:
+    """Determine file key from filename."""
+    lower = filename.lower()
+    if 'baseline' in lower:
+        return 'baseline'
+    return 'primary'
+
+
+async def upload_outputs_to_s3(
+    task: Any,  # models.Task
+    downloads: List[Dict]
+) -> int:
+    """
+    Upload download files to S3.
+    
+    Args:
+        task: Task model
+        downloads: List of download dicts with content_base64 and file_name
+        
+    Returns:
+        Number of files uploaded
+    """
+    from services.s3_service import s3_service
+    
+    uploaded_count = 0
+    
+    for download in downloads:
+        content_b64 = download.get("content_base64")
+        filename = download.get("file_name")
+        
+        if not content_b64 or not filename:
+            continue
+        
+        try:
+            # Decode content
+            content = base64.b64decode(content_b64)
+            
+            # Determine content type
+            if filename.endswith('.xlsx'):
+                content_type = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            elif filename.endswith('.json'):
+                content_type = "application/json"
+            else:
+                content_type = "text/csv"
+            
+            # Build S3 key
+            key = f"{task.get_output_prefix()}{filename}"
+            
+            # Upload
+            s3_service.upload_file(key, content, content_type)
+            uploaded_count += 1
+            print(f"[V2.1] Uploaded output: {filename} ({len(content)} bytes)")
+            
+        except Exception as e:
+            print(f"[V2.1] Error uploading {filename}: {str(e)}")
+    
+    return uploaded_count
+
+
+def build_agent_input(
+    agent_id: str,
+    files_map: Dict[str, tuple],
+    parameters: Dict[str, Any],
+    tool_def: Dict[str, Any]
+) -> Dict[str, Any]:
+    """Build agent-specific input based on tool definition."""
+    agent_def = tool_def.get("agents", {}).get(agent_id, {})
+    required_files = agent_def.get("required_files", [])
+    
+    # Build files dictionary for agent
+    agent_files = {}
+    for file_key in required_files:
+        if file_key in files_map:
+            agent_files[file_key] = files_map[file_key]
+    
+    # Get agent parameters
+    agent_params = parameters.get(agent_id, {})
+    
+    return {
+        "agent_id": agent_id,
+        "files": agent_files,
+        "parameters": agent_params
+    }
+
+
+def update_files_from_result(
+    files_map: Dict[str, tuple],
+    result: Dict[str, Any]
+) -> None:
+    """Update files map with cleaned file from agent result."""
+    agent_id = result.get("agent_id", "unknown_agent")
+    
+    if result.get("status") == "success" and "cleaned_file" in result:
+        cleaned_file = result["cleaned_file"]
+        if cleaned_file and "content" in cleaned_file:
+            try:
+                # Decode base64 content
+                new_content = base64.b64decode(cleaned_file["content"])
+                new_filename = cleaned_file.get("filename", "cleaned_data.csv")
+                
+                # Update primary file for next agent
+                files_map["primary"] = (new_content, new_filename)
+                print(f"[{agent_id}] Successfully updated primary file: {new_filename}. New size: {len(new_content)} bytes")
+            except Exception as e:
+                print(f"[{agent_id}] Error updating file from result: {str(e)}")
+                pass
+    else:
+        print(f"[{agent_id}] No cleaned file produced. Continuing with previous file.")
 
 
 def validate_files(

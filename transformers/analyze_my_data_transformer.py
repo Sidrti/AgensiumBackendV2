@@ -1,7 +1,9 @@
 """
-Profile My Data Transformer
+Analyze My Data Transformer
 
-Consolidates outputs from profiling agents into unified response.
+Consolidates outputs from analytics agents (Customer Segmentation, Market Basket, Experimental Design)
+into unified response. This tool is read-only (does not modify input files).
+
 Agents generate their own alerts, issues, recommendations, executive summaries, and AI analysis.
 Transformer aggregates these outputs and generates downloads.
 """
@@ -13,8 +15,8 @@ from datetime import datetime
 from fastapi import UploadFile, HTTPException
 
 from ai.analysis_summary_ai import AnalysisSummaryAI
-from downloads.profile_my_data_downloads import ProfileMyDataDownloads
-from agents import readiness_rater, unified_profiler, drift_detector, score_risk, governance_checker, test_coverage_agent
+from downloads.analyze_my_data_downloads import AnalyzeMyDataDownloads
+from agents import customer_segmentation_agent
 from transformers.transformers_utils import (
     get_required_files,
     validate_files,
@@ -31,7 +33,7 @@ if TYPE_CHECKING:
     from db import models
 
 
-async def run_profile_my_data_analysis(
+async def run_analyze_my_data_analysis(
     tool_id: str,
     agents: Optional[str],
     parameters_json: Optional[str],
@@ -41,14 +43,14 @@ async def run_profile_my_data_analysis(
     current_user: Any = None
 ) -> Dict[str, Any]:
     """
-    Execute profile-my-data analysis.
+    Execute analyze-my-data analysis.
     
     Args:
         tool_id: Tool identifier
         agents: Comma-separated agent IDs
         parameters_json: JSON string with agent-specific parameters
-        primary: Primary data file
-        baseline: Optional baseline/reference file
+        primary: Primary data file (transaction-level dataset)
+        baseline: Optional baseline/reference file (not typically used for this tool)
         analysis_id: Unique analysis ID
         current_user: Current user object
         
@@ -142,7 +144,7 @@ async def run_profile_my_data_analysis(
                 }
         
         # Transform results
-        return transform_profile_my_data_response(
+        return transform_analyze_my_data_response(
             agent_results,
             int((time.time() - start_time) * 1000),
             analysis_id,
@@ -164,13 +166,13 @@ async def run_profile_my_data_analysis(
 # V2.1 FUNCTION - Read files and parameters from S3
 # ============================================================================
 
-async def run_profile_my_data_analysis_v2_1(
+async def run_analyze_my_data_analysis_v2_1(
     task: "models.Task",
     current_user: Any,
     db: Any
 ) -> Dict[str, Any]:
     """
-    Execute profile-my-data analysis using S3 files (V2.1).
+    Execute analyze-my-data analysis using S3 files (V2.1).
     
     This function reads files AND parameters from Backblaze B2 storage
     instead of receiving them in the request body.
@@ -271,7 +273,7 @@ async def run_profile_my_data_analysis_v2_1(
                 }
         
         # Transform results
-        final_result = transform_profile_my_data_response(
+        final_result = transform_analyze_my_data_response(
             agent_results,
             int((time.time() - start_time) * 1000),
             task.task_id,
@@ -287,12 +289,13 @@ async def run_profile_my_data_analysis_v2_1(
         return {"status": "success"}
         
     except Exception as e:
-        print(f"[V2.1] Error in profile analysis: {str(e)}")
+        print(f"[V2.1] Error in analyze analysis: {str(e)}")
         return {
             "status": "error",
             "error": str(e),
             "error_code": "PROCESSING_ERROR"
         }
+
 
 def _execute_agent(
     agent_id: str,
@@ -302,113 +305,37 @@ def _execute_agent(
     files_map = agent_input.get("files", {})
     parameters = agent_input.get("parameters", {})
     
-    if agent_id == "drift-detector":
-        if "primary" not in files_map or "baseline" not in files_map:
+    if agent_id == "customer-segmentation-agent":
+        if "primary" not in files_map:
             return {
                 "status": "error",
-                "error": "Drift detector requires 'primary' and 'baseline' files",
+                "error": "Customer segmentation agent requires 'primary' file",
                 "execution_time_ms": 0
             }
         
-        baseline_bytes, baseline_filename = files_map["baseline"]
         primary_bytes, primary_filename = files_map["primary"]
         
-        return drift_detector.execute_drift_detector(
-            baseline_bytes,
-            baseline_filename,
+        return customer_segmentation_agent.execute_customer_segmentation_agent(
             primary_bytes,
             primary_filename,
             parameters
         )
     
-    elif agent_id == "readiness-rater":
-        if "primary" not in files_map:
-            return {
-                "status": "error",
-                "error": "Readiness rater requires 'primary' file",
-                "execution_time_ms": 0
-            }
-        
-        primary_bytes, primary_filename = files_map["primary"]
-        
-        return readiness_rater.execute_readiness_rater(
-            primary_bytes,
-            primary_filename,
-            parameters
-        )
-    
-    elif agent_id == "unified-profiler":
-        if "primary" not in files_map:
-            return {
-                "status": "error",
-                "error": "Unified profiler requires 'primary' file",
-                "execution_time_ms": 0
-            }
-        
-        primary_bytes, primary_filename = files_map["primary"]
-        
-        return unified_profiler.execute_unified_profiler(
-            primary_bytes,
-            primary_filename,
-            parameters
-        )
-    
-    elif agent_id == "score-risk":
-        if "primary" not in files_map:
-            return {
-                "status": "error",
-                "error": "Risk scorer requires 'primary' file",
-                "execution_time_ms": 0
-            }
-        
-        primary_bytes, primary_filename = files_map["primary"]
-        
-        return score_risk.execute_score_risk(
-            primary_bytes,
-            primary_filename,
-            parameters
-        )
-    
-    elif agent_id == "governance-checker":
-        if "primary" not in files_map:
-            return {
-                "status": "error",
-                "error": "Governance checker requires 'primary' file",
-                "execution_time_ms": 0
-            }
-        
-        primary_bytes, primary_filename = files_map["primary"]
-        
-        return governance_checker.execute_governance(
-            primary_bytes,
-            primary_filename,
-            parameters
-        )
-    
-    elif agent_id == "test-coverage-agent":
-        if "primary" not in files_map:
-            return {
-                "status": "error",
-                "error": "Test coverage agent requires 'primary' file",
-                "execution_time_ms": 0
-            }
-        
-        primary_bytes, primary_filename = files_map["primary"]
-        
-        return test_coverage_agent.execute_test_coverage(
-            primary_bytes,
-            primary_filename,
-            parameters
-        )
+    # Future agents for this tool:
+    # elif agent_id == "market-basket-sequence-agent":
+    #     ...
+    # elif agent_id == "experimental-design-agent":
+    #     ...
     
     else:
         return {
             "status": "error",
-            "error": f"Unknown agent for profile-my-data: {agent_id}",
+            "error": f"Unknown agent for analyze-my-data: {agent_id}",
             "execution_time_ms": 0
         }
 
-def transform_profile_my_data_response(
+
+def transform_analyze_my_data_response(
     agent_results: Dict[str, Any],
     execution_time_ms: int,
     analysis_id: str,
@@ -418,7 +345,7 @@ def transform_profile_my_data_response(
     
     # Print current user data
     if current_user:
-        print(f"[Transformer] Profile My Data - Current User: ID={current_user.id}, Email={current_user.email}, Active={current_user.is_active}, Verified={current_user.is_verified}")
+        print(f"[Transformer] Analyze My Data - Current User: ID={current_user.id}, Email={current_user.email}, Active={current_user.is_active}, Verified={current_user.is_verified}")
     
     # ==================== CONSOLIDATE AGENT OUTPUTS ====================
     
@@ -522,14 +449,14 @@ def transform_profile_my_data_response(
         ai_generator = AnalysisSummaryAI()
         summary_result = ai_generator.generate_summary(
             analysis_text=complete_analysis_text,
-            dataset_name="Data Profile Analysis"
+            dataset_name="Business Analytics Analysis"
         )
         analysis_summary = summary_result
     except Exception as e:
         print(f"Warning: OpenAI summary generation failed: {str(e)}. Using fallback summary.")
         analysis_summary = {
             "status": "success",
-            "summary": f"Data profile analysis completed. {len(all_alerts)} alerts detected, {len(all_issues)} issues identified.",
+            "summary": f"Business analytics analysis completed. {len(all_alerts)} alerts detected, {len(all_issues)} issues identified.",
             "execution_time_ms": 0,
             "model_used": "fallback-rule-based"
         }
@@ -540,7 +467,7 @@ def transform_profile_my_data_response(
         from ai.routing_decision_ai import RoutingDecisionAI
         routing_ai = RoutingDecisionAI()
         routing_decisions = routing_ai.get_routing_decisions(
-            current_tool="profile-my-data",
+            current_tool="analyze-my-data",
             agent_results=agent_results,
             primary_filename="data.csv",
             baseline_filename=None,
@@ -578,7 +505,7 @@ def transform_profile_my_data_response(
     all_row_level_issues = all_row_level_issues[:1000]
     
     # ==================== DOWNLOADS ====================
-    downloader = ProfileMyDataDownloads()
+    downloader = AnalyzeMyDataDownloads()
     downloads = downloader.generate_downloads(
         agent_results=agent_results,
         analysis_id=analysis_id,

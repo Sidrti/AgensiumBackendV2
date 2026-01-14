@@ -1,380 +1,67 @@
 """
-Master My Data Downloads Module
+Master My Data Downloads Module (Refactored)
 
-Comprehensive download and report generation for master-my-data tool.
-Generates two complete export formats:
-1. Excel Report (.xlsx) - Multi-sheet detailed analysis
-2. JSON Report (.json) - Complete hierarchical data structure
-
-Optimal Agent Execution Sequence (Master Data Management Pipeline):
-1. key-identifier      - Discovery Phase: Identify primary/composite keys for entity matching
-2. contract-enforcer   - Validation Phase: Enforce schema and data contracts
-3. semantic-mapper     - Standardization Phase: Standardize column names and values
-4. survivorship-resolver - Resolution Phase: Resolve field value conflicts using rules
-5. golden-record-builder - Consolidation Phase: Create unified golden records
-6. stewardship-flagger - Quality Gate Phase: Flag issues requiring human review
-7. lineage-tracer      - Governance Phase: Track transformations and build audit trail
-8. master-writeback-agent - Output Phase: Generate final mastered output file
+Uses BaseDownloader for standardized report generation.
 """
 
-from typing import Dict, List, Any
-from datetime import datetime
-import base64
-import io
+from typing import Dict, Any
 from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill
-from downloads.downloads_utils import (
-    ExcelStyler,
-    CommonSheetCreator,
-    build_json_report_structure,
-    generate_json_download,
-    get_agents_metadata
-)
+from downloads.downloads_utils import BaseDownloader
 
-
-class MasterMyDataDownloads:
+class MasterMyDataDownloads(BaseDownloader):
     """Handles comprehensive downloads for master-my-data tool."""
     
     def __init__(self):
-        """Initialize download generator."""
-        self.styler = ExcelStyler()
-        self.common_sheets = CommonSheetCreator(self.styler)
-        # Keep legacy references for existing code
-        self.header_fill = self.styler.header_fill
-        self.header_font = self.styler.header_font
-        self.subheader_fill = self.styler.subheader_fill
-        self.subheader_font = self.styler.subheader_font
-        self.border = self.styler.border
-        self.center_alignment = self.styler.center_alignment
-        self.left_alignment = self.styler.left_alignment
-    
-    def generate_downloads(
-        self,
-        agent_results: Dict[str, Any],
-        analysis_id: str,
-        execution_time_ms: int,
-        alerts: List[Dict],
-        issues: List[Dict],
-        recommendations: List[Dict],
-        cleaned_files: Dict[str, Dict[str, Any]] = None,
-        executive_summary: List[Dict] = None,
-        analysis_summary: Dict[str, Any] = None,
-        row_level_issues: List[Dict] = None,
-        issue_summary: Dict[str, Any] = None,
-        routing_decisions: List[Dict] = None
-    ) -> List[Dict[str, Any]]:
-        """
-        Generate both Excel and JSON downloads, plus mastered data files from agents.
+        super().__init__("master-my-data", "Master My Data")
         
-        Args:
-            agent_results: Dictionary of agent_id -> agent output
-            analysis_id: Unique analysis identifier
-            execution_time_ms: Total execution time
-            alerts: List of alerts
-            issues: List of issues
-            recommendations: List of recommendations
-            cleaned_files: Dictionary of agent_id -> mastered_file metadata (with base64 content)
-            executive_summary: Executive summary items
-            analysis_summary: AI-generated analysis summary
-            row_level_issues: List of row-level issues
-            issue_summary: Summary of issues by type and severity
-            routing_decisions: List of routing recommendations
+    def create_tool_specific_sheets(self, wb: Workbook, agent_results: Dict[str, Any]):
+        """Create tool-specific analysis sheets."""
         
-        Returns:
-            List of download metadata dicts with base64 encoded content.
-        """
-        downloads = []
-        cleaned_files = cleaned_files or {}
-        executive_summary = executive_summary or []
-        analysis_summary = analysis_summary or {}
-        row_level_issues = row_level_issues or []
-        issue_summary = issue_summary or {}
-        routing_decisions = routing_decisions or []
+        # 1. KEY IDENTIFIER SHEET
+        key_identifier_output = agent_results.get("key-identifier", {})
+        if key_identifier_output.get("status") == "success":
+            self._create_key_identifier_sheet(wb, key_identifier_output)
         
-        # Generate Excel report
-        excel_data = self._generate_excel_report(
-            agent_results=agent_results,
-            analysis_id=analysis_id,
-            execution_time_ms=execution_time_ms,
-            alerts=alerts,
-            issues=issues,
-            recommendations=recommendations,
-            executive_summary=executive_summary,
-            analysis_summary=analysis_summary,
-            row_level_issues=row_level_issues,
-            issue_summary=issue_summary,
-            routing_decisions=routing_decisions
-        )
-        downloads.append(excel_data)
+        # 2. CONTRACT ENFORCER SHEET
+        contract_enforcer_output = agent_results.get("contract-enforcer", {})
+        if contract_enforcer_output.get("status") == "success":
+            self._create_contract_enforcer_sheet(wb, contract_enforcer_output)
         
-        # Generate JSON report
-        json_data = self._generate_json_report(
-            agent_results=agent_results,
-            analysis_id=analysis_id,
-            execution_time_ms=execution_time_ms,
-            alerts=alerts,
-            issues=issues,
-            recommendations=recommendations,
-            executive_summary=executive_summary,
-            analysis_summary=analysis_summary,
-            row_level_issues=row_level_issues,
-            issue_summary=issue_summary,
-            routing_decisions=routing_decisions
-        )
-        downloads.append(json_data)
+        # 3. SEMANTIC MAPPER SHEET
+        semantic_mapper_output = agent_results.get("semantic-mapper", {})
+        if semantic_mapper_output.get("status") == "success":
+            self._create_semantic_mapper_sheet(wb, semantic_mapper_output)
         
-        # ==================== ADD MASTERED DATA FILES ====================
-        agent_names = {
-            "key-identifier": "Key Identifier",
-            "contract-enforcer": "Contract Enforcer",
-            "semantic-mapper": "Semantic Mapper",
-            "lineage-tracer": "Lineage Tracer",
-            "golden-record-builder": "Golden Record Builder",
-            "survivorship-resolver": "Survivorship Resolver",
-            "master-writeback-agent": "Master Writeback Agent",
-            "stewardship-flagger": "Stewardship Flagger"
-        }
+        # 4. LINEAGE TRACER SHEET
+        lineage_tracer_output = agent_results.get("lineage-tracer", {})
+        if lineage_tracer_output.get("status") == "success":
+            self._create_lineage_tracer_sheet(wb, lineage_tracer_output)
         
-        for agent_id, agent_name in agent_names.items():
-            if agent_id in cleaned_files:
-                cleaned_file_data = cleaned_files[agent_id]
-                
-                # Create download entry for final mastered data
-                # download_entry = {
-                #     "download_id": f"{analysis_id}_mastered_{agent_id}",
-                #     "name": f"Master My Data - {agent_name} Output",
-                #     "format": cleaned_file_data.get("format", "csv"),
-                #     "file_name": cleaned_file_data.get("filename", f"mastered_{agent_id}.csv"),
-                #     "description": f"Output data file produced by {agent_name} agent",
-                #     "mimeType": cleaned_file_data.get("mimeType", "text/csv"),
-                #     "content_base64": cleaned_file_data.get("content", ""),
-                #     "size_bytes": cleaned_file_data.get("size_bytes", 0),
-                #     "creation_date": datetime.utcnow().isoformat() + "Z",
-                #     "type": "mastered_data",
-                #     "agent_id": agent_id
-                # }
+        # 5. GOLDEN RECORD BUILDER SHEET
+        golden_record_output = agent_results.get("golden-record-builder", {})
+        if golden_record_output.get("status") == "success":
+            self._create_golden_record_sheet(wb, golden_record_output)
+        
+        # 6. SURVIVORSHIP RESOLVER SHEET
+        survivorship_output = agent_results.get("survivorship-resolver", {})
+        if survivorship_output.get("status") == "success":
+            self._create_survivorship_sheet(wb, survivorship_output)
+        
+        # 7. MASTER WRITEBACK SHEET
+        master_writeback_output = agent_results.get("master-writeback-agent", {})
+        if master_writeback_output.get("status") == "success":
+            self._create_master_writeback_sheet(wb, master_writeback_output)
+        
+        # 8. STEWARDSHIP FLAGGER SHEET
+        stewardship_output = agent_results.get("stewardship-flagger", {})
+        if stewardship_output.get("status") == "success":
+            self._create_stewardship_sheet(wb, stewardship_output)
 
-                download_entry = {
-                    "download_id": f"{analysis_id}_final_mastered_data",
-                    "name": "Master My Data - Final Mastered Data",
-                    "format": "csv",
-                    "file_name": cleaned_file_data.get("filename", "final_mastered_data.csv"),
-                    "description": "Final mastered data file produced by Master My Data tool",
-                    "mimeType": "text/csv",
-                    "content_base64": cleaned_file_data.get("content", ""),  # Already base64 encoded from agent
-                    "size_bytes": cleaned_file_data.get("size_bytes", 0),
-                    "creation_date": datetime.utcnow().isoformat() + "Z",
-                    "type": "mastered_data",
-                    "agent_id": agent_id
-                }
-                
-                downloads.append(download_entry)
-        
-        return downloads
-    
-    def _generate_excel_report(
-        self,
-        agent_results: Dict[str, Any],
-        analysis_id: str,
-        execution_time_ms: int,
-        alerts: List[Dict],
-        issues: List[Dict],
-        recommendations: List[Dict],
-        executive_summary: List[Dict],
-        analysis_summary: Dict[str, Any],
-        row_level_issues: List[Dict],
-        issue_summary: Dict[str, Any],
-        routing_decisions: List[Dict]
-    ) -> Dict[str, Any]:
-        """Generate comprehensive Excel report with all agent data."""
-        try:
-            wb = Workbook()
-            wb.remove(wb.active)
-            
-            # Extract agent outputs
-            key_identifier_output = agent_results.get("key-identifier", {})
-            contract_enforcer_output = agent_results.get("contract-enforcer", {})
-            semantic_mapper_output = agent_results.get("semantic-mapper", {})
-            lineage_tracer_output = agent_results.get("lineage-tracer", {})
-            golden_record_output = agent_results.get("golden-record-builder", {})
-            survivorship_output = agent_results.get("survivorship-resolver", {})
-            master_writeback_output = agent_results.get("master-writeback-agent", {})
-            stewardship_output = agent_results.get("stewardship-flagger", {})
-            
-            # 1. ANALYSIS SUMMARY SHEET
-            self._create_analysis_summary_sheet(
-                wb, analysis_id, execution_time_ms, alerts, issues, recommendations, executive_summary, agent_results
-            )
-            
-            # 2. KEY IDENTIFIER SHEET
-            if key_identifier_output.get("status") == "success":
-                self._create_key_identifier_sheet(wb, key_identifier_output)
-            
-            # 3. CONTRACT ENFORCER SHEET
-            if contract_enforcer_output.get("status") == "success":
-                self._create_contract_enforcer_sheet(wb, contract_enforcer_output)
-            
-            # 4. SEMANTIC MAPPER SHEET
-            if semantic_mapper_output.get("status") == "success":
-                self._create_semantic_mapper_sheet(wb, semantic_mapper_output)
-            
-            # 5. LINEAGE TRACER SHEET
-            if lineage_tracer_output.get("status") == "success":
-                self._create_lineage_tracer_sheet(wb, lineage_tracer_output)
-            
-            # 6. GOLDEN RECORD BUILDER SHEET
-            if golden_record_output.get("status") == "success":
-                self._create_golden_record_sheet(wb, golden_record_output)
-            
-            # 7. SURVIVORSHIP RESOLVER SHEET
-            if survivorship_output.get("status") == "success":
-                self._create_survivorship_sheet(wb, survivorship_output)
-            
-            # 8. MASTER WRITEBACK SHEET
-            if master_writeback_output.get("status") == "success":
-                self._create_master_writeback_sheet(wb, master_writeback_output)
-            
-            # 9. STEWARDSHIP FLAGGER SHEET
-            if stewardship_output.get("status") == "success":
-                self._create_stewardship_sheet(wb, stewardship_output)
-            
-            # 10. ALERTS SHEET
-            if alerts:
-                self._create_alerts_sheet(wb, alerts)
-            
-            # 11. ISSUES SHEET
-            if issues:
-                self._create_issues_sheet(wb, issues)
-            
-            # 12. RECOMMENDATIONS SHEET
-            if recommendations:
-                self._create_recommendations_sheet(wb, recommendations)
-            
-            # 13. ANALYSIS SUMMARY (AI) SHEET
-            if analysis_summary:
-                self._create_ai_summary_sheet(wb, analysis_summary)
-            
-            # 14. ROW-LEVEL ISSUES SHEET
-            if row_level_issues:
-                self._create_row_level_issues_sheet(wb, row_level_issues, issue_summary)
-            
-            # 15. ROUTING DECISIONS SHEET
-            if routing_decisions:
-                self._create_routing_decisions_sheet(wb, routing_decisions)
-            
-            # Convert to bytes and base64
-            output = io.BytesIO()
-            wb.save(output)
-            output.seek(0)
-            file_content = output.getvalue()
-            
-            return {
-                "download_id": f"{analysis_id}_master_excel",
-                "name": "Master My Data - Complete Analysis Report",
-                "format": "xlsx",
-                "file_name": "master_my_data_analysis.xlsx",
-                "description": "Comprehensive Excel report with all master data management analysis, key identification, contract enforcement, golden records, and stewardship tasks",
-                "mimeType": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                "content_base64": base64.b64encode(file_content).decode('utf-8'),
-                "size_bytes": len(file_content),
-                "creation_date": datetime.utcnow().isoformat() + "Z",
-                "type": "complete_report",
-                "sheets": [
-                    "Summary", "Key Identifier", "Contract Enforcer", "Semantic Mapper",
-                    "Lineage Tracer", "Golden Records", "Survivorship", "Master Writeback",
-                    "Stewardship", "Alerts", "Issues", "Recommendations"
-                ]
-            }
-        except Exception as e:
-            print(f"Error generating Excel report: {str(e)}")
-            return {
-                "download_id": f"{analysis_id}_master_excel_error",
-                "status": "error",
-                "error": str(e)
-            }
-    
-    def _create_analysis_summary_sheet(self, wb, analysis_id, execution_time_ms, alerts, issues, recommendations, executive_summary, agent_results):
-        """Create analysis summary sheet."""
-        ws = wb.create_sheet("Summary", 0)
-        ws.column_dimensions['A'].width = 35
-        ws.column_dimensions['B'].width = 50
-        
-        row = 1
-        # Title
-        ws[f'A{row}'] = "MASTER MY DATA - ANALYSIS SUMMARY"
-        ws[f'A{row}'].font = Font(bold=True, size=14, color="FFFFFF")
-        ws[f'A{row}'].fill = self.header_fill
-        ws.merge_cells(f'A{row}:B{row}')
-        row += 2
-        
-        # Get agent names and lineage dynamically from tool config
-        agents_names, agents_ids = get_agents_metadata('master-my-data', agent_results)
-        
-        # Metadata
-        metadata = [
-            ["Analysis ID", analysis_id],
-            ["Tool", "Master My Data"],
-            ["Timestamp", datetime.utcnow().isoformat() + 'Z'],
-            ["Execution Time (ms)", execution_time_ms],
-            ["Report Generated", datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S UTC")],
-            ["Agents Used", ", ".join(agents_names)],
-            ["Lineage", " → ".join(agents_names)]
-        ]
-        
-        for key, value in metadata:
-            ws[f'A{row}'] = key
-            ws[f'B{row}'] = str(value)
-            ws[f'A{row}'].font = Font(bold=True)
-            ws[f'A{row}'].fill = self.subheader_fill
-            ws[f'A{row}'].border = self.border
-            ws[f'B{row}'].border = self.border
-            row += 1
-        
-        row += 1
-        
-        # Executive Summary
-        if executive_summary:
-            ws[f'A{row}'] = "EXECUTIVE SUMMARY"
-            ws[f'A{row}'].font = Font(bold=True, size=11)
-            ws[f'A{row}'].fill = self.subheader_fill
-            ws.merge_cells(f'A{row}:B{row}')
-            row += 1
-            
-            for item in executive_summary:
-                ws[f'A{row}'] = item.get('title', '')
-                ws[f'B{row}'] = f"{item.get('value', '')} - {item.get('description', '')}"
-                ws[f'A{row}'].border = self.border
-                ws[f'B{row}'].border = self.border
-                row += 1
-            
-            row += 1
-        
-        # Statistics
-        ws[f'A{row}'] = "ANALYSIS STATISTICS"
-        ws[f'A{row}'].font = Font(bold=True, size=11)
-        ws[f'A{row}'].fill = self.subheader_fill
-        ws.merge_cells(f'A{row}:B{row}')
-        row += 1
-        
-        stats = [
-            ["Total Alerts", len(alerts)],
-            ["Total Issues", len(issues)],
-            ["Total Recommendations", len(recommendations)],
-            ["High Severity Alerts", len([a for a in alerts if a.get('severity') == 'high'])],
-            ["Critical Alerts", len([a for a in alerts if a.get('severity') == 'critical'])]
-        ]
-        
-        for key, value in stats:
-            ws[f'A{row}'] = key
-            ws[f'B{row}'] = value
-            ws[f'A{row}'].border = self.border
-            ws[f'B{row}'].border = self.border
-            row += 1
-    
     def _create_key_identifier_sheet(self, wb, agent_output):
         """Create key identifier detailed sheet."""
-        ws = wb.create_sheet("Key Identifier", 1)
-        self._set_column_widths(ws, [25, 20, 15, 15, 50])
+        ws = wb.create_sheet("Key Identifier")
+        self.styler.set_column_widths(ws, [25, 20, 15, 15, 50])
         
         row = 1
         ws[f'A{row}'] = "KEY IDENTIFIER ANALYSIS"
@@ -501,8 +188,8 @@ class MasterMyDataDownloads:
     
     def _create_contract_enforcer_sheet(self, wb, agent_output):
         """Create contract enforcer detailed sheet."""
-        ws = wb.create_sheet("Contract Enforcer", 2)
-        self._set_column_widths(ws, [25, 20, 15, 15, 50])
+        ws = wb.create_sheet("Contract Enforcer")
+        self.styler.set_column_widths(ws, [25, 20, 15, 15, 50])
         
         row = 1
         ws[f'A{row}'] = "CONTRACT ENFORCER ANALYSIS"
@@ -643,8 +330,8 @@ class MasterMyDataDownloads:
     
     def _create_semantic_mapper_sheet(self, wb, agent_output):
         """Create semantic mapper detailed sheet."""
-        ws = wb.create_sheet("Semantic Mapper", 3)
-        self._set_column_widths(ws, [25, 25, 15, 20, 50])
+        ws = wb.create_sheet("Semantic Mapper")
+        self.styler.set_column_widths(ws, [25, 25, 15, 20, 50])
         
         row = 1
         ws[f'A{row}'] = "SEMANTIC MAPPER ANALYSIS"
@@ -678,13 +365,12 @@ class MasterMyDataDownloads:
         
         row += 1
         
-        # Mapping Score - mapping_score is a float, not a dict
+        # Mapping Score
         ws[f'A{row}'] = "MAPPING SCORES"
         ws[f'A{row}'].font = Font(bold=True, size=10)
         ws[f'A{row}'].fill = self.subheader_fill
         row += 1
         
-        # Get score directly as float
         mapping_score = data.get("mapping_score", 0)
         if isinstance(mapping_score, dict):
             overall_score = mapping_score.get("overall_score", 0)
@@ -772,8 +458,8 @@ class MasterMyDataDownloads:
     
     def _create_lineage_tracer_sheet(self, wb, agent_output):
         """Create lineage tracer detailed sheet."""
-        ws = wb.create_sheet("Lineage Tracer", 4)
-        self._set_column_widths(ws, [25, 20, 20, 50])
+        ws = wb.create_sheet("Lineage Tracer")
+        self.styler.set_column_widths(ws, [25, 20, 20, 50])
         
         row = 1
         ws[f'A{row}'] = "LINEAGE TRACER ANALYSIS"
@@ -836,8 +522,8 @@ class MasterMyDataDownloads:
     
     def _create_golden_record_sheet(self, wb, agent_output):
         """Create golden record builder detailed sheet."""
-        ws = wb.create_sheet("Golden Records", 5)
-        self._set_column_widths(ws, [20, 15, 15, 15, 50])
+        ws = wb.create_sheet("Golden Records")
+        self.styler.set_column_widths(ws, [20, 15, 15, 15, 50])
         
         row = 1
         ws[f'A{row}'] = "GOLDEN RECORD BUILDER ANALYSIS"
@@ -871,7 +557,7 @@ class MasterMyDataDownloads:
         
         row += 1
         
-        # Golden Record Score - golden_score is a float, not a dict
+        # Golden Record Score
         ws[f'A{row}'] = "GOLDEN RECORD SCORES"
         ws[f'A{row}'].font = Font(bold=True, size=10)
         ws[f'A{row}'].fill = self.subheader_fill
@@ -963,8 +649,8 @@ class MasterMyDataDownloads:
     
     def _create_survivorship_sheet(self, wb, agent_output):
         """Create survivorship resolver detailed sheet."""
-        ws = wb.create_sheet("Survivorship", 6)
-        self._set_column_widths(ws, [25, 20, 15, 15, 50])
+        ws = wb.create_sheet("Survivorship")
+        self.styler.set_column_widths(ws, [25, 20, 15, 15, 50])
         
         row = 1
         ws[f'A{row}'] = "SURVIVORSHIP RESOLVER ANALYSIS"
@@ -998,7 +684,7 @@ class MasterMyDataDownloads:
         
         row += 1
         
-        # Survivorship Score - survivorship_score is a float, not a dict
+        # Survivorship Score
         ws[f'A{row}'] = "SURVIVORSHIP SCORES"
         ws[f'A{row}'].font = Font(bold=True, size=10)
         ws[f'A{row}'].fill = self.subheader_fill
@@ -1089,8 +775,8 @@ class MasterMyDataDownloads:
     
     def _create_master_writeback_sheet(self, wb, agent_output):
         """Create master writeback detailed sheet."""
-        ws = wb.create_sheet("Master Writeback", 7)
-        self._set_column_widths(ws, [30, 25, 50])
+        ws = wb.create_sheet("Master Writeback")
+        self.styler.set_column_widths(ws, [30, 25, 50])
         
         row = 1
         ws[f'A{row}'] = "MASTER WRITEBACK ANALYSIS"
@@ -1169,8 +855,8 @@ class MasterMyDataDownloads:
     
     def _create_stewardship_sheet(self, wb, agent_output):
         """Create stewardship flagger detailed sheet."""
-        ws = wb.create_sheet("Stewardship", 8)
-        self._set_column_widths(ws, [15, 20, 15, 15, 50])
+        ws = wb.create_sheet("Stewardship")
+        self.styler.set_column_widths(ws, [15, 20, 15, 15, 50])
         
         row = 1
         ws[f'A{row}'] = "STEWARDSHIP FLAGGER ANALYSIS"
@@ -1205,7 +891,7 @@ class MasterMyDataDownloads:
         
         row += 1
         
-        # Stewardship Score - stewardship_score is a float, not a dict
+        # Stewardship Score
         ws[f'A{row}'] = "STEWARDSHIP SCORES"
         ws[f'A{row}'].font = Font(bold=True, size=10)
         ws[f'A{row}'].fill = self.subheader_fill
@@ -1348,69 +1034,3 @@ class MasterMyDataDownloads:
                 ws.cell(row=row, column=col_idx).border = self.border
                 ws.cell(row=row, column=col_idx).alignment = self.left_alignment
             row += 1
-    
-    def _create_alerts_sheet(self, wb, alerts):
-        """Create alerts sheet."""
-        self.common_sheets.create_alerts_sheet(wb, alerts)
-    
-    def _create_issues_sheet(self, wb, issues):
-        """Create issues sheet."""
-        self.common_sheets.create_issues_sheet(wb, issues)
-    
-    def _create_recommendations_sheet(self, wb, recommendations):
-        """Create recommendations sheet."""
-        self.common_sheets.create_recommendations_sheet(wb, recommendations)
-    
-    def _set_column_widths(self, ws, widths):
-        """Set column widths for worksheet."""
-        self.styler.set_column_widths(ws, widths)
-    
-    def _create_ai_summary_sheet(self, wb, analysis_summary):
-        """Create AI-generated analysis summary sheet."""
-        self.common_sheets.create_ai_summary_sheet(wb, analysis_summary)
-    
-    def _create_row_level_issues_sheet(self, wb, row_level_issues, issue_summary):
-        """Create row-level issues sheet."""
-        self.common_sheets.create_row_level_issues_sheet(wb, row_level_issues, issue_summary)
-    
-    def _create_routing_decisions_sheet(self, wb, routing_decisions):
-        """Create routing decisions sheet."""
-        self.common_sheets.create_routing_decisions_sheet(wb, routing_decisions)
-    
-    def _generate_json_report(
-        self,
-        agent_results: Dict[str, Any],
-        analysis_id: str,
-        execution_time_ms: int,
-        alerts: List[Dict],
-        issues: List[Dict],
-        recommendations: List[Dict],
-        executive_summary: List[Dict],
-        analysis_summary: Dict[str, Any],
-        row_level_issues: List[Dict],
-        issue_summary: Dict[str, Any],
-        routing_decisions: List[Dict]
-    ) -> Dict[str, Any]:
-        """Generate comprehensive JSON report with all agent data."""
-        report_data = build_json_report_structure(
-            analysis_id=analysis_id,
-            tool="master-my-data",
-            execution_time_ms=execution_time_ms,
-            alerts=alerts,
-            issues=issues,
-            recommendations=recommendations,
-            executive_summary=executive_summary,
-            analysis_summary=analysis_summary,
-            row_level_issues=row_level_issues,
-            issue_summary=issue_summary,
-            routing_decisions=routing_decisions,
-            agent_results=agent_results
-        )
-        
-        return generate_json_download(
-            analysis_id=analysis_id,
-            tool="master",
-            file_name="master_my_data_analysis.json",
-            description="Complete hierarchical JSON report with all master data management analysis, including key identification, contract enforcement, golden records, and stewardship tasks",
-            report_data=report_data
-        )

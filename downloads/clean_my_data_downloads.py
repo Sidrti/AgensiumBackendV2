@@ -1,392 +1,77 @@
 """
-Clean My Data Downloads Module
+Clean My Data Downloads Module (Refactored)
 
-Comprehensive download and report generation for clean-my-data tool.
-Generates two complete export formats:
-1. Excel Report (.xlsx) - Multi-sheet detailed analysis
-2. JSON Report (.json) - Complete hierarchical data structure
-
-Agents covered:
-- cleanse-previewer: 'What If' analysis and impact assessment
-- quarantine-agent: Invalid data identification and isolation
-- null-handler: Null value detection and handling
-- outlier-remover: Outlier detection and removal
-- type-fixer: Type conversion and fixing
-- duplicate-resolver: Duplicate record detection and resolution
-- field-standardization: Field value standardization
-- cleanse-writeback: Final quality assurance and documentation
-- governance-checker: Governance compliance validation
-- test-coverage-agent: Test coverage validation
+Uses BaseDownloader for standardized report generation.
 """
 
-from typing import Dict, List, Any, Tuple
-from datetime import datetime
-import base64
-import io
+from typing import Dict, Any
 from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill
-from downloads.downloads_utils import (
-    ExcelStyler,
-    CommonSheetCreator,
-    build_json_report_structure,
-    generate_json_download,
-    get_agents_metadata
-)
+from downloads.downloads_utils import BaseDownloader
 
-
-class CleanMyDataDownloads:
+class CleanMyDataDownloads(BaseDownloader):
     """Handles comprehensive downloads for clean-my-data tool."""
     
     def __init__(self):
-        """Initialize download generator."""
-        self.styler = ExcelStyler()
-        self.common_sheets = CommonSheetCreator(self.styler)
-        # Keep legacy references for existing code
-        self.header_fill = self.styler.header_fill
-        self.header_font = self.styler.header_font
-        self.subheader_fill = self.styler.subheader_fill
-        self.subheader_font = self.styler.subheader_font
-        self.border = self.styler.border
-        self.center_alignment = self.styler.center_alignment
-        self.left_alignment = self.styler.left_alignment
-    
-    def generate_downloads(
-        self,
-        agent_results: Dict[str, Any],
-        analysis_id: str,
-        execution_time_ms: int,
-        alerts: List[Dict],
-        issues: List[Dict],
-        recommendations: List[Dict],
-        cleaned_files: Dict[str, Dict[str, Any]] = None,
-        executive_summary: List[Dict] = None,
-        analysis_summary: Dict[str, Any] = None,
-        row_level_issues: List[Dict] = None,
-        issue_summary: Dict[str, Any] = None,
-        routing_decisions: List[Dict] = None
-    ) -> List[Dict[str, Any]]:
-        """
-        Generate both Excel and JSON downloads, plus cleaned data files from agents.
+        super().__init__("clean-my-data", "Clean My Data")
         
-        Args:
-            agent_results: Dictionary of agent_id -> agent output
-            analysis_id: Unique analysis identifier
-            execution_time_ms: Total execution time
-            alerts: List of alerts
-            issues: List of issues
-            recommendations: List of recommendations
-            cleaned_files: Dictionary of agent_id -> cleaned_file metadata (with base64 content)
-            executive_summary: Executive summary items
-            analysis_summary: AI-generated analysis summary
-            row_level_issues: List of row-level issues
-            issue_summary: Summary of issues by type and severity
-            routing_decisions: List of routing recommendations
+    def create_tool_specific_sheets(self, wb: Workbook, agent_results: Dict[str, Any]):
+        """Create tool-specific analysis sheets."""
         
-        Returns:
-            List of download metadata dicts with base64 encoded content.
-        """
-        downloads = []
-        cleaned_files = cleaned_files or {}
-        executive_summary = executive_summary or []
-        analysis_summary = analysis_summary or {}
-        row_level_issues = row_level_issues or []
-        issue_summary = issue_summary or {}
-        routing_decisions = routing_decisions or []
+        # 1. CLEANSE PREVIEWER SHEET
+        cleanse_previewer_output = agent_results.get("cleanse-previewer", {})
+        if cleanse_previewer_output.get("status") == "success":
+            self._create_cleanse_previewer_sheet(wb, cleanse_previewer_output)
         
-        # Generate Excel report
-        excel_data = self._generate_excel_report(
-            agent_results=agent_results,
-            analysis_id=analysis_id,
-            execution_time_ms=execution_time_ms,
-            alerts=alerts,
-            issues=issues,
-            recommendations=recommendations,
-            executive_summary=executive_summary,
-            analysis_summary=analysis_summary,
-            row_level_issues=row_level_issues,
-            issue_summary=issue_summary,
-            routing_decisions=routing_decisions
-        )
-        downloads.append(excel_data)
+        # 2. NULL HANDLER SHEET
+        null_output = agent_results.get("null-handler", {})
+        if null_output.get("status") == "success":
+            self._create_null_handler_sheet(wb, null_output)
         
-        # Generate JSON report
-        json_data = self._generate_json_report(
-            agent_results=agent_results,
-            analysis_id=analysis_id,
-            execution_time_ms=execution_time_ms,
-            alerts=alerts,
-            issues=issues,
-            recommendations=recommendations,
-            executive_summary=executive_summary,
-            analysis_summary=analysis_summary,
-            row_level_issues=row_level_issues,
-            issue_summary=issue_summary,
-            routing_decisions=routing_decisions
-        )
-        downloads.append(json_data)
+        # 3. OUTLIER REMOVER SHEET
+        outlier_output = agent_results.get("outlier-remover", {})
+        if outlier_output.get("status") == "success":
+            self._create_outlier_sheet(wb, outlier_output)
         
-        # ==================== ADD CLEANED DATA FILES ====================
-        # Add cleaned CSV files from individual agents
-        agent_names = {
-            "cleanse-previewer": "Cleanse Previewer",
-            "quarantine-agent": "Quarantine Agent",
-            "type-fixer": "Type Fixer",
-            "field-standardization": "Field Standardization",
-            "duplicate-resolver": "Duplicate Resolver",
-            "null-handler": "Null Handler",
-            "outlier-remover": "Outlier Remover",
-            "governance-checker": "Governance Checker",
-            "test-coverage-agent": "Test Coverage Agent",
-            "cleanse-writeback": "Cleanse Writeback"
-        }
+        # 4. TYPE FIXER SHEET
+        type_output = agent_results.get("type-fixer", {})
+        if type_output.get("status") == "success":
+            self._create_type_fixer_sheet(wb, type_output)
         
-        for agent_id, agent_name in agent_names.items():
-            if agent_id in cleaned_files:
-                cleaned_file_data = cleaned_files[agent_id]
-                
-                # Create download entry for cleaned file following the standard pattern
-                # download_entry = {
-                #     "download_id": f"{analysis_id}_cleaned_{agent_id}",
-                #     "name": f"Clean My Data - {agent_name} Cleaned Data",
-                #     "format": "csv",
-                #     "file_name": cleaned_file_data.get("filename", f"cleaned_{agent_id}.csv"),
-                #     "description": f"Cleaned data file produced by {agent_name} agent with all cleaning operations applied",
-                #     "mimeType": "text/csv",
-                #     "content_base64": cleaned_file_data.get("content", ""),  # Already base64 encoded from agent
-                #     "size_bytes": cleaned_file_data.get("size_bytes", 0),
-                #     "creation_date": datetime.utcnow().isoformat() + "Z",
-                #     "type": "cleaned_data",
-                #     "agent_id": agent_id
-                # }
+        # 5. DUPLICATE RESOLVER SHEET
+        duplicate_output = agent_results.get("duplicate-resolver", {})
+        if duplicate_output.get("status") == "success":
+            self._create_duplicate_resolver_sheet(wb, duplicate_output)
+        
+        # 6. FIELD STANDARDIZATION SHEET
+        field_standardization_output = agent_results.get("field-standardization", {})
+        if field_standardization_output.get("status") == "success":
+            self._create_field_standardization_sheet(wb, field_standardization_output)
+        
+        # 7. CLEANSE WRITEBACK SHEET
+        cleanse_writeback_output = agent_results.get("cleanse-writeback", {})
+        if cleanse_writeback_output.get("status") == "success":
+            self._create_cleanse_writeback_sheet(wb, cleanse_writeback_output)
+        
+        # 8. QUARANTINE AGENT SHEET
+        quarantine_output = agent_results.get("quarantine-agent", {})
+        if quarantine_output.get("status") == "success":
+            self._create_quarantine_sheet(wb, quarantine_output)
+        
+        # 9. GOVERNANCE CHECKER SHEET
+        governance_output = agent_results.get("governance-checker", {})
+        if governance_output.get("status") == "success":
+            self._create_governance_sheet(wb, governance_output)
+        
+        # 10. TEST COVERAGE SHEET
+        test_output = agent_results.get("test-coverage-agent", {})
+        if test_output.get("status") == "success":
+            self._create_test_coverage_sheet(wb, test_output)
 
-               # Create download entry for final cleaned data (most processed version)
-                download_entry = {
-                    "download_id": f"{analysis_id}_final_cleaned_data",
-                    "name": "Clean My Data - Final Cleaned Data",
-                    "format": "csv",
-                    "file_name": cleaned_file_data.get("filename", "final_cleaned_data.csv"),
-                    "description": "Final cleaned data file with all cleaning operations applied across the entire pipeline",
-                    "mimeType": "text/csv",
-                    "content_base64": cleaned_file_data.get("content", ""),  # Already base64 encoded from agent
-                    "size_bytes": cleaned_file_data.get("size_bytes", 0),
-                    "creation_date": datetime.utcnow().isoformat() + "Z",
-                    "type": "cleaned_data",
-                    "agent_id": agent_id
-                }
-                
-                downloads.append(download_entry)
-        
-        return downloads
-    
-    def _generate_excel_report(
-        self,
-        agent_results: Dict[str, Any],
-        analysis_id: str,
-        execution_time_ms: int,
-        alerts: List[Dict],
-        issues: List[Dict],
-        recommendations: List[Dict],
-        executive_summary: List[Dict],
-        analysis_summary: Dict[str, Any],
-        row_level_issues: List[Dict],
-        issue_summary: Dict[str, Any],
-        routing_decisions: List[Dict]
-    ) -> Dict[str, Any]:
-        """Generate comprehensive Excel report with all agent data."""
-        try:
-            wb = Workbook()
-            wb.remove(wb.active)
-            
-            # Extract agent outputs
-            null_output = agent_results.get("null-handler", {})
-            outlier_output = agent_results.get("outlier-remover", {})
-            type_output = agent_results.get("type-fixer", {})
-            duplicate_output = agent_results.get("duplicate-resolver", {})
-            governance_output = agent_results.get("governance-checker", {})
-            test_output = agent_results.get("test-coverage-agent", {})
-            quarantine_output = agent_results.get("quarantine-agent", {})
-            
-            # 1. ANALYSIS SUMMARY SHEET
-            self._create_analysis_summary_sheet(
-                wb, analysis_id, execution_time_ms, alerts, issues, recommendations, executive_summary, agent_results
-            )
-            
-            # 2. CLEANSE PREVIEWER SHEET
-            cleanse_previewer_output = agent_results.get("cleanse-previewer", {})
-            if cleanse_previewer_output.get("status") == "success":
-                self._create_cleanse_previewer_sheet(wb, cleanse_previewer_output)
-            
-            # 3. NULL HANDLER SHEET
-            if null_output.get("status") == "success":
-                self._create_null_handler_sheet(wb, null_output)
-            
-            # 4. OUTLIER REMOVER SHEET
-            if outlier_output.get("status") == "success":
-                self._create_outlier_sheet(wb, outlier_output)
-            
-            # 5. TYPE FIXER SHEET
-            if type_output.get("status") == "success":
-                self._create_type_fixer_sheet(wb, type_output)
-            
-            # 6. DUPLICATE RESOLVER SHEET
-            if duplicate_output.get("status") == "success":
-                self._create_duplicate_resolver_sheet(wb, duplicate_output)
-            
-            # 7. FIELD STANDARDIZATION SHEET
-            field_standardization_output = agent_results.get("field-standardization", {})
-            if field_standardization_output.get("status") == "success":
-                self._create_field_standardization_sheet(wb, field_standardization_output)
-            
-            # 8. CLEANSE WRITEBACK SHEET
-            cleanse_writeback_output = agent_results.get("cleanse-writeback", {})
-            if cleanse_writeback_output.get("status") == "success":
-                self._create_cleanse_writeback_sheet(wb, cleanse_writeback_output)
-            
-            # 9. QUARANTINE AGENT SHEET
-            if quarantine_output.get("status") == "success":
-                self._create_quarantine_sheet(wb, quarantine_output)
-            
-            # 9. GOVERNANCE CHECKER SHEET
-            if governance_output.get("status") == "success":
-                self._create_governance_sheet(wb, governance_output)
-            
-            # 10. TEST COVERAGE SHEET
-            if test_output.get("status") == "success":
-                self._create_test_coverage_sheet(wb, test_output)
-            
-            # 11. ALERTS SHEET
-            if alerts:
-                self._create_alerts_sheet(wb, alerts)
-            
-            # 12. ISSUES SHEET
-            if issues:
-                self._create_issues_sheet(wb, issues)
-            
-            # 13. RECOMMENDATIONS SHEET
-            if recommendations:
-                self._create_recommendations_sheet(wb, recommendations)
-            
-            # 14. ANALYSIS SUMMARY (AI) SHEET
-            if analysis_summary:
-                self._create_ai_summary_sheet(wb, analysis_summary)
-            
-            # 15. ROW-LEVEL ISSUES SHEET
-            if row_level_issues:
-                self._create_row_level_issues_sheet(wb, row_level_issues, issue_summary)
-            
-            # 16. ROUTING DECISIONS SHEET
-            if routing_decisions:
-                self._create_routing_decisions_sheet(wb, routing_decisions)
-            
-            # Convert to bytes and base64
-            output = io.BytesIO()
-            wb.save(output)
-            output.seek(0)
-            file_content = output.getvalue()
-            
-            return {
-                "download_id": f"{analysis_id}_clean_excel",
-                "name": "Clean My Data - Complete Analysis Report",
-                "format": "xlsx",
-                "file_name": "clean_my_data_analysis.xlsx",
-                "description": "Comprehensive Excel report with all cleaning analysis data, agent results, and detailed metrics",
-                "mimeType": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                "content_base64": base64.b64encode(file_content).decode('utf-8'),
-                "size_bytes": len(file_content),
-                "creation_date": datetime.utcnow().isoformat() + "Z",
-                "type": "complete_report",
-                "sheets": ["Summary", "Cleanse Preview", "Null Handler", "Outlier Remover", "Type Fixer", "Quarantine", "Duplicates", "Field Standardization", "Cleanse Writeback", "Governance", "Test Coverage", "Alerts", "Issues", "Recommendations"]
-            }
-        except Exception as e:
-            print(f"Error generating Excel report: {str(e)}")
-            return {
-                "download_id": f"{analysis_id}_clean_excel_error",
-                "status": "error",
-                "error": str(e)
-            }
-    
-    def _create_analysis_summary_sheet(self, wb, analysis_id, execution_time_ms, alerts, issues, recommendations, executive_summary, agent_results):
-        """Create analysis summary sheet."""
-        ws = wb.create_sheet("Summary", 0)
-        ws.column_dimensions['A'].width = 35
-        ws.column_dimensions['B'].width = 50
-        
-        row = 1
-        # Title
-        ws[f'A{row}'] = "CLEAN MY DATA - ANALYSIS SUMMARY"
-        ws[f'A{row}'].font = Font(bold=True, size=14, color="FFFFFF")
-        ws[f'A{row}'].fill = self.header_fill
-        ws.merge_cells(f'A{row}:B{row}')
-        row += 2
-        
-        # Get agent names and lineage dynamically from tool config
-        agents_names, agents_ids = get_agents_metadata('clean-my-data', agent_results)
-        
-        # Metadata
-        metadata = [
-            ["Analysis ID", analysis_id],
-            ["Tool", "Clean My Data"],
-            ["Timestamp", datetime.utcnow().isoformat() + 'Z'],
-            ["Execution Time (ms)", execution_time_ms],
-            ["Report Generated", datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S UTC")],
-            ["Agents Used", ", ".join(agents_names)],
-            ["Lineage", " → ".join(agents_names)]
-        ]
-        
-        for key, value in metadata:
-            ws[f'A{row}'] = key
-            ws[f'B{row}'] = str(value)
-            ws[f'A{row}'].font = Font(bold=True)
-            ws[f'A{row}'].fill = self.subheader_fill
-            ws[f'A{row}'].border = self.border
-            ws[f'B{row}'].border = self.border
-            row += 1
-        
-        row += 1
-        
-        # Executive Summary
-        if executive_summary:
-            ws[f'A{row}'] = "EXECUTIVE SUMMARY"
-            ws[f'A{row}'].font = Font(bold=True, size=11)
-            ws[f'A{row}'].fill = self.subheader_fill
-            ws.merge_cells(f'A{row}:B{row}')
-            row += 1
-            
-            for item in executive_summary:
-                ws[f'A{row}'] = item.get('title', '')
-                ws[f'B{row}'] = f"{item.get('value', '')} - {item.get('description', '')}"
-                ws[f'A{row}'].border = self.border
-                ws[f'B{row}'].border = self.border
-                row += 1
-            
-            row += 1
-        
-        # Statistics
-        ws[f'A{row}'] = "ANALYSIS STATISTICS"
-        ws[f'A{row}'].font = Font(bold=True, size=11)
-        ws[f'A{row}'].fill = self.subheader_fill
-        ws.merge_cells(f'A{row}:B{row}')
-        row += 1
-        
-        stats = [
-            ["Total Alerts", len(alerts)],
-            ["Total Issues", len(issues)],
-            ["Total Recommendations", len(recommendations)],
-            ["High Severity Alerts", len([a for a in alerts if a.get('severity') == 'high'])],
-            ["Critical Alerts", len([a for a in alerts if a.get('severity') == 'critical'])]
-        ]
-        
-        for key, value in stats:
-            ws[f'A{row}'] = key
-            ws[f'B{row}'] = value
-            ws[f'A{row}'].border = self.border
-            ws[f'B{row}'].border = self.border
-            row += 1
-    
     def _create_cleanse_previewer_sheet(self, wb, agent_output):
         """Create cleanse previewer detailed sheet."""
-        ws = wb.create_sheet("Cleanse Preview", 1)
-        self._set_column_widths(ws, [30, 20, 20, 20, 50])
+        ws = wb.create_sheet("Cleanse Preview")
+        self.styler.set_column_widths(ws, [30, 20, 20, 20, 50])
         
         row = 1
         ws[f'A{row}'] = "CLEANSE PREVIEWER ANALYSIS"
@@ -522,8 +207,8 @@ class CleanMyDataDownloads:
     
     def _create_null_handler_sheet(self, wb, agent_output):
         """Create null handler detailed sheet."""
-        ws = wb.create_sheet("Null Handler", 1)
-        self._set_column_widths(ws, [25, 15, 15, 15, 15, 15, 50])
+        ws = wb.create_sheet("Null Handler")
+        self.styler.set_column_widths(ws, [25, 15, 15, 15, 15, 15, 50])
         
         row = 1
         # Header
@@ -634,8 +319,8 @@ class CleanMyDataDownloads:
     
     def _create_outlier_sheet(self, wb, agent_output):
         """Create outlier remover detailed sheet."""
-        ws = wb.create_sheet("Outlier Remover", 2)
-        self._set_column_widths(ws, [25, 15, 15, 15, 15, 15, 50])
+        ws = wb.create_sheet("Outlier Remover")
+        self.styler.set_column_widths(ws, [25, 15, 15, 15, 15, 15, 50])
         
         row = 1
         ws[f'A{row}'] = "OUTLIER REMOVER ANALYSIS"
@@ -724,8 +409,8 @@ class CleanMyDataDownloads:
     
     def _create_type_fixer_sheet(self, wb, agent_output):
         """Create type fixer detailed sheet."""
-        ws = wb.create_sheet("Type Fixer", 3)
-        self._set_column_widths(ws, [25, 20, 20, 20, 50])
+        ws = wb.create_sheet("Type Fixer")
+        self.styler.set_column_widths(ws, [25, 20, 20, 20, 50])
         
         row = 1
         ws[f'A{row}'] = "TYPE FIXER ANALYSIS"
@@ -809,131 +494,10 @@ class CleanMyDataDownloads:
                 ws.cell(row=row, column=col_idx).alignment = self.left_alignment
             row += 1
     
-    def _create_quarantine_sheet(self, wb, agent_output):
-        """Create quarantine agent detailed sheet."""
-        ws = wb.create_sheet("Quarantine", 5)
-        self._set_column_widths(ws, [25, 15, 15, 15, 15, 50])
-        
-        row = 1
-        ws[f'A{row}'] = "QUARANTINE AGENT ANALYSIS"
-        ws[f'A{row}'].font = Font(bold=True, size=12, color="FFFFFF")
-        ws[f'A{row}'].fill = self.header_fill
-        row += 2
-        
-        data = agent_output.get("data", {})
-        summary_metrics = agent_output.get("summary_metrics", {})
-        
-        # Metadata
-        metadata = [
-            ["Status", agent_output.get("status")],
-            ["Execution Time (ms)", agent_output.get("execution_time_ms", 0)],
-            ["Total Rows Processed", summary_metrics.get("total_rows_processed", 0)],
-            ["Quarantined Records", summary_metrics.get("quarantined_records", 0)],
-            ["Clean Records", summary_metrics.get("clean_records", 0)],
-            ["Quarantine %", f"{summary_metrics.get('quarantine_percentage', 0):.2f}%"]
-        ]
-        
-        for key, value in metadata:
-            ws[f'A{row}'] = key
-            ws[f'B{row}'] = value
-            ws[f'A{row}'].font = Font(bold=True)
-            ws[f'A{row}'].fill = self.subheader_fill
-            ws[f'A{row}'].border = self.border
-            ws[f'B{row}'].border = self.border
-            row += 1
-        
-        row += 1
-        
-        # Quality scores
-        ws[f'A{row}'] = "QUARANTINE QUALITY SCORES"
-        ws[f'A{row}'].font = Font(bold=True, size=10)
-        ws[f'A{row}'].fill = self.subheader_fill
-        row += 1
-        
-        quality_score = data.get("quality_score", {})
-        metrics = quality_score.get("metrics", {})
-        score_items = [
-            ["Overall Score", quality_score.get("overall_score", 0)],
-            ["Quality Status", data.get("quality_status", "unknown")],
-            ["Quarantine Reduction Rate", f"{metrics.get('quarantine_reduction_rate', 0):.1f}%"],
-            ["Data Integrity Rate", f"{metrics.get('data_integrity_rate', 0):.1f}%"],
-            ["Processing Efficiency", f"{metrics.get('processing_efficiency_rate', 0):.1f}%"]
-        ]
-        
-        for key, value in score_items:
-            ws[f'A{row}'] = key
-            ws[f'B{row}'] = value
-            ws[f'A{row}'].border = self.border
-            ws[f'B{row}'].border = self.border
-            row += 1
-        
-        row += 1
-        
-        # Quarantine issues by type
-        ws[f'A{row}'] = "ISSUES BY TYPE"
-        ws[f'A{row}'].font = Font(bold=True, size=10)
-        ws[f'A{row}'].fill = self.subheader_fill
-        ws.merge_cells(f'A{row}:C{row}')
-        row += 1
-        
-        headers = ["Issue Type", "Count", "Percentage"]
-        for col_idx, header in enumerate(headers, 1):
-            cell = ws.cell(row=row, column=col_idx, value=header)
-            cell.fill = self.header_fill
-            cell.font = self.header_font
-            cell.border = self.border
-            cell.alignment = self.center_alignment
-        row += 1
-        
-        quarantine_analysis = data.get("quarantine_analysis", {})
-        issue_types = quarantine_analysis.get("issue_types", {})
-        total_issues = sum(issue_types.values())
-        
-        for issue_type, count in issue_types.items():
-            ws.cell(row=row, column=1, value=issue_type.replace('_', ' ').title())
-            ws.cell(row=row, column=2, value=count)
-            ws.cell(row=row, column=3, value=f"{(count / total_issues * 100) if total_issues > 0 else 0:.1f}%")
-            
-            for col_idx in range(1, 4):
-                ws.cell(row=row, column=col_idx).border = self.border
-                ws.cell(row=row, column=col_idx).alignment = self.left_alignment
-            row += 1
-        
-        row += 1
-        
-        # Severity breakdown
-        ws[f'A{row}'] = "SEVERITY BREAKDOWN"
-        ws[f'A{row}'].font = Font(bold=True, size=10)
-        ws[f'A{row}'].fill = self.subheader_fill
-        ws.merge_cells(f'A{row}:C{row}')
-        row += 1
-        
-        headers = ["Severity Level", "Count", "Percentage"]
-        for col_idx, header in enumerate(headers, 1):
-            cell = ws.cell(row=row, column=col_idx, value=header)
-            cell.fill = self.header_fill
-            cell.font = self.header_font
-            cell.border = self.border
-            cell.alignment = self.center_alignment
-        row += 1
-        
-        severity_breakdown = quarantine_analysis.get("severity_breakdown", {})
-        severity_total = sum(severity_breakdown.values())
-        
-        for severity, count in severity_breakdown.items():
-            ws.cell(row=row, column=1, value=severity.upper())
-            ws.cell(row=row, column=2, value=count)
-            ws.cell(row=row, column=3, value=f"{(count / severity_total * 100) if severity_total > 0 else 0:.1f}%")
-            
-            for col_idx in range(1, 4):
-                ws.cell(row=row, column=col_idx).border = self.border
-                ws.cell(row=row, column=col_idx).alignment = self.left_alignment
-            row += 1
-    
     def _create_duplicate_resolver_sheet(self, wb, agent_output):
         """Create duplicate resolver detailed sheet."""
-        ws = wb.create_sheet("Duplicates", 6)
-        self._set_column_widths(ws, [30, 15, 50])
+        ws = wb.create_sheet("Duplicates")
+        self.styler.set_column_widths(ws, [30, 15, 50])
         
         row = 1
         ws[f'A{row}'] = "DUPLICATE RESOLVER ANALYSIS"
@@ -1019,8 +583,8 @@ class CleanMyDataDownloads:
     
     def _create_field_standardization_sheet(self, wb, agent_output):
         """Create field standardization detailed sheet."""
-        ws = wb.create_sheet("Field Standardization", 7)
-        self._set_column_widths(ws, [30, 15, 15, 15, 50])
+        ws = wb.create_sheet("Field Standardization")
+        self.styler.set_column_widths(ws, [30, 15, 15, 15, 50])
         
         row = 1
         ws[f'A{row}'] = "FIELD STANDARDIZATION ANALYSIS"
@@ -1128,8 +692,8 @@ class CleanMyDataDownloads:
     
     def _create_cleanse_writeback_sheet(self, wb, agent_output):
         """Create cleanse writeback detailed sheet."""
-        ws = wb.create_sheet("Cleanse Writeback", 8)
-        self._set_column_widths(ws, [30, 20, 15, 50])
+        ws = wb.create_sheet("Cleanse Writeback")
+        self.styler.set_column_widths(ws, [30, 20, 15, 50])
         
         row = 1
         ws[f'A{row}'] = "CLEANSE WRITEBACK ANALYSIS"
@@ -1320,10 +884,131 @@ class CleanMyDataDownloads:
             ws.merge_cells(f'A{row}:D{row}')
             row += 1
     
+    def _create_quarantine_sheet(self, wb, agent_output):
+        """Create quarantine agent detailed sheet."""
+        ws = wb.create_sheet("Quarantine")
+        self.styler.set_column_widths(ws, [25, 15, 15, 15, 15, 50])
+        
+        row = 1
+        ws[f'A{row}'] = "QUARANTINE AGENT ANALYSIS"
+        ws[f'A{row}'].font = Font(bold=True, size=12, color="FFFFFF")
+        ws[f'A{row}'].fill = self.header_fill
+        row += 2
+        
+        data = agent_output.get("data", {})
+        summary_metrics = agent_output.get("summary_metrics", {})
+        
+        # Metadata
+        metadata = [
+            ["Status", agent_output.get("status")],
+            ["Execution Time (ms)", agent_output.get("execution_time_ms", 0)],
+            ["Total Rows Processed", summary_metrics.get("total_rows_processed", 0)],
+            ["Quarantined Records", summary_metrics.get("quarantined_records", 0)],
+            ["Clean Records", summary_metrics.get("clean_records", 0)],
+            ["Quarantine %", f"{summary_metrics.get('quarantine_percentage', 0):.2f}%"]
+        ]
+        
+        for key, value in metadata:
+            ws[f'A{row}'] = key
+            ws[f'B{row}'] = value
+            ws[f'A{row}'].font = Font(bold=True)
+            ws[f'A{row}'].fill = self.subheader_fill
+            ws[f'A{row}'].border = self.border
+            ws[f'B{row}'].border = self.border
+            row += 1
+        
+        row += 1
+        
+        # Quality scores
+        ws[f'A{row}'] = "QUARANTINE QUALITY SCORES"
+        ws[f'A{row}'].font = Font(bold=True, size=10)
+        ws[f'A{row}'].fill = self.subheader_fill
+        row += 1
+        
+        quality_score = data.get("quality_score", {})
+        metrics = quality_score.get("metrics", {})
+        score_items = [
+            ["Overall Score", quality_score.get("overall_score", 0)],
+            ["Quality Status", data.get("quality_status", "unknown")],
+            ["Quarantine Reduction Rate", f"{metrics.get('quarantine_reduction_rate', 0):.1f}%"],
+            ["Data Integrity Rate", f"{metrics.get('data_integrity_rate', 0):.1f}%"],
+            ["Processing Efficiency", f"{metrics.get('processing_efficiency_rate', 0):.1f}%"]
+        ]
+        
+        for key, value in score_items:
+            ws[f'A{row}'] = key
+            ws[f'B{row}'] = value
+            ws[f'A{row}'].border = self.border
+            ws[f'B{row}'].border = self.border
+            row += 1
+        
+        row += 1
+        
+        # Quarantine issues by type
+        ws[f'A{row}'] = "ISSUES BY TYPE"
+        ws[f'A{row}'].font = Font(bold=True, size=10)
+        ws[f'A{row}'].fill = self.subheader_fill
+        ws.merge_cells(f'A{row}:C{row}')
+        row += 1
+        
+        headers = ["Issue Type", "Count", "Percentage"]
+        for col_idx, header in enumerate(headers, 1):
+            cell = ws.cell(row=row, column=col_idx, value=header)
+            cell.fill = self.header_fill
+            cell.font = self.header_font
+            cell.border = self.border
+            cell.alignment = self.center_alignment
+        row += 1
+        
+        quarantine_analysis = data.get("quarantine_analysis", {})
+        issue_types = quarantine_analysis.get("issue_types", {})
+        total_issues = sum(issue_types.values())
+        
+        for issue_type, count in issue_types.items():
+            ws.cell(row=row, column=1, value=issue_type.replace('_', ' ').title())
+            ws.cell(row=row, column=2, value=count)
+            ws.cell(row=row, column=3, value=f"{(count / total_issues * 100) if total_issues > 0 else 0:.1f}%")
+            
+            for col_idx in range(1, 4):
+                ws.cell(row=row, column=col_idx).border = self.border
+                ws.cell(row=row, column=col_idx).alignment = self.left_alignment
+            row += 1
+        
+        row += 1
+        
+        # Severity breakdown
+        ws[f'A{row}'] = "SEVERITY BREAKDOWN"
+        ws[f'A{row}'].font = Font(bold=True, size=10)
+        ws[f'A{row}'].fill = self.subheader_fill
+        ws.merge_cells(f'A{row}:C{row}')
+        row += 1
+        
+        headers = ["Severity Level", "Count", "Percentage"]
+        for col_idx, header in enumerate(headers, 1):
+            cell = ws.cell(row=row, column=col_idx, value=header)
+            cell.fill = self.header_fill
+            cell.font = self.header_font
+            cell.border = self.border
+            cell.alignment = self.center_alignment
+        row += 1
+        
+        severity_breakdown = quarantine_analysis.get("severity_breakdown", {})
+        severity_total = sum(severity_breakdown.values())
+        
+        for severity, count in severity_breakdown.items():
+            ws.cell(row=row, column=1, value=severity.upper())
+            ws.cell(row=row, column=2, value=count)
+            ws.cell(row=row, column=3, value=f"{(count / severity_total * 100) if severity_total > 0 else 0:.1f}%")
+            
+            for col_idx in range(1, 4):
+                ws.cell(row=row, column=col_idx).border = self.border
+                ws.cell(row=row, column=col_idx).alignment = self.left_alignment
+            row += 1
+    
     def _create_governance_sheet(self, wb, agent_output):
         """Create governance checker detailed sheet."""
-        ws = wb.create_sheet("Governance", 5)
-        self._set_column_widths(ws, [30, 15, 50])
+        ws = wb.create_sheet("Governance")
+        self.styler.set_column_widths(ws, [30, 15, 50])
         
         row = 1
         ws[f'A{row}'] = "GOVERNANCE CHECKER ANALYSIS"
@@ -1337,7 +1022,7 @@ class CleanMyDataDownloads:
         metadata = [
             ["Status", agent_output.get("status")],
             ["Execution Time (ms)", agent_output.get("execution_time_ms", 0)],
-            ["Compliance Status", data.get("compliance_status", "unknown")],
+            ["Compliance Status", data.get("compliance_status", "")],
             ["Governance Issues Found", summary_metrics.get("governance_issues_found", 0)],
             ["Fields Analyzed", summary_metrics.get("fields_analyzed", 0)]
         ]
@@ -1384,7 +1069,7 @@ class CleanMyDataDownloads:
         ws.merge_cells(f'A{row}:C{row}')
         row += 1
         
-        headers = ["Issue Type", "Severity", "Description"]
+        headers = ["Issue Type", "Severity", "Message"]
         for col_idx, header in enumerate(headers, 1):
             cell = ws.cell(row=row, column=col_idx, value=header)
             cell.fill = self.header_fill
@@ -1393,9 +1078,9 @@ class CleanMyDataDownloads:
         row += 1
         
         for issue in data.get("governance_issues", []):
-            ws.cell(row=row, column=1, value=issue.get("issue_type", ""))
+            ws.cell(row=row, column=1, value=issue.get("type", ""))
             ws.cell(row=row, column=2, value=issue.get("severity", ""))
-            ws.cell(row=row, column=3, value=issue.get("description", ""))
+            ws.cell(row=row, column=3, value=issue.get("message", ""))
             
             for col_idx in range(1, 4):
                 ws.cell(row=row, column=col_idx).border = self.border
@@ -1404,8 +1089,8 @@ class CleanMyDataDownloads:
     
     def _create_test_coverage_sheet(self, wb, agent_output):
         """Create test coverage detailed sheet."""
-        ws = wb.create_sheet("Test Coverage", 6)
-        self._set_column_widths(ws, [30, 15, 50])
+        ws = wb.create_sheet("Test Coverage")
+        self.styler.set_column_widths(ws, [30, 15, 50])
         
         row = 1
         ws[f'A{row}'] = "TEST COVERAGE ANALYSIS"
@@ -1419,7 +1104,7 @@ class CleanMyDataDownloads:
         metadata = [
             ["Status", agent_output.get("status")],
             ["Execution Time (ms)", agent_output.get("execution_time_ms", 0)],
-            ["Coverage Status", data.get("coverage_status", "unknown")],
+            ["Coverage Status", data.get("coverage_status", "")],
             ["Test Issues Found", summary_metrics.get("test_issues_count", 0)],
             ["Fields Tested", summary_metrics.get("fields_tested", 0)]
         ]
@@ -1444,9 +1129,9 @@ class CleanMyDataDownloads:
         test_scores = data.get("test_coverage_scores", {})
         score_items = [
             ["Overall Score", test_scores.get("overall", 0)],
-            ["Uniqueness Tests", test_scores.get("uniqueness", 0)],
-            ["Range Tests", test_scores.get("range", 0)],
-            ["Format Tests", test_scores.get("format", 0)],
+            ["Uniqueness", test_scores.get("uniqueness", 0)],
+            ["Range", test_scores.get("range", 0)],
+            ["Format", test_scores.get("format", 0)],
             ["Consistency Tests", test_scores.get("consistency", 0)]
         ]
         
@@ -1483,69 +1168,3 @@ class CleanMyDataDownloads:
                 ws.cell(row=row, column=col_idx).border = self.border
                 ws.cell(row=row, column=col_idx).alignment = self.left_alignment
             row += 1
-    
-    def _create_alerts_sheet(self, wb, alerts):
-        """Create alerts sheet."""
-        self.common_sheets.create_alerts_sheet(wb, alerts)
-    
-    def _create_issues_sheet(self, wb, issues):
-        """Create issues sheet."""
-        self.common_sheets.create_issues_sheet(wb, issues)
-    
-    def _create_recommendations_sheet(self, wb, recommendations):
-        """Create recommendations sheet."""
-        self.common_sheets.create_recommendations_sheet(wb, recommendations)
-    
-    def _set_column_widths(self, ws, widths):
-        """Set column widths for worksheet."""
-        self.styler.set_column_widths(ws, widths)
-    
-    def _create_ai_summary_sheet(self, wb, analysis_summary):
-        """Create AI-generated analysis summary sheet."""
-        self.common_sheets.create_ai_summary_sheet(wb, analysis_summary)
-    
-    def _create_row_level_issues_sheet(self, wb, row_level_issues, issue_summary):
-        """Create row-level issues sheet."""
-        self.common_sheets.create_row_level_issues_sheet(wb, row_level_issues, issue_summary)
-    
-    def _create_routing_decisions_sheet(self, wb, routing_decisions):
-        """Create routing decisions sheet."""
-        self.common_sheets.create_routing_decisions_sheet(wb, routing_decisions)
-    
-    def _generate_json_report(
-        self,
-        agent_results: Dict[str, Any],
-        analysis_id: str,
-        execution_time_ms: int,
-        alerts: List[Dict],
-        issues: List[Dict],
-        recommendations: List[Dict],
-        executive_summary: List[Dict],
-        analysis_summary: Dict[str, Any],
-        row_level_issues: List[Dict],
-        issue_summary: Dict[str, Any],
-        routing_decisions: List[Dict]
-    ) -> Dict[str, Any]:
-        """Generate comprehensive JSON report with all agent data."""
-        report_data = build_json_report_structure(
-            analysis_id=analysis_id,
-            tool="clean-my-data",
-            execution_time_ms=execution_time_ms,
-            alerts=alerts,
-            issues=issues,
-            recommendations=recommendations,
-            executive_summary=executive_summary,
-            analysis_summary=analysis_summary,
-            row_level_issues=row_level_issues,
-            issue_summary=issue_summary,
-            routing_decisions=routing_decisions,
-            agent_results=agent_results
-        )
-        
-        return generate_json_download(
-            analysis_id=analysis_id,
-            tool="clean",
-            file_name="clean_my_data_analysis.json",
-            description="Complete hierarchical JSON report with all analysis data, including raw agent outputs and metrics",
-            report_data=report_data
-        )

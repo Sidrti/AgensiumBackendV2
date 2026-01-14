@@ -13,7 +13,7 @@ import time
 from typing import Dict, Any, Optional
 from scipy.stats import ks_2samp, wasserstein_distance
 
-def detect_drift(
+def execute_drift_detector(
     baseline_contents: bytes,
     baseline_filename: str,
     current_contents: bytes,

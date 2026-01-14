@@ -12,8 +12,7 @@ from datetime import datetime
 from typing import Dict, Any, Optional, List
 from fastapi import APIRouter, HTTPException, File, UploadFile, Form, Depends
 
-from transformers import profile_my_data_transformer, clean_my_data_transformer, master_my_data_transformer
-from transformers.transformers_utils import persist_analysis_inputs
+from transformers import profile_my_data_transformer, clean_my_data_transformer, master_my_data_transformer, analyze_my_data_transformer
 from ai import ChatAgent
 from auth.dependencies import get_current_active_verified_user
 from db import models
@@ -120,16 +119,6 @@ async def analyze(
     start_time = time.time()
     
     try:
-        # Persist inputs under uploads/<user_id>/<analysis_id>/inputs
-        # NOTE: This will reset file pointers so transformers can read them again.
-        # _ = await persist_analysis_inputs(
-        #     user_id=current_user.id,
-        #     analysis_id=analysis_id,
-        #     primary=primary,
-        #     baseline=baseline,
-        #     parameters_json=parameters_json,
-        # )
-        
         # Execute analysis via transformer
         if tool_id == "profile-my-data":
             final_response = await profile_my_data_transformer.run_profile_my_data_analysis(
@@ -153,6 +142,16 @@ async def analyze(
             )
         elif tool_id == "master-my-data":
             final_response = await master_my_data_transformer.run_master_my_data_analysis(
+                tool_id,
+                agents,
+                parameters_json,
+                primary,
+                baseline,
+                analysis_id,
+                current_user
+            )
+        elif tool_id == "analyze-my-data":
+            final_response = await analyze_my_data_transformer.run_analyze_my_data_analysis(
                 tool_id,
                 agents,
                 parameters_json,

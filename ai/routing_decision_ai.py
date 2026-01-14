@@ -1,5 +1,5 @@
 """
-Routing Decision AI Agent - Intelligent Tool Recommendation Engine
+Routing Decision AI Agent - Intelligent Tool Recommendation Engine (OpenRouter Version)
 
 Purpose:
     Takes analysis results from one tool and intelligently recommends the next best tool
@@ -8,19 +8,22 @@ Purpose:
 Logic:
     1. Analyzes current tool's findings (quality issues, data characteristics, scores)
     2. Evaluates all available tools based on findings
-    3. Uses AI to determine which tool would be most beneficial next
+    3. Uses OpenRouter AI to determine which tool would be most beneficial next
     4. Returns routing decision with tool path, required files, and parameters
 
-Current Tools:
+Current Tools (4 Total):
     - profile-my-data: Data profiling, quality assessment, drift detection, risk scoring, readiness rating
     - clean-my-data: Null handling, outlier removal, type fixing, governance validation, test coverage
+    - master-my-data: Master data management, key identification, golden records, survivorship, stewardship
+    - analyze-my-data: Business analytics, customer segmentation, market basket analysis, experimental design
 """
 
+import os
 import json
 import time
-import os
 from typing import Dict, Any, List, Optional
 from datetime import datetime
+
 try:
     from openai import OpenAI
     OPENAI_AVAILABLE = True
@@ -30,13 +33,24 @@ except ImportError:
 
 
 class RoutingDecisionAI:
-    """Intelligent AI agent for tool routing and recommendations"""
+    """Intelligent AI agent for tool routing and recommendations using OpenRouter"""
 
     def __init__(
-            self, 
-            api_key: Optional[str] = None,
-                 ):
-        """Initialize routing AI agent and configure OpenAI API key from environment or provided key"""
+        self,
+        api_key: Optional[str] = None,
+        model: str = "xiaomi/mimo-v2-flash:free",
+        site_url: Optional[str] = None,
+        site_name: Optional[str] = None,
+    ):
+        """
+        Initialize routing AI agent with OpenRouter configuration.
+        
+        Args:
+            api_key: OpenRouter API key (defaults to OPENROUTER_API_KEY env var)
+            model: Model name to use (default: xiaomi/mimo-v2-flash:free)
+            site_url: Your site URL for OpenRouter rankings (optional)
+            site_name: Your site name for OpenRouter rankings (optional)
+        """
         self.available_tools = {
             "profile-my-data": {
                 "name": "Profile My Data",
@@ -55,8 +69,8 @@ class RoutingDecisionAI:
             },
             "clean-my-data": {
                 "name": "Clean My Data",
-                "description": "Data cleaning and validation - null handling, outlier removal, type fixing, duplicate resolution, governance validation, test coverage",
-                "agents": ["cleanse-previewer", "quarantine-agent", "type-fixer", "field-standardization", "duplicate-resolver", "null-handler", "outlier-remover", "governance-checker", "test-coverage-agent", "cleanse-writeback"],
+                "description": "Data cleaning and validation - null handling, outlier removal, type fixing, duplicate resolution, field standardization",
+                "agents": ["cleanse-previewer", "quarantine-agent", "type-fixer", "field-standardization", "duplicate-resolver", "null-handler", "outlier-remover", "cleanse-writeback"],
                 "requires_files": ["primary"],
                 "optional_files": [],
                 "use_cases": [
@@ -64,29 +78,65 @@ class RoutingDecisionAI:
                     "Detect and handle outliers",
                     "Fix data type inconsistencies",
                     "Detect and resolve duplicate records",
-                    "Validate data governance rules",
-                    "Assess test coverage requirements",
+                    "Standardize field values and formats",
                     "Improve data quality scores",
-                    "Prepare data for ML/analytics"
+                    "Prepare data for analytics/ML"
+                ]
+            },
+            "master-my-data": {
+                "name": "Master My Data",
+                "description": "Master data management - key identification, contract enforcement, semantic mapping, golden records, survivorship resolution",
+                "agents": ["key-identifier", "contract-enforcer", "semantic-mapper", "survivorship-resolver", "golden-record-builder", "stewardship-flagger"],
+                "requires_files": ["primary"],
+                "optional_files": ["schema"],
+                "use_cases": [
+                    "Identify primary and foreign keys",
+                    "Enforce data contracts",
+                    "Map semantics across sources",
+                    "Resolve conflicting records",
+                    "Build golden records (single source of truth)",
+                    "Flag data stewardship tasks"
+                ]
+            },
+            "analyze-my-data": {
+                "name": "Analyze My Data",
+                "description": "Business analytics - customer segmentation (RFM), market basket analysis, sequence mining, experimental design",
+                "agents": ["customer-segmentation-agent", "market-basket-sequence-agent", "experimental-design-agent"],
+                "requires_files": ["primary"],
+                "optional_files": [],
+                "use_cases": [
+                    "Segment customers by RFM or value",
+                    "Discover product affinity patterns",
+                    "Find purchase sequences",
+                    "Calculate A/B test sample sizes",
+                    "Design experiments",
+                    "Behavioral cohort analysis"
                 ]
             }
         }
-        # Configure OpenAI API key from provided value or environment variable
-        self.api_key = api_key or os.getenv("OPENAI_API_KEY")
+        
+        # Configure OpenRouter API
+        self.api_key = api_key or os.getenv("OPENROUTER_API_KEY")
+        self.model = model
+        self.site_url = site_url or os.getenv("OPENROUTER_SITE_URL", "https://agensium.app")
+        self.site_name = site_name or os.getenv("OPENROUTER_SITE_NAME", "Agensium")
         self.openai_client = None
         self.use_ai = False
         
         if not self.api_key:
-            print("Warning: OPENAI_API_KEY not set - AI-based routing will use fallback recommendations")
+            print("Warning: OPENROUTER_API_KEY not set - AI-based routing will use fallback recommendations")
         elif not OPENAI_AVAILABLE:
-            print("Warning: OpenAI package not installed. To enable AI routing, install 'openai' and set OPENAI_API_KEY.")
+            print("Warning: OpenAI package not installed. To enable AI routing, install 'openai' and set OPENROUTER_API_KEY.")
         else:
             try:
-                self.openai_client = OpenAI(api_key=self.api_key)
+                self.openai_client = OpenAI(
+                    base_url="https://openrouter.ai/api/v1",
+                    api_key=self.api_key,
+                )
                 self.use_ai = True
-                print("Info: OpenAI client initialized successfully for routing decisions.")
+                print(f"Info: OpenRouter client initialized successfully for routing decisions with model: {self.model}")
             except Exception as e:
-                print(f"Warning: Failed to initialize OpenAI client: {str(e)}. Using fallback routing.")
+                print(f"Warning: Failed to initialize OpenRouter client: {str(e)}. Using fallback routing.")
                 self.openai_client = None
                 self.use_ai = False
 
@@ -109,26 +159,7 @@ class RoutingDecisionAI:
             current_parameters: Current tool's parameters
 
         Returns:
-            List of routing decisions, each containing:
-            {
-                "recommendation_id": str,
-                "next_tool": str,
-                "confidence_score": float (0-1),
-                "reason": str,
-                "priority": int,
-                "path": str (e.g., "/results/clean-my-data"),
-                "required_files": {
-                    "primary": {"name": str, "available": bool},
-                    "baseline": {"name": str, "available": bool} (optional)
-                },
-                "parameters": {
-                    "selected_agents": List[str],
-                    "agent_parameters": Dict[str, Any]
-                },
-                "expected_benefits": List[str],
-                "estimated_time_minutes": int,
-                "execution_steps": List[str]
-            }
+            List of routing decisions with tool recommendations
         """
         try:
             # Analyze current results
@@ -190,139 +221,69 @@ class RoutingDecisionAI:
 
         # ==================== PROFILE-MY-DATA ANALYSIS ====================
         if current_tool == "profile-my-data":
-            # Profiler findings
             if agent_results.get("unified-profiler", {}).get("status") == "success":
                 profiler_data = agent_results["unified-profiler"].get("data", {})
                 quality_score = profiler_data.get("quality_summary", {}).get("overall_quality_score", 0)
                 analysis["scores"]["quality"] = quality_score
 
                 if quality_score < 70:
-                    analysis["key_findings"].append(f"Low data quality score ({quality_score:.1f}/100)")
-                    analysis["data_quality_issues"].append("poor_overall_quality")
+                    analysis["data_quality_issues"].append(f"Low quality score: {quality_score:.1f}%")
+                    analysis["key_findings"].append("Data quality needs improvement")
 
-            # Drift findings
             if agent_results.get("drift-detector", {}).get("status") == "success":
                 drift_data = agent_results["drift-detector"].get("data", {})
                 drift_pct = drift_data.get("drift_summary", {}).get("drift_percentage", 0)
                 analysis["scores"]["drift"] = drift_pct
 
                 if drift_pct > 20:
-                    analysis["key_findings"].append(f"Significant drift detected ({drift_pct:.1f}%)")
-                    analysis["risk_factors"].append("dataset_drift")
+                    analysis["data_quality_issues"].append(f"High drift detected: {drift_pct:.1f}%")
 
-            # Risk findings
             if agent_results.get("score-risk", {}).get("status") == "success":
                 risk_data = agent_results["score-risk"].get("data", {})
                 risk_score = risk_data.get("risk_summary", {}).get("overall_risk_score", 0)
                 analysis["scores"]["risk"] = risk_score
 
                 if risk_score > 70:
-                    analysis["key_findings"].append(f"High risk score ({risk_score:.1f}/100)")
-                    analysis["risk_factors"].append("high_risk_data")
-
-            # Readiness findings
-            if agent_results.get("readiness-rater", {}).get("status") == "success":
-                readiness_data = agent_results["readiness-rater"].get("data", {})
-                readiness_score = readiness_data.get("readiness_assessment", {}).get("overall_score", 0)
-                readiness_status = readiness_data.get("readiness_assessment", {}).get("overall_status", "unknown")
-                analysis["scores"]["readiness"] = readiness_score
-
-                if readiness_score < 60 or readiness_status == "not_ready":
-                    analysis["key_findings"].append(f"Data not ready for production ({readiness_status})")
-                    analysis["data_quality_issues"].append("readiness_concerns")
-
-            # Governance findings
-            if agent_results.get("governance-checker", {}).get("status") == "success":
-                gov_data = agent_results["governance-checker"].get("data", {})
-                compliance_status = gov_data.get("compliance_status", "unknown")
-
-                if compliance_status in ["non_compliant", "needs_review"]:
-                    analysis["key_findings"].append(f"Governance issues detected ({compliance_status})")
-                    analysis["risk_factors"].append("governance_non_compliance")
+                    analysis["risk_factors"].append(f"High risk score: {risk_score:.1f}%")
 
         # ==================== CLEAN-MY-DATA ANALYSIS ====================
         elif current_tool == "clean-my-data":
-            # Cleanse previewer findings
-            if agent_results.get("cleanse-previewer", {}).get("status") == "success":
-                preview_metrics = agent_results["cleanse-previewer"].get("summary_metrics", {})
-                total_warnings = preview_metrics.get("total_warnings", 0)
-                if total_warnings > 0:
-                    analysis["key_findings"].append(f"Preview identified {total_warnings} potential issues")
+            if agent_results.get("cleanse-writeback", {}).get("status") == "success":
+                writeback_data = agent_results["cleanse-writeback"].get("data", {})
+                quality_score = writeback_data.get("quality_assessment", {}).get("overall_score", 0)
+                analysis["scores"]["post_cleaning_quality"] = quality_score
+                analysis["key_findings"].append(f"Post-cleaning quality: {quality_score:.1f}%")
 
-            # Quarantine agent findings
-            if agent_results.get("quarantine-agent", {}).get("status") == "success":
-                quarantine_metrics = agent_results["quarantine-agent"].get("summary_metrics", {})
-                issues_found = quarantine_metrics.get("quarantine_issues_found", 0)
-                if issues_found > 0:
-                    analysis["key_findings"].append(f"Quarantined {issues_found} invalid records")
-                    analysis["data_quality_issues"].append("invalid_records_quarantined")
-
-            # Type fixer findings
-            if agent_results.get("type-fixer", {}).get("status") == "success":
-                type_data = agent_results["type-fixer"].get("data", {})
-                fixing_score = type_data.get("fixing_score", {}).get("overall_score", 0)
-                type_issues_fixed = agent_results["type-fixer"].get("summary_metrics", {}).get("type_issues_fixed", 0)
-                analysis["scores"]["type_fixing"] = fixing_score
-
-                if type_issues_fixed > 0:
-                    analysis["key_findings"].append(f"Type issues fixed: {type_issues_fixed}")
-                    
-                if fixing_score < 80:
-                    analysis["data_quality_issues"].append("type_mismatch_concerns")
-
-            # Field standardization findings
-            if agent_results.get("field-standardization", {}).get("status") == "success":
-                std_metrics = agent_results["field-standardization"].get("summary_metrics", {})
-                total_issues = std_metrics.get("total_issues", 0)
-                if total_issues > 0:
-                    analysis["key_findings"].append(f"Standardized {total_issues} field values")
-
-            # Duplicate resolver findings
-            if agent_results.get("duplicate-resolver", {}).get("status") == "success":
-                dup_metrics = agent_results["duplicate-resolver"].get("summary_metrics", {})
-                total_issues = dup_metrics.get("total_issues", 0)
-                if total_issues > 0:
-                    analysis["key_findings"].append(f"Resolved {total_issues} duplicate records")
-
-            # Null handler findings
             if agent_results.get("null-handler", {}).get("status") == "success":
                 null_data = agent_results["null-handler"].get("data", {})
-                cleaning_score = null_data.get("cleaning_score", {}).get("overall_score", 0)
-                nulls_handled = agent_results["null-handler"].get("summary_metrics", {}).get("nulls_handled", 0)
-                analysis["scores"]["null_handling"] = cleaning_score
+                null_reduction = null_data.get("cleaning_score", {}).get("metrics", {}).get("null_reduction_rate", 0)
+                if null_reduction > 0:
+                    analysis["key_findings"].append(f"Reduced nulls by {null_reduction*100:.1f}%")
 
-                if nulls_handled > 0:
-                    analysis["key_findings"].append(f"Null values handled: {nulls_handled}")
+        # ==================== MASTER-MY-DATA ANALYSIS ====================
+        elif current_tool == "master-my-data":
+            if agent_results.get("key-identifier", {}).get("status") == "success":
+                key_data = agent_results["key-identifier"].get("data", {})
+                pk_count = len(key_data.get("candidate_primary_keys", []))
+                analysis["key_findings"].append(f"Identified {pk_count} primary key candidates")
 
-            # Outlier remover findings
-            if agent_results.get("outlier-remover", {}).get("status") == "success":
-                outlier_data = agent_results["outlier-remover"].get("data", {})
-                outlier_score = outlier_data.get("outlier_score", {}).get("overall_score", 0)
-                outliers_handled = agent_results["outlier-remover"].get("summary_metrics", {}).get("outliers_handled", 0)
-                analysis["scores"]["outlier_removal"] = outlier_score
+            if agent_results.get("golden-record-builder", {}).get("status") == "success":
+                golden_data = agent_results["golden-record-builder"].get("data", {})
+                compression_ratio = golden_data.get("compression_metrics", {}).get("compression_ratio", 0)
+                if compression_ratio > 1:
+                    analysis["key_findings"].append(f"Golden records created with {compression_ratio:.1f}x compression")
 
-                if outliers_handled > 0:
-                    analysis["key_findings"].append(f"Outliers handled: {outliers_handled}")
+        # ==================== ANALYZE-MY-DATA ANALYSIS ====================
+        elif current_tool == "analyze-my-data":
+            if agent_results.get("customer-segmentation-agent", {}).get("status") == "success":
+                seg_data = agent_results["customer-segmentation-agent"].get("data", {})
+                segments = len(seg_data.get("segment_summary", []))
+                analysis["key_findings"].append(f"Created {segments} customer segments")
 
-            # Governance findings
-            if agent_results.get("governance-checker", {}).get("status") == "success":
-                gov_data = agent_results["governance-checker"].get("data", {})
-                compliance_status = gov_data.get("compliance_status", "unknown")
-
-                if compliance_status == "compliant":
-                    analysis["key_findings"].append("Data governance compliant")
-                else:
-                    analysis["data_quality_issues"].append("governance_concerns")
-
-            # Test coverage findings
-            if agent_results.get("test-coverage-agent", {}).get("status") == "success":
-                test_data = agent_results["test-coverage-agent"].get("data", {})
-                coverage_status = test_data.get("coverage_status", "unknown")
-                analysis["key_findings"].append(f"Test coverage status: {coverage_status}")
-
-            # Cleanse writeback findings
-            if agent_results.get("cleanse-writeback", {}).get("status") == "success":
-                analysis["key_findings"].append("Cleaned data successfully written back")
+            if agent_results.get("market-basket-sequence-agent", {}).get("status") == "success":
+                basket_data = agent_results["market-basket-sequence-agent"].get("data", {})
+                rules_count = len(basket_data.get("association_rules", []))
+                analysis["key_findings"].append(f"Discovered {rules_count} product affinity rules")
 
         return analysis
 
@@ -332,11 +293,10 @@ class RoutingDecisionAI:
         analysis: Dict[str, Any],
         agent_results: Dict[str, Any]
     ) -> List[Dict[str, Any]]:
-        """Use LLM to generate intelligent routing recommendations with retry logic"""
+        """Use OpenRouter LLM to generate intelligent routing recommendations"""
 
-        # Check if AI is available
         if not self.use_ai or not self.openai_client:
-            print("Info: OpenAI not configured - using rule-based fallback recommendations")
+            print("Info: OpenRouter not configured - using rule-based fallback recommendations")
             return self._get_fallback_recommendations(current_tool, analysis)
         
         max_retries = 3
@@ -344,69 +304,51 @@ class RoutingDecisionAI:
         
         while retry_count < max_retries:
             try:
-                # Build prompt for LLM
                 prompt = self._build_routing_prompt(current_tool, analysis, agent_results)
-
-                # Use new OpenAI client interface
+                
                 response = self.openai_client.chat.completions.create(
-                    model="gpt-4o-mini",
+                    extra_headers={
+                        "HTTP-Referer": self.site_url,
+                        "X-Title": self.site_name,
+                    },
+                    model=self.model,
                     messages=[
                         {
                             "role": "system",
-                            "content": "You are an expert data analysis advisor. Your role is to recommend the best next tool to use based on current analysis results. Return a JSON array of recommendations."
+                            "content": "You are a data workflow expert. Recommend the best next tool based on analysis results. Return only valid JSON."
                         },
-                        {
-                            "role": "user",
-                            "content": prompt
-                        }
+                        {"role": "user", "content": prompt}
                     ],
                     temperature=0.3,
                     max_tokens=800,
                 )
-
-                # Parse response
-                response_text = response.choices[0].message.content.strip()
-
-                # Extract JSON from response
-                try:
-                    # Try direct JSON parsing
-                    recommendations = json.loads(response_text)
-                except json.JSONDecodeError:
-                    # Try extracting JSON from markdown code blocks
-                    if "```json" in response_text:
-                        json_str = response_text.split("```json")[1].split("```")[0].strip()
-                        recommendations = json.loads(json_str)
-                    elif "```" in response_text:
-                        json_str = response_text.split("```")[1].split("```")[0].strip()
-                        recommendations = json.loads(json_str)
-                    else:
-                        raise ValueError("Could not parse JSON from response")
-
-                # Ensure it's a list
-                if not isinstance(recommendations, list):
-                    recommendations = [recommendations]
-
-                # Validate recommendations structure
-                validated_recommendations = []
-                for rec in recommendations:
-                    if isinstance(rec, dict) and "next_tool" in rec:
-                        validated_recommendations.append(rec)
                 
-                return validated_recommendations if validated_recommendations else self._get_fallback_recommendations(current_tool, analysis)
+                content = response.choices[0].message.content.strip()
                 
+                # Try to parse JSON
+                if content.startswith("```json"):
+                    content = content[7:]
+                if content.endswith("```"):
+                    content = content[:-3]
+                content = content.strip()
+                
+                recommendations = json.loads(content)
+                
+                # Validate structure
+                if isinstance(recommendations, list) and len(recommendations) > 0:
+                    return recommendations[:2]  # Return top 2
+                
+                retry_count += 1
+                print(f"Warning: Invalid recommendation format, retry {retry_count}/{max_retries}")
+                
+            except json.JSONDecodeError as e:
+                retry_count += 1
+                print(f"Warning: Failed to parse AI recommendations (retry {retry_count}/{max_retries}): {str(e)}")
             except Exception as e:
                 retry_count += 1
-                if retry_count >= max_retries:
-                    print(f"Error getting AI recommendations after {max_retries} retries: {str(e)}")
-                    # Return rule-based recommendations as fallback
-                    return self._get_fallback_recommendations(current_tool, analysis)
-                else:
-                    # Exponential backoff: wait 1, 2, 4 seconds
-                    wait_time = 2 ** (retry_count - 1)
-                    print(f"Retry {retry_count}/{max_retries} after {wait_time}s. Error: {str(e)}")
-                    time.sleep(wait_time)
+                print(f"Warning: OpenRouter API call failed (retry {retry_count}/{max_retries}): {str(e)}")
         
-        # Should never reach here, but return fallback just in case
+        # Fallback after retries
         return self._get_fallback_recommendations(current_tool, analysis)
 
     def _build_routing_prompt(
@@ -423,12 +365,13 @@ class RoutingDecisionAI:
         available_options = []
         for tool_id, tool_info in self.available_tools.items():
             if tool_id != current_tool:
-                available_options.append(f"- {tool_info['name']} ({tool_id}): {tool_info['description']}")
+                available_options.append(f"- {tool_id}: {tool_info['description']}")
 
         prompt = f"""
-You are analyzing data from a {current_tool_name} analysis. Based on the findings below, recommend the BEST next tool the user should run to maximize value and improve their data.
+You are analyzing data from a {current_tool_name} analysis. Based on the findings below, recommend the BEST 1-2 next tools the user should run to maximize value and improve their data.
 
 CURRENT ANALYSIS FINDINGS:
+- Current Tool: {current_tool}
 - Overall success rate: {analysis['success_rate']*100:.0f}%
 - Key findings: {', '.join(analysis['key_findings']) if analysis['key_findings'] else 'None'}
 - Data quality issues: {', '.join(analysis['data_quality_issues']) if analysis['data_quality_issues'] else 'None'}
@@ -438,26 +381,19 @@ CURRENT ANALYSIS FINDINGS:
 AVAILABLE TOOLS:
 {chr(10).join(available_options)}
 
-TOOL DETAILS:
-Profile My Data:
-  - Use cases: First-time data exploration, quality baseline, drift detection, risk assessment, readiness evaluation, governance check
-  - Files needed: Primary (required), Baseline (optional for drift detection)
-  - Best when: You need comprehensive data understanding
+TOOL DETAILS & USE CASES:
+1. Profile My Data: First-time exploration, quality baseline, drift detection, risk assessment, readiness evaluation
+2. Clean My Data: Remove nulls, handle outliers, fix types, resolve duplicates, standardize fields, improve quality
+3. Master My Data: Identify keys, enforce contracts, map semantics, resolve conflicts, build golden records, manage stewardship
+4. Analyze My Data: Customer segmentation (RFM), market basket analysis, sequence mining, A/B test design
 
-Clean My Data:
-  - Use cases: Remove nulls, handle outliers, fix type issues, validate governance, assess test coverage, improve quality scores, prepare for ML
-  - Files needed: Primary (required)
-  - Best when: Your data has quality issues (nulls, outliers, type mismatches) that need fixing
+ROUTING LOGIC:
+- After profile: If quality < 70 → clean; If risk high → clean or master; If quality good → analyze
+- After clean: → profile (verify improvements) OR master (establish MDM) OR analyze (business insights)
+- After master: → analyze (segment golden records) OR profile (assess master data quality)
+- After analyze: → profile (understand data better) OR clean (improve before re-analysis)
 
-RECOMMENDATION GUIDELINES:
-1. If current tool is profile-my-data and data quality is poor (<70): Recommend clean-my-data
-2. If current tool is clean-my-data and data quality improved: Recommend profile-my-data to verify improvements
-3. If high drift detected in profile: Recommend clean-my-data to handle quality issues
-4. If type mismatches detected: Recommend clean-my-data with type-fixer agent
-5. If governance issues: Recommend profile-my-data governance check or clean-my-data to fix
-6. Always prioritize: Type consistency → Quality → Governance → Risk reduction
-
-Return a JSON array with 1-2 recommendations in this exact format:
+Return a JSON array with 1-2 recommendations in this EXACT format:
 [
   {{
     "next_tool": "tool-id",
@@ -469,7 +405,7 @@ Return a JSON array with 1-2 recommendations in this exact format:
   }}
 ]
 
-IMPORTANT: Return ONLY valid JSON array, no other text.
+IMPORTANT: Return ONLY valid JSON array, no markdown, no other text.
 """
         return prompt
 
@@ -483,72 +419,97 @@ IMPORTANT: Return ONLY valid JSON array, no other text.
         recommendations = []
 
         if current_tool == "profile-my-data":
-            # If quality score is low, recommend cleaning
             quality_score = analysis["scores"].get("quality", 100)
             if quality_score < 70:
                 recommendations.append({
                     "next_tool": "clean-my-data",
-                    "confidence_score": 0.9,
-                    "reason": f"Data quality score is {quality_score:.1f}/100. Run Clean My Data to improve quality through null handling and outlier removal.",
+                    "confidence_score": 0.95,
+                    "reason": "Low quality score detected. Clean data to improve quality metrics.",
                     "priority": 1,
-                    "expected_benefits": ["Improved data quality", "Removed null values", "Handled outliers", "Better readiness scores"],
-                    "estimated_time_minutes": 10
-                })
-
-            # If risk is high, recommend cleaning
-            risk_score = analysis["scores"].get("risk", 0)
-            if risk_score > 70 and quality_score >= 70:
-                recommendations.append({
-                    "next_tool": "clean-my-data",
-                    "confidence_score": 0.8,
-                    "reason": f"Risk score is {risk_score:.1f}/100. Clean My Data can help mitigate identified risks.",
-                    "priority": 2,
-                    "expected_benefits": ["Reduced data risk", "Better data governance compliance", "Improved test coverage"],
+                    "expected_benefits": [
+                        "Remove null values",
+                        "Handle outliers",
+                        "Fix type inconsistencies",
+                        "Improve overall quality score"
+                    ],
                     "estimated_time_minutes": 8
                 })
-
-            # If no issues found, still recommend cleaning as next step
-            if not recommendations:
+            else:
                 recommendations.append({
-                    "next_tool": "clean-my-data",
-                    "confidence_score": 0.7,
-                    "reason": "Proceed to Clean My Data to handle any data quality issues and prepare for production.",
+                    "next_tool": "analyze-my-data",
+                    "confidence_score": 0.85,
+                    "reason": "Data quality is good. Ready for business analytics and segmentation.",
                     "priority": 1,
-                    "expected_benefits": ["Ensure data quality", "Handle nulls and outliers"],
-                    "estimated_time_minutes": 5
+                    "expected_benefits": [
+                        "Customer segmentation",
+                        "Product affinity analysis",
+                        "Behavioral insights"
+                    ],
+                    "estimated_time_minutes": 6
                 })
 
         elif current_tool == "clean-my-data":
-            # After cleaning, recommend profile to verify improvements
             recommendations.append({
                 "next_tool": "profile-my-data",
                 "confidence_score": 0.95,
-                "reason": "Verify data quality improvements and overall data health after cleaning operations.",
+                "reason": "Verify data quality improvements and assess readiness after cleaning.",
                 "priority": 1,
                 "expected_benefits": [
                     "Verify quality score improvements",
                     "Re-assess data readiness",
-                    "Check for new data patterns",
-                    "Validate governance compliance",
-                    "Risk assessment update"
+                    "Validate cleaning operations"
+                ],
+                "estimated_time_minutes": 7
+            })
+            recommendations.append({
+                "next_tool": "master-my-data",
+                "confidence_score": 0.80,
+                "reason": "Establish master data management on cleaned data.",
+                "priority": 2,
+                "expected_benefits": [
+                    "Create golden records",
+                    "Resolve conflicts",
+                    "Single source of truth"
+                ],
+                "estimated_time_minutes": 10
+            })
+
+        elif current_tool == "master-my-data":
+            recommendations.append({
+                "next_tool": "analyze-my-data",
+                "confidence_score": 0.90,
+                "reason": "Golden records ready. Perform business analytics on master data.",
+                "priority": 1,
+                "expected_benefits": [
+                    "Segment golden records",
+                    "Discover patterns",
+                    "Generate insights"
+                ],
+                "estimated_time_minutes": 6
+            })
+
+        elif current_tool == "analyze-my-data":
+            recommendations.append({
+                "next_tool": "profile-my-data",
+                "confidence_score": 0.75,
+                "reason": "Profile data to understand quality and characteristics for better analysis.",
+                "priority": 1,
+                "expected_benefits": [
+                    "Understand data quality",
+                    "Identify issues",
+                    "Improve future analyses"
                 ],
                 "estimated_time_minutes": 7
             })
 
-        # Return at least one recommendation
-        if not recommendations:
-            # Recommend the opposite tool
-            opposite_tool = "clean-my-data" if current_tool == "profile-my-data" else "profile-my-data"
-            recommendations.append({
-                "next_tool": opposite_tool,
-                "confidence_score": 0.7,
-                "reason": "Complementary analysis of your data with the other available tool.",
-                "priority": 1,
-                "expected_benefits": ["Comprehensive data understanding"],
-                "estimated_time_minutes": 5
-            })
-
-        return recommendations
+        return recommendations if recommendations else [{
+            "next_tool": "profile-my-data",
+            "confidence_score": 0.70,
+            "reason": "Start with data profiling to understand your data.",
+            "priority": 1,
+            "expected_benefits": ["Comprehensive data understanding"],
+            "estimated_time_minutes": 7
+        }]
 
     def _format_routing_decisions(
         self,
@@ -566,7 +527,7 @@ IMPORTANT: Return ONLY valid JSON array, no other text.
         for idx, rec in enumerate(recommendations, 1):
             next_tool = rec.get("next_tool", "profile-my-data")
             
-            # Skip if the recommended tool is the same as the current tool
+            # Skip if the recommended tool is the same as current
             if next_tool == current_tool:
                 continue
             
@@ -582,16 +543,13 @@ IMPORTANT: Return ONLY valid JSON array, no other text.
                 "confidence_score": rec.get("confidence_score", 0.7),
                 "reason": rec.get("reason", ""),
                 "priority": rec.get("priority", idx),
-                # Frontend navigation path
                 "path": f"/results/{next_tool}",
-                # Files that should be provided
                 "required_files": {
                     "primary": {
                         "name": base_filename,
                         "available": True
                     }
                 },
-                # Optional baseline file
                 "parameters": {
                     "selected_agents": recommended_agents,
                     "agent_parameters": self._build_agent_parameters(next_tool, rec)
@@ -606,7 +564,7 @@ IMPORTANT: Return ONLY valid JSON array, no other text.
                 ]
             }
 
-            # Add baseline file if drift is to be checked
+            # Add baseline file if applicable
             if baseline_filename and next_tool == "profile-my-data" and "drift-detector" in recommended_agents:
                 routing_decision["required_files"]["baseline"] = {
                     "name": baseline_filename,
@@ -624,19 +582,8 @@ IMPORTANT: Return ONLY valid JSON array, no other text.
         current_tool: str
     ) -> List[str]:
         """Determine which agents should be run for the next tool"""
-
-        all_agents = self.available_tools[next_tool]["agents"]
-
-        # If coming from profile-my-data to clean-my-data: all cleaning agents
-        if current_tool == "profile-my-data" and next_tool == "clean-my-data":
-            return all_agents  # Run all: null-handler, outlier-remover, governance-checker, test-coverage-agent
-
-        # If coming from clean-my-data to profile-my-data: all profiling agents
-        if current_tool == "clean-my-data" and next_tool == "profile-my-data":
-            return all_agents  # Run all: unified-profiler, drift-detector, score-risk, readiness-rater, etc.
-
-        # Default: return all agents
-        return all_agents
+        # Return all agents for the tool
+        return self.available_tools[next_tool]["agents"]
 
     def _build_agent_parameters(
         self,
@@ -644,7 +591,5 @@ IMPORTANT: Return ONLY valid JSON array, no other text.
         recommendation: Dict[str, Any]
     ) -> Dict[str, Any]:
         """Build agent-specific parameters based on recommendation"""
-
-        # For now, return empty - agents use defaults
-        # This can be extended to fine-tune parameters based on findings
+        # Return empty - agents use defaults
         return {}

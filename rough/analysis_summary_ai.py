@@ -1,7 +1,7 @@
 """
-Analysis Summary AI Generator (OpenRouter Version)
+Analysis Summary AI Generator
 
-Generates intelligent, actionable analysis summaries using OpenRouter API.
+Generates intelligent, actionable analysis summaries using OpenAI's language models.
 Universal, general-purpose summarization for any analysis data.
 
 Key Features:
@@ -10,12 +10,6 @@ Key Features:
 - Cost-optimized with smart token management
 - Robust error handling with fallback summaries
 - Works with any agent output structure
-- Uses OpenRouter for access to multiple LLM providers
-
-OpenRouter Integration:
-- Provides access to multiple AI models through a single API
-- Fallback model support for reliability
-- Better pricing and availability options
 """
 
 import os
@@ -34,54 +28,44 @@ except ImportError:
 
 class AnalysisSummaryAI:
     """
-    Generates AI-powered analysis summaries from analysis data using OpenRouter.
+    Generates AI-powered analysis summaries from analysis data.
     Universal generator that works with any analysis tool or agent output.
     """
 
     def __init__(
         self,
         api_key: Optional[str] = None,
-        model: str = "xiaomi/mimo-v2-flash:free", # xiaomi/mimo-v2-flash:free
-        site_url: Optional[str] = None,
-        site_name: Optional[str] = None,
+        model: str = "gpt-4o-mini",
     ):
         """
-        Initialize the Analysis Summary AI generator with OpenRouter.
+        Initialize the Analysis Summary AI generator.
 
         Args:
-            api_key: OpenRouter API key (defaults to OPENROUTER_API_KEY env var)
-            model: Model name to use with OpenRouter
-            site_url: Your site URL for OpenRouter rankings (optional)
-            site_name: Your site name for OpenRouter rankings (optional)
+            api_key: OpenAI API key
+            model: Model name to use (default: gpt-4o-mini - latest & most efficient)
         """
-        # Prefer a provided api_key argument, but fall back to environment variable
-        self.api_key = api_key or os.getenv("OPENROUTER_API_KEY")
+        # Prefer a provided api_key argument, but fall back to environment variable.
+        self.api_key = api_key or os.getenv("OPENAI_API_KEY")
         self.model = model
-        self.site_url = site_url or os.getenv("OPENROUTER_SITE_URL", "https://agensium.app")
-        self.site_name = site_name or os.getenv("OPENROUTER_SITE_NAME", "Agensium")
         self.client = None
         self.use_ai = False
 
         if not self.api_key:
-            # Do not raise here; allow using fallback summarizer behavior when API key is missing
+            # Do not raise here; allow using fallback summarizer behavior when API key is missing.
             print(
-                "Info: OPENROUTER_API_KEY not set. Falling back to rule-based summary for analysis summaries."
+                "Info: OPENAI_API_KEY not set. Falling back to rule-based summary for analysis summaries."
             )
         elif not OPENAI_AVAILABLE:
             print(
-                "Warning: OpenAI package not installed. To enable AI summaries install 'openai' package and set OPENROUTER_API_KEY."
+                "Warning: OpenAI package not installed. To enable AI summaries install 'openai' and set OPENAI_API_KEY."
             )
         else:
             try:
-                # Initialize OpenAI client with OpenRouter base URL
-                self.client = OpenAI(
-                    base_url="https://openrouter.ai/api/v1",
-                    api_key=self.api_key,
-                )
+                self.client = OpenAI(api_key=self.api_key)
                 self.use_ai = True
-                print(f"Info: OpenRouter client initialized successfully with model: {self.model}")
+                print("Info: OpenAI client initialized successfully for analysis summaries.")
             except Exception as e:
-                print(f"Warning: Failed to initialize OpenRouter client: {str(e)}. Using fallback summaries.")
+                print(f"Warning: Failed to initialize OpenAI client: {str(e)}. Using fallback summaries.")
                 self.client = None
                 self.use_ai = False
 
@@ -96,7 +80,7 @@ class AnalysisSummaryAI:
             dataset_name: Name of the dataset being analyzed
 
         Returns:
-            Formatted prompt string for the AI model
+            Formatted prompt string for OpenAI
         """
         prompt = f"""You are an expert data analyst. Based on the following analysis results for "{dataset_name}", 
 generate a professional, actionable analysis summary.
@@ -136,7 +120,7 @@ Be concise, data-driven, and actionable. Focus on what matters most."""
         dataset_name: str = "Dataset",
     ) -> Dict[str, Any]:
         """
-        Generate an analysis summary from text-based analysis data using OpenRouter.
+        Generate an analysis summary from text-based analysis data.
 
         Args:
             analysis_text: Complete analysis data formatted as text/string
@@ -159,9 +143,9 @@ Be concise, data-driven, and actionable. Focus on what matters most."""
             # Create universal prompt
             prompt = self._create_summary_prompt(analysis_text, dataset_name)
 
-            # Call OpenRouter API if configured, otherwise use fallback
+            # Call OpenAI API if configured, otherwise use fallback
             if not self.use_ai or not self.client:
-                # No OpenRouter client configured - return the fallback summary
+                # No OpenAI client configured - return the fallback summary
                 return {
                     "status": "success",
                     "summary": self.get_fallback_summary(analysis_text, dataset_name),
@@ -171,12 +155,8 @@ Be concise, data-driven, and actionable. Focus on what matters most."""
                 }
 
             try:
-                # Call the OpenRouter API with extra headers
+                # Call the OpenAI-based client
                 response = self.client.chat.completions.create(
-                    extra_headers={
-                        "HTTP-Referer": self.site_url,  # For rankings on openrouter.ai
-                        "X-Title": self.site_name,       # For rankings on openrouter.ai
-                    },
                     model=self.model,
                     messages=[
                         {
@@ -199,7 +179,7 @@ Be concise, data-driven, and actionable. Focus on what matters most."""
                     "timestamp": datetime.utcnow().isoformat() + "Z",
                 }
             except Exception as api_error:
-                print(f"Warning: OpenRouter API call failed: {str(api_error)}. Using fallback summary.")
+                print(f"Warning: OpenAI API call failed: {str(api_error)}. Using fallback summary.")
                 return {
                     "status": "success",
                     "summary": self.get_fallback_summary(analysis_text, dataset_name),
@@ -223,7 +203,7 @@ Be concise, data-driven, and actionable. Focus on what matters most."""
         dataset_name: str = "Dataset",
     ) -> str:
         """
-        Generate a rule-based fallback summary when OpenRouter is unavailable.
+        Generate a rule-based fallback summary when OpenAI is unavailable.
         Simple, general-purpose fallback that works with any analysis data.
 
         Args:

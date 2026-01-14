@@ -392,6 +392,13 @@ async def _execute_task_background(task_id: str, user_id: int):
                     current_user=current_user,
                     db=db
                 )
+            elif task.tool_id == "analyze-my-data":
+                from transformers import analyze_my_data_transformer
+                result = await analyze_my_data_transformer.run_analyze_my_data_analysis_v2_1(
+                    task=task,
+                    current_user=current_user,
+                    db=db
+                )
             else:
                 result = {"status": "error", "error": f"Unknown tool: {task.tool_id}", "error_code": "UNKNOWN_TOOL"}
         except Exception as e:
@@ -467,6 +474,13 @@ async def _execute_task(
     elif task.tool_id == "master-my-data":
         from transformers import master_my_data_transformer
         result = await master_my_data_transformer.run_master_my_data_analysis_v2_1(
+            task=task,
+            current_user=current_user,
+            db=db
+        )
+    elif task.tool_id == "analyze-my-data":
+        from transformers import analyze_my_data_transformer
+        result = await analyze_my_data_transformer.run_analyze_my_data_analysis_v2_1(
             task=task,
             current_user=current_user,
             db=db

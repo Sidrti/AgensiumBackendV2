@@ -47,7 +47,7 @@ COMPLIANCE_FRAMEWORKS = {
 }
 
 
-def score_risk(
+def execute_score_risk(
     file_contents: bytes,
     filename: str,
     parameters: Optional[Dict[str, Any]] = None

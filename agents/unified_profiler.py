@@ -15,7 +15,7 @@ from typing import Dict, Any, Optional, List
 from scipy import stats
 
 
-def profile_data(
+def execute_unified_profiler(
     file_contents: bytes,
     filename: str,
     parameters: Optional[Dict[str, Any]] = None

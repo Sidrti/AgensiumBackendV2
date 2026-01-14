@@ -12,6 +12,7 @@ Architecture:
             - profile-my-data → profile_my_data_transformer
             - clean-my-data   → clean_my_data_transformer
             - master-my-data  → master_my_data_transformer
+            - analyze-my-data → analyze_my_data_transformer
         → Update task status on completion/failure
 """
 
@@ -78,6 +79,10 @@ def get_transformer(tool_id: str):
     elif tool_id == "master-my-data":
         from transformers import master_my_data_transformer
         return master_my_data_transformer.run_master_my_data_analysis_v2_1
+
+    elif tool_id == "analyze-my-data":
+        from transformers import analyze_my_data_transformer
+        return analyze_my_data_transformer.run_analyze_my_data_analysis_v2_1
     
     else:
         raise ValueError(f"Unknown tool_id: {tool_id}")

@@ -530,7 +530,7 @@ class TaskCreateRequest(BaseModel):
     @classmethod
     def validate_tool_id(cls, v: str) -> str:
         """Validate tool_id is valid."""
-        valid_tools = ['profile-my-data', 'clean-my-data', 'master-my-data']
+        valid_tools = ['profile-my-data', 'clean-my-data', 'master-my-data','analyze-my-data']
         if v not in valid_tools:
             raise ValueError(f"Invalid tool_id. Must be one of: {valid_tools}")
         return v
