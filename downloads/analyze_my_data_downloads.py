@@ -26,11 +26,10 @@ class AnalyzeMyDataDownloads(BaseDownloader):
             self._create_segmentation_sheet(wb, segmentation_output)
             self._create_segment_customers_sheet(wb, segmentation_output)
         
-        # Future agents:
         # 2. MARKET BASKET & SEQUENCE SHEET
-        # market_output = agent_results.get("market-basket-sequence-agent", {})
-        # if market_output.get("status") == "success":
-        #     self._create_market_basket_sheet(wb, market_output)
+        market_output = agent_results.get("market-basket-sequence-agent", {})
+        if market_output.get("status") == "success":
+            self._create_market_basket_sheet(wb, market_output)
         
         # 3. EXPERIMENTAL DESIGN SHEET
         # experiment_output = agent_results.get("experimental-design-agent", {})
@@ -263,19 +262,190 @@ class AnalyzeMyDataDownloads(BaseDownloader):
     # =========================================================================
     
     def _create_market_basket_sheet(self, wb: Workbook, agent_output: Dict[str, Any]):
-        """Create market basket analysis sheet. (Placeholder for future implementation)"""
-        ws = wb.create_sheet("Market Basket")
-        self.styler.set_column_widths(ws, [30, 30, 15, 15, 15, 40])
+        """Create market basket & sequence analysis sheet."""
+        ws = wb.create_sheet("Market Basket & Sequence")
+        self.styler.set_column_widths(ws, [28, 28, 18, 18, 18, 20, 45])
         
         row = 1
         ws[f'A{row}'] = "MARKET BASKET & SEQUENCE ANALYSIS"
         ws[f'A{row}'].font = Font(bold=True, size=12, color="FFFFFF")
         ws[f'A{row}'].fill = self.header_fill
-        ws.merge_cells(f'A{row}:F{row}')
+        ws.merge_cells(f'A{row}:G{row}')
         row += 2
         
-        # Will be implemented when market-basket-sequence-agent is ready
-        ws[f'A{row}'] = "Agent output will be rendered here when implemented."
+        data = agent_output.get("data", {})
+        analysis = data.get("analysis", {})
+        parameters = analysis.get("parameters", {})
+        columns_used = analysis.get("columns_used", {})
+        mode = analysis.get("mode", "")
+        
+        # Metadata Section
+        metadata = [
+            ["Status", agent_output.get("status", "")],
+            ["Execution Time (ms)", agent_output.get("execution_time_ms", 0)],
+            ["Mode", mode],
+            ["Algorithm", analysis.get("algorithm", "")],
+            ["Industry Context", analysis.get("industry", "")],
+            ["Support Threshold", parameters.get("support", 0)],
+            ["Confidence Threshold", parameters.get("confidence", 0)],
+            ["Lift Threshold", parameters.get("lift", 0)],
+            ["Gap Days", parameters.get("gap_days", 0)],
+            ["Top N Rules", parameters.get("top_n_rules", 0)],
+            ["Min Items / Transaction", parameters.get("min_items_per_transaction", 0)],
+            ["Max Itemset Length", parameters.get("max_itemset_length", 0)],
+        ]
+        
+        for key, value in metadata:
+            ws[f'A{row}'] = key
+            ws[f'B{row}'] = str(value) if value is not None else ""
+            ws[f'A{row}'].font = Font(bold=True)
+            ws[f'A{row}'].fill = self.subheader_fill
+            ws[f'A{row}'].border = self.border
+            ws[f'B{row}'].border = self.border
+            row += 1
+        
+        row += 1
+        
+        # Columns Used Section
+        ws[f'A{row}'] = "COLUMNS USED"
+        ws[f'A{row}'].font = Font(bold=True, size=10)
+        ws[f'A{row}'].fill = self.subheader_fill
+        ws.merge_cells(f'A{row}:B{row}')
+        row += 1
+        
+        columns_info = [
+            ["Transaction ID Column", columns_used.get("transaction_id_column", "")],
+            ["Product ID Column", columns_used.get("product_id_column", "")],
+            ["Customer ID Column", columns_used.get("customer_id_column", "")],
+            ["Timestamp Column", columns_used.get("timestamp_column", "")],
+        ]
+        
+        for key, value in columns_info:
+            ws[f'A{row}'] = key
+            ws[f'B{row}'] = str(value) if value is not None else ""
+            ws[f'A{row}'].border = self.border
+            ws[f'B{row}'].border = self.border
+            row += 1
+        
+        row += 2
+        
+        # Mode-specific summary
+        if mode == "within_basket":
+            within = data.get("within_basket", {})
+            summary_items = [
+                ["Transactions", within.get("transactions", 0)],
+                ["Unique Products", within.get("unique_products", 0)],
+                ["Frequent Itemsets", len(within.get("frequent_itemsets", []))],
+                ["Association Rules", len(within.get("association_rules", []))],
+            ]
+        else:
+            cross = data.get("cross_transaction", {})
+            summary_items = [
+                ["Customers", cross.get("customers", 0)],
+                ["Transactions", cross.get("transactions", 0)],
+                ["Transitions", cross.get("total_transitions", 0)],
+                ["Sequence Rules", len(cross.get("sequence_rules", []))],
+            ]
+        
+        ws[f'A{row}'] = "SUMMARY"
+        ws[f'A{row}'].font = Font(bold=True, size=10)
+        ws[f'A{row}'].fill = self.subheader_fill
+        ws.merge_cells(f'A{row}:B{row}')
+        row += 1
+        
+        for key, value in summary_items:
+            ws[f'A{row}'] = key
+            ws[f'B{row}'] = str(value)
+            ws[f'A{row}'].border = self.border
+            ws[f'B{row}'].border = self.border
+            row += 1
+        
+        row += 2
+        
+        if mode == "within_basket":
+            # Frequent Itemsets
+            ws[f'A{row}'] = "FREQUENT ITEMSETS"
+            ws[f'A{row}'].font = Font(bold=True, size=11)
+            ws[f'A{row}'].fill = self.subheader_fill
+            ws.merge_cells(f'A{row}:G{row}')
+            row += 1
+            
+            headers = ["Items", "Size", "Count", "Support"]
+            for col_idx, header in enumerate(headers, 1):
+                cell = ws.cell(row=row, column=col_idx, value=header)
+                cell.fill = self.header_fill
+                cell.font = self.header_font
+                cell.alignment = self.center_alignment
+                cell.border = self.border
+            row += 1
+            
+            for itemset in data.get("within_basket", {}).get("frequent_itemsets", [])[:200]:
+                ws.cell(row=row, column=1, value=", ".join(itemset.get("items", [])))
+                ws.cell(row=row, column=2, value=itemset.get("size", 0))
+                ws.cell(row=row, column=3, value=itemset.get("count", 0))
+                ws.cell(row=row, column=4, value=itemset.get("support", 0))
+                for col_idx in range(1, 5):
+                    ws.cell(row=row, column=col_idx).border = self.border
+                    ws.cell(row=row, column=col_idx).alignment = self.left_alignment
+                row += 1
+            
+            row += 2
+            
+            # Association Rules
+            ws[f'A{row}'] = "ASSOCIATION RULES"
+            ws[f'A{row}'].font = Font(bold=True, size=11)
+            ws[f'A{row}'].fill = self.subheader_fill
+            ws.merge_cells(f'A{row}:G{row}')
+            row += 1
+            
+            headers = ["Antecedent", "Consequent", "Support", "Confidence", "Lift"]
+            for col_idx, header in enumerate(headers, 1):
+                cell = ws.cell(row=row, column=col_idx, value=header)
+                cell.fill = self.header_fill
+                cell.font = self.header_font
+                cell.alignment = self.center_alignment
+                cell.border = self.border
+            row += 1
+            
+            for rule in data.get("within_basket", {}).get("association_rules", [])[:200]:
+                ws.cell(row=row, column=1, value=", ".join(rule.get("antecedent", [])))
+                ws.cell(row=row, column=2, value=", ".join(rule.get("consequent", [])))
+                ws.cell(row=row, column=3, value=rule.get("support", 0))
+                ws.cell(row=row, column=4, value=rule.get("confidence", 0))
+                ws.cell(row=row, column=5, value=rule.get("lift", 0))
+                for col_idx in range(1, 6):
+                    ws.cell(row=row, column=col_idx).border = self.border
+                    ws.cell(row=row, column=col_idx).alignment = self.left_alignment
+                row += 1
+        else:
+            # Sequence Rules
+            ws[f'A{row}'] = "SEQUENCE RULES"
+            ws[f'A{row}'].font = Font(bold=True, size=11)
+            ws[f'A{row}'].fill = self.subheader_fill
+            ws.merge_cells(f'A{row}:G{row}')
+            row += 1
+            
+            headers = ["From Item", "To Item", "Count", "Support", "Confidence", "Lift", "Avg Gap (Days)"]
+            for col_idx, header in enumerate(headers, 1):
+                cell = ws.cell(row=row, column=col_idx, value=header)
+                cell.fill = self.header_fill
+                cell.font = self.header_font
+                cell.alignment = self.center_alignment
+                cell.border = self.border
+            row += 1
+            
+            for rule in data.get("cross_transaction", {}).get("sequence_rules", [])[:200]:
+                ws.cell(row=row, column=1, value=rule.get("from_item", ""))
+                ws.cell(row=row, column=2, value=rule.get("to_item", ""))
+                ws.cell(row=row, column=3, value=rule.get("count", 0))
+                ws.cell(row=row, column=4, value=rule.get("support", 0))
+                ws.cell(row=row, column=5, value=rule.get("confidence", 0))
+                ws.cell(row=row, column=6, value=rule.get("lift", 0))
+                ws.cell(row=row, column=7, value=rule.get("avg_gap_days", 0))
+                for col_idx in range(1, 8):
+                    ws.cell(row=row, column=col_idx).border = self.border
+                    ws.cell(row=row, column=col_idx).alignment = self.left_alignment
+                row += 1
         
     def _create_experiment_design_sheet(self, wb: Workbook, agent_output: Dict[str, Any]):
         """Create experimental design sheet. (Placeholder for future implementation)"""

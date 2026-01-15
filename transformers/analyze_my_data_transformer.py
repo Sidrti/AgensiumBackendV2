@@ -16,7 +16,7 @@ from fastapi import UploadFile, HTTPException
 
 from ai.analysis_summary_ai import AnalysisSummaryAI
 from downloads.analyze_my_data_downloads import AnalyzeMyDataDownloads
-from agents import customer_segmentation_agent
+from agents import customer_segmentation_agent, market_basket_sequence_agent
 from transformers.transformers_utils import (
     get_required_files,
     validate_files,
@@ -321,9 +321,23 @@ def _execute_agent(
             parameters
         )
     
+    elif agent_id == "market-basket-sequence-agent":
+        if "primary" not in files_map:
+            return {
+                "status": "error",
+                "error": "Market basket agent requires 'primary' file",
+                "execution_time_ms": 0
+            }
+
+        primary_bytes, primary_filename = files_map["primary"]
+
+        return market_basket_sequence_agent.execute_market_basket_sequence_agent(
+            primary_bytes,
+            primary_filename,
+            parameters
+        )
+
     # Future agents for this tool:
-    # elif agent_id == "market-basket-sequence-agent":
-    #     ...
     # elif agent_id == "experimental-design-agent":
     #     ...
     
