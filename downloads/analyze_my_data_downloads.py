@@ -2,7 +2,7 @@
 Analyze My Data Downloads Module
 
 Uses BaseDownloader for standardized report generation.
-Handles downloads for analytics agents: Customer Segmentation, Market Basket, Experimental Design.
+Handles downloads for analytics agents: Customer Segmentation, Market Basket, Experimental Design, Synthetic Control.
 """
 
 from typing import Dict, Any, List
@@ -32,9 +32,15 @@ class AnalyzeMyDataDownloads(BaseDownloader):
             self._create_market_basket_sheet(wb, market_output)
         
         # 3. EXPERIMENTAL DESIGN SHEET
-        # experiment_output = agent_results.get("experimental-design-agent", {})
-        # if experiment_output.get("status") == "success":
-        #     self._create_experiment_design_sheet(wb, experiment_output)
+        experiment_output = agent_results.get("experimental-design-agent", {})
+        if experiment_output.get("status") == "success":
+            self._create_experiment_design_sheet(wb, experiment_output)
+        
+        # 4. SYNTHETIC CONTROL SHEET
+        synthetic_output = agent_results.get("synthetic-control-agent", {})
+        if synthetic_output.get("status") == "success":
+            self._create_synthetic_control_sheet(wb, synthetic_output)
+            self._create_synthetic_time_series_sheet(wb, synthetic_output)
 
     def _create_segmentation_sheet(self, wb: Workbook, agent_output: Dict[str, Any]):
         """Create customer segmentation summary sheet."""
@@ -448,9 +454,9 @@ class AnalyzeMyDataDownloads(BaseDownloader):
                 row += 1
         
     def _create_experiment_design_sheet(self, wb: Workbook, agent_output: Dict[str, Any]):
-        """Create experimental design sheet. (Placeholder for future implementation)"""
+        """Create experimental design sheet."""
         ws = wb.create_sheet("Experimental Design")
-        self.styler.set_column_widths(ws, [30, 20, 20, 40])
+        self.styler.set_column_widths(ws, [35, 25, 25, 50])
         
         row = 1
         ws[f'A{row}'] = "EXPERIMENTAL DESIGN ANALYSIS"
@@ -459,5 +465,404 @@ class AnalyzeMyDataDownloads(BaseDownloader):
         ws.merge_cells(f'A{row}:D{row}')
         row += 2
         
-        # Will be implemented when experimental-design-agent is ready
-        ws[f'A{row}'] = "Agent output will be rendered here when implemented."
+        data = agent_output.get("data", {})
+        summary_metrics = agent_output.get("summary_metrics", {})
+        experiment_design = data.get("experiment_design", {})
+        sample_calc = data.get("sample_size_calculation", {})
+        feasibility = data.get("feasibility", {})
+        quality = data.get("quality", {})
+        
+        # Metadata Section
+        ws[f'A{row}'] = "ANALYSIS METADATA"
+        ws[f'A{row}'].font = Font(bold=True, size=10)
+        ws[f'A{row}'].fill = self.subheader_fill
+        ws.merge_cells(f'A{row}:B{row}')
+        row += 1
+        
+        metadata = [
+            ["Status", agent_output.get("status", "")],
+            ["Execution Time (ms)", agent_output.get("execution_time_ms", 0)],
+            ["Design Quality Score", quality.get("design_quality_score", 0)],
+            ["Quality Status", quality.get("quality_status", "")],
+        ]
+        
+        for key, value in metadata:
+            ws[f'A{row}'] = key
+            ws[f'B{row}'] = str(value) if value is not None else ""
+            ws[f'A{row}'].font = Font(bold=True)
+            ws[f'A{row}'].border = self.border
+            ws[f'B{row}'].border = self.border
+            row += 1
+        
+        row += 1
+        
+        # Experiment Design Parameters
+        ws[f'A{row}'] = "EXPERIMENT DESIGN PARAMETERS"
+        ws[f'A{row}'].font = Font(bold=True, size=10)
+        ws[f'A{row}'].fill = self.subheader_fill
+        ws.merge_cells(f'A{row}:B{row}')
+        row += 1
+        
+        design_params = [
+            ["Baseline Conversion Rate", f"{experiment_design.get('baseline_rate_pct', 0):.2f}%"],
+            ["Minimum Detectable Lift", f"{experiment_design.get('min_detectable_lift_pct', 0):.1f}%"],
+            ["Confidence Level", f"{experiment_design.get('confidence_pct', 0):.0f}%"],
+            ["Statistical Power", f"{experiment_design.get('power_pct', 0):.0f}%"],
+            ["Test Type", experiment_design.get("test_type", "").replace("_", " ").title()],
+        ]
+        
+        for key, value in design_params:
+            ws[f'A{row}'] = key
+            ws[f'B{row}'] = str(value) if value is not None else ""
+            ws[f'A{row}'].border = self.border
+            ws[f'B{row}'].border = self.border
+            row += 1
+        
+        row += 1
+        
+        # Sample Size Calculation Results
+        ws[f'A{row}'] = "SAMPLE SIZE CALCULATION"
+        ws[f'A{row}'].font = Font(bold=True, size=10)
+        ws[f'A{row}'].fill = self.subheader_fill
+        ws.merge_cells(f'A{row}:B{row}')
+        row += 1
+        
+        sample_results = [
+            ["Control Group Size", f"{sample_calc.get('control_group_size', 0):,}"],
+            ["Test Group Size", f"{sample_calc.get('test_group_size', 0):,}"],
+            ["Total Sample Required", f"{sample_calc.get('total_sample_size', 0):,}"],
+            ["Expected Control Rate", f"{sample_calc.get('expected_control_rate', 0)*100:.4f}%"],
+            ["Expected Treatment Rate", f"{sample_calc.get('expected_treatment_rate', 0)*100:.4f}%"],
+            ["Absolute Effect Size", f"{sample_calc.get('absolute_effect_size', 0):.6f}"],
+            ["Z-Alpha (Two-Tailed)", f"{sample_calc.get('z_alpha', 0):.4f}"],
+            ["Z-Beta", f"{sample_calc.get('z_beta', 0):.4f}"],
+        ]
+        
+        for key, value in sample_results:
+            ws[f'A{row}'] = key
+            ws[f'B{row}'] = str(value) if value is not None else ""
+            ws[f'A{row}'].border = self.border
+            ws[f'B{row}'].border = self.border
+            row += 1
+        
+        row += 1
+        
+        # Feasibility Assessment
+        ws[f'A{row}'] = "FEASIBILITY ASSESSMENT"
+        ws[f'A{row}'].font = Font(bold=True, size=10)
+        ws[f'A{row}'].fill = self.subheader_fill
+        ws.merge_cells(f'A{row}:B{row}')
+        row += 1
+        
+        feasibility_items = [
+            ["Is Feasible", "Yes" if feasibility.get("is_feasible") else "No"],
+            ["Feasibility Status", feasibility.get("status", "").upper()],
+            ["Population Size", f"{feasibility.get('population_size', 0):,}" if feasibility.get('population_size') else "Not Provided"],
+            ["Population Utilization", f"{feasibility.get('utilization_pct', 0):.1f}%" if feasibility.get('utilization_pct') else "N/A"],
+            ["Feasibility Message", feasibility.get("message", "")],
+        ]
+        
+        for key, value in feasibility_items:
+            ws[f'A{row}'] = key
+            ws[f'B{row}'] = str(value) if value is not None else ""
+            ws[f'A{row}'].border = self.border
+            ws[f'B{row}'].border = self.border
+            
+            # Special handling for long message
+            if key == "Feasibility Message":
+                ws.merge_cells(f'B{row}:D{row}')
+                ws[f'B{row}'].alignment = self.left_alignment
+            row += 1
+        
+        row += 2
+        
+        # Visual Summary Table
+        ws[f'A{row}'] = "EXPERIMENT SUMMARY"
+        ws[f'A{row}'].font = Font(bold=True, size=11)
+        ws[f'A{row}'].fill = self.subheader_fill
+        ws.merge_cells(f'A{row}:D{row}')
+        row += 1
+        
+        headers = ["Group", "Required Size", "Purpose"]
+        for col_idx, header in enumerate(headers, 1):
+            cell = ws.cell(row=row, column=col_idx, value=header)
+            cell.fill = self.header_fill
+            cell.font = self.header_font
+            cell.alignment = self.center_alignment
+            cell.border = self.border
+        row += 1
+        
+        summary_rows = [
+            ["Control Group", f"{sample_calc.get('control_group_size', 0):,}", "Baseline experience (no change)"],
+            ["Test Group", f"{sample_calc.get('test_group_size', 0):,}", "New experience (treatment)"],
+            ["Total", f"{sample_calc.get('total_sample_size', 0):,}", "Combined experiment population"],
+        ]
+        
+        for group_row in summary_rows:
+            for col_idx, value in enumerate(group_row, 1):
+                cell = ws.cell(row=row, column=col_idx, value=value)
+                cell.border = self.border
+                cell.alignment = self.left_alignment
+            row += 1
+
+    def _create_synthetic_control_sheet(self, wb: Workbook, agent_output: Dict[str, Any]):
+        """Create synthetic control analysis sheet."""
+        ws = wb.create_sheet("Synthetic Control")
+        self.styler.set_column_widths(ws, [35, 25, 25, 25, 40])
+        
+        row = 1
+        ws[f'A{row}'] = "SYNTHETIC CONTROL ANALYSIS"
+        ws[f'A{row}'].font = Font(bold=True, size=12, color="FFFFFF")
+        ws[f'A{row}'].fill = self.header_fill
+        ws.merge_cells(f'A{row}:E{row}')
+        row += 2
+        
+        data = agent_output.get("data", {})
+        summary_metrics = agent_output.get("summary_metrics", {})
+        config = data.get("analysis_configuration", {})
+        data_summary = data.get("data_summary", {})
+        matching = data.get("matching_diagnostics", {})
+        lift = data.get("lift_analysis", {})
+        quality = data.get("quality", {})
+        
+        # Metadata Section
+        ws[f'A{row}'] = "ANALYSIS METADATA"
+        ws[f'A{row}'].font = Font(bold=True, size=10)
+        ws[f'A{row}'].fill = self.subheader_fill
+        ws.merge_cells(f'A{row}:B{row}')
+        row += 1
+        
+        metadata = [
+            ["Status", agent_output.get("status", "")],
+            ["Execution Time (ms)", agent_output.get("execution_time_ms", 0)],
+            ["Match Confidence Score", f"{quality.get('match_confidence_score', 0):.1f}%"],
+            ["Quality Status", quality.get("quality_status", "")],
+        ]
+        
+        for key, value in metadata:
+            ws[f'A{row}'] = key
+            ws[f'B{row}'] = str(value) if value is not None else ""
+            ws[f'A{row}'].font = Font(bold=True)
+            ws[f'A{row}'].border = self.border
+            ws[f'B{row}'].border = self.border
+            row += 1
+        
+        row += 1
+        
+        # Period Configuration
+        periods = config.get("periods", {})
+        ws[f'A{row}'] = "PERIOD CONFIGURATION"
+        ws[f'A{row}'].font = Font(bold=True, size=10)
+        ws[f'A{row}'].fill = self.subheader_fill
+        ws.merge_cells(f'A{row}:B{row}')
+        row += 1
+        
+        pre_period = periods.get("pre_period", {})
+        treatment_period = periods.get("treatment_period", {})
+        
+        period_items = [
+            ["Pre-Period Start", pre_period.get("start_date", "")],
+            ["Pre-Period End", pre_period.get("end_date", "")],
+            ["Pre-Period Days", pre_period.get("days", 0)],
+            ["Treatment Start", treatment_period.get("start_date", "")],
+            ["Treatment End", treatment_period.get("end_date", "")],
+            ["Treatment Days", treatment_period.get("days", 0)],
+        ]
+        
+        for key, value in period_items:
+            ws[f'A{row}'] = key
+            ws[f'B{row}'] = str(value) if value is not None else ""
+            ws[f'A{row}'].border = self.border
+            ws[f'B{row}'].border = self.border
+            row += 1
+        
+        row += 1
+        
+        # Data Summary
+        ws[f'A{row}'] = "DATA SUMMARY"
+        ws[f'A{row}'].font = Font(bold=True, size=10)
+        ws[f'A{row}'].fill = self.subheader_fill
+        ws.merge_cells(f'A{row}:B{row}')
+        row += 1
+        
+        treatment_file = data_summary.get("treatment_file", {})
+        baseline_file = data_summary.get("baseline_file", {})
+        
+        data_items = [
+            ["Treatment File", treatment_file.get("filename", "")],
+            ["Treatment Rows", treatment_file.get("valid_rows", 0)],
+            ["Treatment Customers (Pre)", treatment_file.get("unique_customers_pre", 0)],
+            ["Baseline File", baseline_file.get("filename", "")],
+            ["Baseline Rows", baseline_file.get("valid_rows", 0)],
+            ["Baseline Customers (Pre)", baseline_file.get("unique_customers_pre", 0)],
+            ["Matched Control Customers", baseline_file.get("matched_customers", 0)],
+        ]
+        
+        for key, value in data_items:
+            ws[f'A{row}'] = key
+            ws[f'B{row}'] = str(value) if value is not None else ""
+            ws[f'A{row}'].border = self.border
+            ws[f'B{row}'].border = self.border
+            row += 1
+        
+        row += 1
+        
+        # Matching Diagnostics
+        ws[f'A{row}'] = "MATCHING DIAGNOSTICS"
+        ws[f'A{row}'].font = Font(bold=True, size=10)
+        ws[f'A{row}'].fill = self.subheader_fill
+        ws.merge_cells(f'A{row}:B{row}')
+        row += 1
+        
+        match_items = [
+            ["Treatment Count", matching.get("treatment_count", 0)],
+            ["Control Pool Size", matching.get("control_pool_size", 0)],
+            ["Matched Control Count", matching.get("matched_control_count", 0)],
+            ["Avg Match Distance", f"{matching.get('avg_match_distance', 0):.4f}"],
+            ["Max Match Distance", f"{matching.get('max_match_distance', 0):.4f}"],
+            ["Match Confidence Score", f"{matching.get('match_confidence_score', 0):.1f}%"],
+        ]
+        
+        for key, value in match_items:
+            ws[f'A{row}'] = key
+            ws[f'B{row}'] = str(value) if value is not None else ""
+            ws[f'A{row}'].border = self.border
+            ws[f'B{row}'].border = self.border
+            row += 1
+        
+        row += 2
+        
+        # Lift Analysis Results
+        ws[f'A{row}'] = "LIFT ANALYSIS RESULTS"
+        ws[f'A{row}'].font = Font(bold=True, size=11)
+        ws[f'A{row}'].fill = self.subheader_fill
+        ws.merge_cells(f'A{row}:E{row}')
+        row += 1
+        
+        headers = ["Metric", "Treatment", "Synthetic Control", "Difference"]
+        for col_idx, header in enumerate(headers, 1):
+            cell = ws.cell(row=row, column=col_idx, value=header)
+            cell.fill = self.header_fill
+            cell.font = self.header_font
+            cell.alignment = self.center_alignment
+            cell.border = self.border
+        row += 1
+        
+        treatment_data = lift.get("treatment", {})
+        control_data = lift.get("control", {})
+        lift_data = lift.get("lift", {})
+        
+        lift_rows = [
+            ["Pre-Period Avg", f"${treatment_data.get('pre_period_avg', 0):,.2f}", 
+             f"${control_data.get('pre_period_avg', 0):,.2f}", 
+             f"${treatment_data.get('pre_period_avg', 0) - control_data.get('pre_period_avg', 0):,.2f}"],
+            ["Post-Period Avg", f"${treatment_data.get('post_period_avg', 0):,.2f}", 
+             f"${control_data.get('post_period_avg', 0):,.2f}",
+             f"${treatment_data.get('post_period_avg', 0) - control_data.get('post_period_avg', 0):,.2f}"],
+            ["Change (Post - Pre)", f"${treatment_data.get('change_avg', 0):,.2f}", 
+             f"${control_data.get('change_avg', 0):,.2f}",
+             f"${lift_data.get('incremental_lift_per_customer', 0):,.2f}"],
+            ["Customer Count", str(treatment_data.get('customer_count', 0)), 
+             str(control_data.get('customer_count', 0)), "-"],
+        ]
+        
+        for lift_row in lift_rows:
+            for col_idx, value in enumerate(lift_row, 1):
+                cell = ws.cell(row=row, column=col_idx, value=value)
+                cell.border = self.border
+                cell.alignment = self.left_alignment
+            row += 1
+        
+        row += 1
+        
+        # Final Lift Summary
+        ws[f'A{row}'] = "INCREMENTAL LIFT SUMMARY"
+        ws[f'A{row}'].font = Font(bold=True, size=10)
+        ws[f'A{row}'].fill = self.subheader_fill
+        ws.merge_cells(f'A{row}:B{row}')
+        row += 1
+        
+        lift_summary = [
+            ["Incremental Lift / Customer", f"${lift_data.get('incremental_lift_per_customer', 0):,.2f}"],
+            ["Total Incremental Lift", f"${lift_data.get('total_incremental_lift', 0):,.2f}"],
+            ["Percentage Lift", f"{lift_data.get('percentage_lift', 0):.1f}%"],
+            ["Counterfactual Post Avg", f"${lift_data.get('counterfactual_post_avg', 0):,.2f}"],
+        ]
+        
+        for key, value in lift_summary:
+            ws[f'A{row}'] = key
+            ws[f'B{row}'] = str(value) if value is not None else ""
+            ws[f'A{row}'].font = Font(bold=True)
+            ws[f'A{row}'].border = self.border
+            ws[f'B{row}'].border = self.border
+            row += 1
+
+    def _create_synthetic_time_series_sheet(self, wb: Workbook, agent_output: Dict[str, Any]):
+        """Create synthetic control time series data sheet."""
+        ws = wb.create_sheet("Time Series Data")
+        self.styler.set_column_widths(ws, [15, 18, 18, 15, 15])
+        
+        row = 1
+        ws[f'A{row}'] = "TIME SERIES DATA"
+        ws[f'A{row}'].font = Font(bold=True, size=12, color="FFFFFF")
+        ws[f'A{row}'].fill = self.header_fill
+        ws.merge_cells(f'A{row}:E{row}')
+        row += 2
+        
+        data = agent_output.get("data", {})
+        time_series = data.get("time_series", {})
+        
+        # Treatment Time Series
+        ws[f'A{row}'] = "TREATMENT GROUP TIME SERIES"
+        ws[f'A{row}'].font = Font(bold=True, size=10)
+        ws[f'A{row}'].fill = self.subheader_fill
+        ws.merge_cells(f'A{row}:E{row}')
+        row += 1
+        
+        headers = ["Date", "Daily Value", "Active Customers", "Transactions"]
+        for col_idx, header in enumerate(headers, 1):
+            cell = ws.cell(row=row, column=col_idx, value=header)
+            cell.fill = self.header_fill
+            cell.font = self.header_font
+            cell.alignment = self.center_alignment
+            cell.border = self.border
+        row += 1
+        
+        treatment_series = time_series.get("treatment", [])[:100]  # Limit for Excel
+        for ts_row in treatment_series:
+            ws.cell(row=row, column=1, value=ts_row.get("date", ""))
+            ws.cell(row=row, column=2, value=f"${ts_row.get('value', 0):,.2f}")
+            ws.cell(row=row, column=3, value=ts_row.get("active_customers", 0))
+            ws.cell(row=row, column=4, value=ts_row.get("transactions", 0))
+            for col_idx in range(1, 5):
+                ws.cell(row=row, column=col_idx).border = self.border
+                ws.cell(row=row, column=col_idx).alignment = self.left_alignment
+            row += 1
+        
+        row += 2
+        
+        # Control Time Series
+        ws[f'A{row}'] = "SYNTHETIC CONTROL TIME SERIES"
+        ws[f'A{row}'].font = Font(bold=True, size=10)
+        ws[f'A{row}'].fill = self.subheader_fill
+        ws.merge_cells(f'A{row}:E{row}')
+        row += 1
+        
+        for col_idx, header in enumerate(headers, 1):
+            cell = ws.cell(row=row, column=col_idx, value=header)
+            cell.fill = self.header_fill
+            cell.font = self.header_font
+            cell.alignment = self.center_alignment
+            cell.border = self.border
+        row += 1
+        
+        control_series = time_series.get("synthetic_control", [])[:100]  # Limit for Excel
+        for ts_row in control_series:
+            ws.cell(row=row, column=1, value=ts_row.get("date", ""))
+            ws.cell(row=row, column=2, value=f"${ts_row.get('value', 0):,.2f}")
+            ws.cell(row=row, column=3, value=ts_row.get("active_customers", 0))
+            ws.cell(row=row, column=4, value=ts_row.get("transactions", 0))
+            for col_idx in range(1, 5):
+                ws.cell(row=row, column=col_idx).border = self.border
+                ws.cell(row=row, column=col_idx).alignment = self.left_alignment
+            row += 1

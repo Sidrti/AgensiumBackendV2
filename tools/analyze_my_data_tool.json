@@ -9,11 +9,19 @@
     "version": "1.0.0",
     "available_agents": [
       "customer-segmentation-agent",
-      "market-basket-sequence-agent"
+      "market-basket-sequence-agent",
+      "experimental-design-agent",
+      "synthetic-control-agent"
     ],
     "files": {
       "primary": {
-        "description": "Transaction-level dataset (required for segmentation and market basket; optional for experimental design)",
+        "description": "Transaction-level dataset (required for segmentation and market basket; optional for experimental design; target/exposed group for synthetic control)",
+        "required": false,
+        "formats": ["csv", "xlsx", "json"],
+        "max_size_mb": 500
+      },
+      "baseline": {
+        "description": "Universe/non-exposed group dataset for synthetic control analysis",
         "required": false,
         "formats": ["csv", "xlsx", "json"],
         "max_size_mb": 500
@@ -319,6 +327,183 @@
           "max": 10,
           "show": false,
           "required": false
+        },
+        "excellent_threshold": {
+          "type": "integer",
+          "description": "Score threshold for excellent quality status",
+          "default": 90,
+          "min": 0,
+          "max": 100,
+          "show": false,
+          "required": false
+        },
+        "good_threshold": {
+          "type": "integer",
+          "description": "Score threshold for good quality status",
+          "default": 75,
+          "min": 0,
+          "max": 100,
+          "show": false,
+          "required": false
+        }
+      }
+    },
+    "experimental-design-agent": {
+      "id": "experimental-design-agent",
+      "name": "Experimental Design Agent",
+      "description": "Calculates statistically valid A/B test sample sizes using baseline rate, minimum detectable lift, and significance level.",
+      "icon": "📐",
+      "category": "Experimentation",
+      "accuracy": "95%",
+      "features": [
+        "Baseline Conversion Rate Input",
+        "Minimum Detectable Lift",
+        "Two-Tailed Power Analysis",
+        "Sample Size Calculation",
+        "Feasibility Warnings"
+      ],
+      "input": {
+        "type": "CSV, JSON, XLSX"
+      },
+      "version": "1.0.0",
+      "required_files": ["primary"],
+      "parameters": {
+        "significance_level": {
+          "type": "float",
+          "description": "Desired statistical significance level",
+          "default": 0.95,
+          "allowed": [0.9, 0.95, 0.99],
+          "example": 0.95,
+          "show": true,
+          "required": false
+        },
+        "baseline_rate": {
+          "type": "float",
+          "description": "Baseline conversion/response rate (0-1)",
+          "default": 0.02,
+          "min": 0,
+          "max": 1,
+          "example": 0.02,
+          "show": true,
+          "required": false
+        },
+        "min_detectable_lift": {
+          "type": "float",
+          "description": "Minimum detectable lift as a percentage",
+          "default": 5,
+          "min": 0,
+          "max": 100,
+          "example": 5,
+          "show": true,
+          "required": false
+        },
+        "total_population_size": {
+          "type": "integer",
+          "description": "Optional total audience size for feasibility checks",
+          "default": null,
+          "min": 0,
+          "example": 100000,
+          "show": true,
+          "required": false
+        },
+        "excellent_threshold": {
+          "type": "integer",
+          "description": "Score threshold for excellent quality status",
+          "default": 90,
+          "min": 0,
+          "max": 100,
+          "show": false,
+          "required": false
+        },
+        "good_threshold": {
+          "type": "integer",
+          "description": "Score threshold for good quality status",
+          "default": 75,
+          "min": 0,
+          "max": 100,
+          "show": false,
+          "required": false
+        }
+      }
+    },
+    "synthetic-control-agent": {
+      "id": "synthetic-control-agent",
+      "name": "Synthetic Control Agent",
+      "description": "Measures campaign impact without randomized control by constructing a statistically similar synthetic control population.",
+      "icon": "🧬",
+      "category": "Causal Inference",
+      "accuracy": "94%",
+      "features": [
+        "Synthetic Control Construction",
+        "Counterfactual Comparison",
+        "Incremental Lift Measurement",
+        "Match Confidence Scoring",
+        "Time-Series Visualization"
+      ],
+      "input": {
+        "type": "CSV, JSON, XLSX"
+      },
+      "version": "1.0.0",
+      "required_files": ["primary", "baseline"],
+      "parameters": {
+        "customer_id_column": {
+          "type": "string",
+          "description": "Customer identifier column",
+          "default": null,
+          "example": "customer_id",
+          "show": true,
+          "required": true,
+          "columnSelection": true
+        },
+        "transaction_date_column": {
+          "type": "string",
+          "description": "Transaction/date column",
+          "default": null,
+          "example": "order_date",
+          "show": true,
+          "required": true,
+          "columnSelection": true
+        },
+        "value_column": {
+          "type": "string",
+          "description": "Numeric value column for impact measurement (e.g., revenue)",
+          "default": null,
+          "example": "revenue",
+          "show": true,
+          "required": true,
+          "columnSelection": true
+        },
+        "pre_period_start_date": {
+          "type": "string",
+          "description": "Pre-period start date (YYYY-MM-DD)",
+          "default": null,
+          "example": "2025-01-01",
+          "show": true,
+          "required": true
+        },
+        "pre_period_end_date": {
+          "type": "string",
+          "description": "Pre-period end date (YYYY-MM-DD)",
+          "default": null,
+          "example": "2025-03-31",
+          "show": true,
+          "required": true
+        },
+        "treatment_start_date": {
+          "type": "string",
+          "description": "Campaign/treatment start date (YYYY-MM-DD)",
+          "default": null,
+          "example": "2025-04-01",
+          "show": true,
+          "required": true
+        },
+        "treatment_end_date": {
+          "type": "string",
+          "description": "Campaign/treatment end date (YYYY-MM-DD)",
+          "default": null,
+          "example": "2025-04-30",
+          "show": true,
+          "required": true
         },
         "excellent_threshold": {
           "type": "integer",

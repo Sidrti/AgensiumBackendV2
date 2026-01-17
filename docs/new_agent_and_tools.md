@@ -161,59 +161,124 @@ Cross-Transaction Mode
 
 **Sr No.:** 3  
 **Agent Name:** Experimental Design Agent  
-**Description:** A statistical planning agent that calculates required sample sizes and power analysis for A/B testing and experimental design.
+**Description:** A statistical planning agent that calculates valid A/B test sample sizes using baseline conversion rate, minimum detectable lift, and significance level to prevent underpowered experiments.
 
 **Agent Input:**
 
-- Baseline conversion or response rate
-- Desired effect size
-- Significance level
-- Statistical power requirement
+- Baseline conversion/response rate
+- Minimum detectable lift (%)
+- Desired significance level (90%, 95%, 99%)
+- Optional total customer base size
+- Optional dataset upload (primary)
 
 **Agent Output:**
 
 - Required control group size
 - Required test group size
-- Power analysis results
-- Sample size recommendations
+- Total sample size (N)
+- Feasibility warning if audience is insufficient
 
 **Components (UI):**
 
 - Inputs:
   - a. Significance Level Dropdown
-  - b. Effect Size Input
-  - c. Power Requirement Input
-  - d. Baseline Rate Input
+  - b. Baseline Rate Input
+  - c. Min Detectable Lift Input
+  - d. Optional Total Audience Size Input
 - Outputs:
-  - e. Sample Size Calculator Results
-  - f. Power Analysis Chart
-  - g. Test Duration Estimator
+  - e. Control Group Size (Big Number)
+  - f. Test Group Size (Big Number)
+  - g. Total N Display
+  - h. Validation Warning Banner
 
 **Functionalities:**
 
-- Performs power analysis for two-tailed hypothesis
-- Calculates minimum detectable effect
-- Recommends optimal sample allocation
-- Provides confidence interval estimates
+- Performs two-tailed power analysis for proportions
+- Calculates statistically valid sample sizes
+- Compares required sample size against available audience
+- Flags experiments that are not feasible
+- Protects teams from underpowered tests and false conclusions
 
 **Backend:**
 
 - Python statsmodels power analysis implementation
-- Statistical calculation engine
-- Sample size optimization algorithms
-- Confidence interval computation
+- Evan Miller method logic wrapper
+- Validation layer comparing dataset size vs required N
+- Precision-controlled numeric output service
 
 **Example Workflow:**
-A marketing team wants to test:
+You want to test a new homepage:
 
-- New homepage design vs. current design
-- Baseline conversion rate: 3.2%
-- Desired lift: 15%
-- Significance level: 95%
-- Power: 80%
+- Current conversion rate: 2%
+- Minimum improvement worth detecting: 5%
+- Confidence level: 95%
 
-The agent calculates:
+The agent outputs:
 
-- Required sample size per variant: 15,800 users
-- Estimated test duration: 4-6 weeks
-- Minimum detectable effect: 12%
+1. Control group size: 18,000 users
+2. Test group size: 18,000 users
+3. Total N: 36,000 users
+4. Feasibility warning if the audience is too small
+
+---
+
+## Agent 4: Synthetic Control Agent
+
+**Sr No.:** 4  
+**Agent Name:** Synthetic Control Agent  
+**Description:** A causal inference agent that measures campaign impact when no randomized control group exists by constructing a statistically similar synthetic control population.
+
+**Agent Input:**
+
+- Target group dataset (exposed users) — uploaded as **primary**
+- Universe dataset (non-exposed users) — uploaded as **baseline**
+- Transaction history
+- Time period definitions (pre, during, post)
+
+**Agent Output:**
+
+- Synthetic control time series
+- Actual vs counterfactual comparison
+- Incremental lift measurement
+- Match confidence score
+
+**Components (UI):**
+
+- Inputs:
+  - a. Target Group Upload
+  - b. Universe Group Upload
+  - c. Interactive Timeline Selector
+- Outputs:
+  - d. Dual Line Time Series Chart
+  - e. Shaded Lift Delta Area
+  - f. Match Confidence Score
+
+**Functionalities:**
+
+- Constructs a counterfactual performance baseline
+- Automatically selects predictive matching features
+- Measures true incremental impact of campaigns
+- Visualizes divergence between actual and synthetic trends
+- Quantifies lift with statistical confidence
+
+**Backend:**
+
+- Synthetic control / matching engine for counterfactuals
+- Feature selection and normalization pipeline
+- Time-series aggregation and comparison service
+- Confidence scoring and diagnostics
+
+**Example Workflow:**
+A company runs a nationwide promotion with no control group.
+
+Sales increase 12%. The CEO asks:
+"Was it because of the campaign or because demand was rising anyway?"
+
+The agent creates a synthetic control group by:
+
+1. Studying customers before the promotion
+2. Matching a similar non-exposed population
+3. Comparing actual vs counterfactual trends
+4. Quantifying incremental lift with confidence
+
+---

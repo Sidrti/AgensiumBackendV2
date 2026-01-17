@@ -21,22 +21,12 @@ from datetime import datetime
 def add_analyze_my_data_agents():
     """Add the three missing agents from analyze-my-data tool."""
     
-    # Define the three agents to add
+    # Define the agents to add (only synthetic-control-agent is missing)
     missing_agents = [
         {
-            "agent_id": "customer-segmentation-agent",
+            "agent_id": "synthetic-control-agent",
             "cost": 1,
-            "description": "Customer segmentation and RFM analysis"
-        },
-        {
-            "agent_id": "market-basket-sequence-agent",
-            "cost": 1,
-            "description": "Market basket and sequence mining analysis"
-        },
-        {
-            "agent_id": "experimental-design-agent",
-            "cost": 1,
-            "description": "Experimental design and sample size calculation"
+            "description": "Synthetic control for campaign impact measurement"
         }
     ]
     

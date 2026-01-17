@@ -1,7 +1,7 @@
 """
 Analyze My Data Transformer
 
-Consolidates outputs from analytics agents (Customer Segmentation, Market Basket, Experimental Design)
+Consolidates outputs from analytics agents (Customer Segmentation, Market Basket, Experimental Design, Synthetic Control)
 into unified response. This tool is read-only (does not modify input files).
 
 Agents generate their own alerts, issues, recommendations, executive summaries, and AI analysis.
@@ -16,7 +16,7 @@ from fastapi import UploadFile, HTTPException
 
 from ai.analysis_summary_ai import AnalysisSummaryAI
 from downloads.analyze_my_data_downloads import AnalyzeMyDataDownloads
-from agents import customer_segmentation_agent, market_basket_sequence_agent
+from agents import customer_segmentation_agent, market_basket_sequence_agent, experimental_design_agent, synthetic_control_agent
 from transformers.transformers_utils import (
     get_required_files,
     validate_files,
@@ -337,9 +337,47 @@ def _execute_agent(
             parameters
         )
 
-    # Future agents for this tool:
-    # elif agent_id == "experimental-design-agent":
-    #     ...
+    elif agent_id == "experimental-design-agent":
+        # Experimental design can work with or without a file
+        # If file is provided, it uses population data; otherwise uses parameter-based calculation
+        primary_bytes = None
+        primary_filename = None
+        
+        if "primary" in files_map:
+            primary_bytes, primary_filename = files_map["primary"]
+        
+        return experimental_design_agent.execute_experimental_design_agent(
+            primary_bytes,
+            primary_filename,
+            parameters
+        )
+    
+    elif agent_id == "synthetic-control-agent":
+        # Synthetic control requires both primary (treatment) and baseline (control pool) files
+        if "primary" not in files_map:
+            return {
+                "status": "error",
+                "error": "Synthetic control agent requires 'primary' file (treatment group data)",
+                "execution_time_ms": 0
+            }
+        
+        if "baseline" not in files_map:
+            return {
+                "status": "error",
+                "error": "Synthetic control agent requires 'baseline' file (control pool data)",
+                "execution_time_ms": 0
+            }
+        
+        primary_bytes, primary_filename = files_map["primary"]
+        baseline_bytes, baseline_filename = files_map["baseline"]
+        
+        return synthetic_control_agent.execute_synthetic_control_agent(
+            primary_bytes,
+            primary_filename,
+            baseline_bytes,
+            baseline_filename,
+            parameters
+        )
     
     else:
         return {
