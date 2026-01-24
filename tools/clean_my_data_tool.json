@@ -32,7 +32,8 @@
       "name": "Cleanse Previewer",
       "description": "Provides 'What If' analysis for data cleaning operations before execution. Calculates and presents anticipated effects of cleaning operations to mitigate risk and build trust. Simulates transformations and compares metrics before/after to ensure safe execution.",
       "icon": "🔮",
-      "category": "Data Analysis & Preview",
+      "category": "shape",
+      "isAvailable": true,
       "accuracy": "97%",
       "features": [
         "What-If Simulation",
@@ -176,7 +177,8 @@
       "name": "Quarantine Agent",
       "description": "Identifies, isolates, and manages bad, invalid, or suspicious data to prevent corruption of the main processing pipeline. Detects missing required fields, type mismatches, out-of-range values, invalid formats, broken records, and schema mismatches.",
       "icon": "☣️",
-      "category": "Data Quality & Security",
+      "category": "shape",
+      "isAvailable": true,
       "accuracy": "98%",
       "features": [
         "Invalid Data Detection",
@@ -326,7 +328,8 @@
       "name": "Type Fixer",
       "description": "Detects and fixes data type inconsistencies in columns. Analyzes column types and applies configurable type conversion strategies to ensure proper data types (numeric, integer, datetime, string, category).",
       "icon": "🏷️",
-      "category": "Data Cleaning",
+      "category": "shape",
+      "isAvailable": true,
       "accuracy": "96%",
       "features": [
         "Type Detection",
@@ -420,7 +423,8 @@
       "name": "Field Standardization",
       "description": "Standardizes field values across datasets with comprehensive normalization strategies. Handles case normalization, whitespace trimming, synonym replacement, and unit alignment to ensure data consistency and uniformity.",
       "icon": "📏",
-      "category": "Data Cleaning",
+      "category": "shape",
+      "isAvailable": true,
       "accuracy": "98%",
       "features": [
         "Case Normalization (lowercase, uppercase, titlecase)",
@@ -596,7 +600,8 @@
       "name": "Duplicate Resolver",
       "description": "Detects and resolves duplicate records with comprehensive duplicate detection strategies. Handles exact duplicates, case/whitespace variations, email case-insensitivity, missing value duplicates, and conflicting duplicates with configurable merge strategies.",
       "icon": "�️",
-      "category": "Data Cleaning",
+      "category": "shape",
+      "isAvailable": true,
       "accuracy": "99%",
       "features": [
         "Exact Duplicate Detection",
@@ -730,7 +735,8 @@
       "name": "Null Handler",
       "description": "Detects and handles missing values in data. Analyzes null patterns and applies configurable imputation strategies including mean, median, mode, forward fill, backward fill, KNN imputation, and row/column removal.",
       "icon": "🧩",
-      "category": "Data Cleaning",
+      "category": "shape",
+      "isAvailable": true,
       "accuracy": "98%",
       "features": [
         "Null Detection",
@@ -838,7 +844,8 @@
       "name": "Outlier Remover",
       "description": "Detects and handles outliers in numeric data. Uses configurable detection methods (Z-score, IQR, Percentile) and removal/imputation strategies to clean data while maintaining integrity.",
       "icon": "✂️",
-      "category": "Data Cleaning",
+      "category": "shape",
+      "isAvailable": true,
       "accuracy": "97%",
       "features": [
         "Outlier Detection",
@@ -958,7 +965,8 @@
       "name": "Cleanse Writeback",
       "description": "Final quality assurance and documentation step that guarantees the dataset leaving the 'Cleanse My Data' tool is not only fixed but also perfectly documented and ready for the next tool. Performs integrity verification, finalizes comprehensive manifest of all cleaning operations, and packages data with complete audit log for chain integrity and auditability.",
       "icon": "💾",
-      "category": "Data Quality Assurance",
+      "category": "shape",
+      "isAvailable": true,
       "accuracy": "99%",
       "features": [
         "Integrity Verification",

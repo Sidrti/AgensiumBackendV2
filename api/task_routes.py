@@ -392,7 +392,7 @@ async def _execute_task_background(task_id: str, user_id: int):
                     current_user=current_user,
                     db=db
                 )
-            elif task.tool_id == "analyze-my-data":
+            elif task.tool_id == "analyze-my-data" or task.tool_id == "customer-segmentation" or task.tool_id == "experimental-design" or task.tool_id == "market-basket-sequence"  or task.tool_id == "synthetic-control":
                 from transformers import analyze_my_data_transformer
                 result = await analyze_my_data_transformer.run_analyze_my_data_analysis_v2_1(
                     task=task,
@@ -439,88 +439,6 @@ async def _execute_task_background(task_id: str, user_id: int):
             print(f"Failed to update task status after error: {db_error}")
     finally:
         db.close()
-
-
-# DEPRECATED: Old synchronous execution function
-async def _execute_task(
-    task: models.Task,
-    current_user: models.User,
-    db: Session
-) -> schemas.TaskResponse:
-    """
-    DEPRECATED: Execute task processing synchronously.
-    
-    This function is kept for reference but is no longer used.
-    Use _execute_task_background instead for async processing.
-    """
-    import time
-    start_time = time.time()
-
-    # Execute based on tool
-    if task.tool_id == "profile-my-data":
-        from transformers import profile_my_data_transformer
-        result = await profile_my_data_transformer.run_profile_my_data_analysis_v2_1(
-            task=task,
-            current_user=current_user,
-            db=db
-        )
-    elif task.tool_id == "clean-my-data":
-        from transformers import clean_my_data_transformer
-        result = await clean_my_data_transformer.run_clean_my_data_analysis_v2_1(
-            task=task,
-            current_user=current_user,
-            db=db
-        )
-    elif task.tool_id == "master-my-data":
-        from transformers import master_my_data_transformer
-        result = await master_my_data_transformer.run_master_my_data_analysis_v2_1(
-            task=task,
-            current_user=current_user,
-            db=db
-        )
-    elif task.tool_id == "analyze-my-data":
-        from transformers import analyze_my_data_transformer
-        result = await analyze_my_data_transformer.run_analyze_my_data_analysis_v2_1(
-            task=task,
-            current_user=current_user,
-            db=db
-        )
-    else:
-        raise HTTPException(status_code=400, detail=f"Unknown tool: {task.tool_id}")
-
-    execution_time_ms = int((time.time() - start_time) * 1000)
-
-    # Update task based on result
-    if result.get("status") == "success":
-        task.status = TaskStatus.COMPLETED.value
-        task.completed_at = datetime.now(timezone.utc)
-        task.progress = 100
-        task.current_agent = None
-    else:
-        task.status = TaskStatus.FAILED.value
-        task.failed_at = datetime.now(timezone.utc)
-        task.error_code = result.get("error_code", "PROCESSING_ERROR")
-        task.error_message = result.get("error")
-
-    db.commit()
-    db.refresh(task)
-
-    return schemas.TaskResponse(
-        task_id=task.task_id,
-        status=schemas.TaskStatusEnum(task.status),
-        tool_id=task.tool_id,
-        agents=task.agents,
-        progress=task.progress,
-        created_at=task.created_at,
-        processing_started_at=task.processing_started_at,
-        completed_at=task.completed_at,
-        failed_at=task.failed_at,
-        downloads_available=task.status == TaskStatus.COMPLETED.value,
-        execution_time_ms=execution_time_ms,
-        error_code=task.error_code,
-        error_message=task.error_message,
-        message="Analysis completed." if task.status == TaskStatus.COMPLETED.value else "Analysis failed."
-    )
 
 
 # ============================================================================
@@ -793,12 +711,14 @@ async def get_task_report(
 
 def _get_download_name(filename: str, tool_id: str) -> str:
     """Generate a human-readable name for a download file."""
-    tool_names = {
-        "profile-my-data": "Profile My Data",
-        "clean-my-data": "Clean My Data",
-        "master-my-data": "Master My Data"
-    }
-    tool_name = tool_names.get(tool_id, tool_id)
+
+    from main import TOOL_DEFINITIONS
+    
+    # Get tool name from TOOL_DEFINITIONS
+    tool_name = tool_id
+    if tool_id in TOOL_DEFINITIONS:
+        tool_name = TOOL_DEFINITIONS[tool_id]["tool"].get("name", tool_id)
+    
     
     if filename.endswith('.xlsx'):
         return f"{tool_name} - Complete Analysis Report"

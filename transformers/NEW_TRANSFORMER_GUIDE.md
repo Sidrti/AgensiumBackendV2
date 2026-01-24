@@ -251,7 +251,11 @@ def transform_my_tool_response(
     # Combine agent AI texts and call AnalysisSummaryAI
     
     # 4. Generate Downloads
-    # Use tool-specific Downloads class
+    # Use tool-specific Downloads class, passing dynamic identity
+    downloader = MyToolDownloads(tool_id, tool_name)
+    downloads = downloader.generate_downloads(
+        # ... args ...
+    )
     
     # 5. Return Final Structure
     return {

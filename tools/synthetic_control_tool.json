@@ -1,0 +1,128 @@
+{
+  "tool": {
+    "id": "synthetic-control",
+    "name": "Synthetic Control",
+    "description": "Measures campaign impact without randomized control by constructing a statistically similar synthetic control population.",
+    "icon": "🧬",
+    "category": "analyze",
+    "isAvailable": true,
+    "version": "1.0.0",
+    "available_agents": ["synthetic-control-agent"],
+    "files": {
+      "primary": {
+        "description": "Time-series or transaction-level dataset for the treated/exposed group (required)",
+        "required": true,
+        "formats": ["csv", "xlsx", "json"],
+        "max_size_mb": 500
+      },
+      "baseline": {
+        "description": "Universe/non-exposed comparator dataset used to build the synthetic control (required)",
+        "required": true,
+        "formats": ["csv", "xlsx", "json"],
+        "max_size_mb": 500
+      }
+    }
+  },
+  "agents": {
+    "synthetic-control-agent": {
+      "id": "synthetic-control-agent",
+      "name": "Synthetic Control Agent",
+      "description": "Measures campaign impact without randomized control by constructing a statistically similar synthetic control population.",
+      "icon": "🧬",
+      "category": "analyze",
+      "isAvailable": true,
+      "accuracy": "94%",
+      "features": [
+        "Synthetic Control Construction",
+        "Counterfactual Comparison",
+        "Incremental Lift Measurement",
+        "Match Confidence Scoring",
+        "Time-Series Visualization"
+      ],
+      "input": {
+        "type": "CSV, JSON, XLSX"
+      },
+      "version": "1.0.0",
+      "required_files": ["primary", "baseline"],
+      "parameters": {
+        "customer_id_column": {
+          "type": "string",
+          "description": "Customer identifier column",
+          "default": null,
+          "example": "customer_id",
+          "show": true,
+          "required": true,
+          "columnSelection": true
+        },
+        "transaction_date_column": {
+          "type": "string",
+          "description": "Transaction/date column",
+          "default": null,
+          "example": "order_date",
+          "show": true,
+          "required": true,
+          "columnSelection": true
+        },
+        "value_column": {
+          "type": "string",
+          "description": "Numeric value column for impact measurement (e.g., revenue)",
+          "default": null,
+          "example": "revenue",
+          "show": true,
+          "required": true,
+          "columnSelection": true
+        },
+        "pre_period_start_date": {
+          "type": "string",
+          "description": "Pre-period start date (YYYY-MM-DD)",
+          "default": null,
+          "example": "2025-01-01",
+          "show": true,
+          "required": true
+        },
+        "pre_period_end_date": {
+          "type": "string",
+          "description": "Pre-period end date (YYYY-MM-DD)",
+          "default": null,
+          "example": "2025-03-31",
+          "show": true,
+          "required": true
+        },
+        "treatment_start_date": {
+          "type": "string",
+          "description": "Campaign/treatment start date (YYYY-MM-DD)",
+          "default": null,
+          "example": "2025-04-01",
+          "show": true,
+          "required": true
+        },
+        "treatment_end_date": {
+          "type": "string",
+          "description": "Campaign/treatment end date (YYYY-MM-DD)",
+          "default": null,
+          "example": "2025-04-30",
+          "show": true,
+          "required": true
+        },
+        "excellent_threshold": {
+          "type": "integer",
+          "description": "Score threshold for excellent quality status",
+          "default": 90,
+          "min": 0,
+          "max": 100,
+          "show": false,
+          "required": false
+        },
+        "good_threshold": {
+          "type": "integer",
+          "description": "Score threshold for good quality status",
+          "default": 75,
+          "min": 0,
+          "max": 100,
+          "show": false,
+          "required": false
+        }
+      }
+    }
+  }
+}

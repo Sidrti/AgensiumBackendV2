@@ -529,8 +529,12 @@ class TaskCreateRequest(BaseModel):
     @field_validator('tool_id')
     @classmethod
     def validate_tool_id(cls, v: str) -> str:
-        """Validate tool_id is valid."""
-        valid_tools = ['profile-my-data', 'clean-my-data', 'master-my-data','analyze-my-data']
+        """Validate tool_id is valid against TOOL_DEFINITIONS."""
+        # Late import to avoid circular dependency
+        from main import TOOL_DEFINITIONS
+        
+        valid_tools = list(TOOL_DEFINITIONS.keys())
+        print("Valid tools for validation:", valid_tools)
         if v not in valid_tools:
             raise ValueError(f"Invalid tool_id. Must be one of: {valid_tools}")
         return v

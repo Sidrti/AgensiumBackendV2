@@ -1,0 +1,187 @@
+{
+  "tool": {
+    "id": "market-basket-sequence",
+    "name": "Market Basket Sequence",
+    "description": "Finds product co-purchase rules (within basket) and next-purchase sequences (cross transaction) to support bundling, promotions, and intent prediction.",
+    "icon": "🛒",
+    "category": "analyze",
+    "isAvailable": true,
+    "version": "1.0.0",
+    "available_agents": ["market-basket-sequence-agent"],
+    "files": {
+      "primary": {
+        "description": "Basket-level dataset with transaction/order identifiers and product items (required for within-basket analysis; required for cross-transaction when customer_id and timestamp are present)",
+        "required": true,
+        "formats": ["csv", "xlsx", "json"],
+        "max_size_mb": 500
+      }
+    }
+  },
+  "agents": {
+    "market-basket-sequence-agent": {
+      "id": "market-basket-sequence-agent",
+      "name": "Market Basket & Sequence Agent",
+      "description": "Finds product co-purchase rules (within basket) and next-purchase sequences (cross transaction) to support bundling, promotions, and intent prediction.",
+      "icon": "🛒",
+      "category": "analyze",
+      "isAvailable": true,
+      "accuracy": "96%",
+      "features": [
+        "Frequent Itemsets (Apriori / FP-Growth)",
+        "Association Rules (Support/Confidence/Lift)",
+        "Cross-Transaction Sequence Mining",
+        "Next Purchase Prediction",
+        "Graph-ready Output Formatting"
+      ],
+      "input": {
+        "type": "CSV, JSON, XLSX"
+      },
+      "version": "1.0.0",
+      "required_files": ["primary"],
+      "parameters": {
+        "industry": {
+          "type": "string",
+          "description": "Optional industry context to improve recommendations",
+          "default": null,
+          "example": "hardware",
+          "show": true,
+          "required": false
+        },
+        "mode": {
+          "type": "string",
+          "description": "Analysis mode",
+          "default": "within_basket",
+          "allowed": ["within_basket", "cross_transaction"],
+          "example": "within_basket",
+          "show": true,
+          "required": false
+        },
+        "algorithm": {
+          "type": "string",
+          "description": "Frequent itemset mining algorithm",
+          "default": "fp_growth",
+          "allowed": ["apriori", "fp_growth"],
+          "show": false,
+          "required": false
+        },
+        "support": {
+          "type": "float",
+          "description": "Minimum support threshold (0-1)",
+          "default": 0.02,
+          "min": 0,
+          "max": 1,
+          "show": true,
+          "required": false
+        },
+        "confidence": {
+          "type": "float",
+          "description": "Minimum confidence threshold (0-1)",
+          "default": 0.3,
+          "min": 0,
+          "max": 1,
+          "show": true,
+          "required": false
+        },
+        "lift": {
+          "type": "float",
+          "description": "Minimum lift threshold (>= 0)",
+          "default": 1.2,
+          "min": 0,
+          "max": 100,
+          "show": true,
+          "required": false
+        },
+        "gap_days": {
+          "type": "integer",
+          "description": "Maximum time gap (days) between transactions to consider a sequence step (used when mode=cross_transaction)",
+          "default": 14,
+          "min": 0,
+          "max": 365,
+          "show": true,
+          "required": false
+        },
+        "top_n_rules": {
+          "type": "integer",
+          "description": "Max number of rules to return",
+          "default": 50,
+          "min": 1,
+          "max": 500,
+          "show": false,
+          "required": false
+        },
+        "transaction_id_column": {
+          "type": "string",
+          "description": "Transaction/order identifier column (required for within basket)",
+          "default": null,
+          "example": "order_id",
+          "show": true,
+          "required": true,
+          "columnSelection": true
+        },
+        "product_id_column": {
+          "type": "string",
+          "description": "Product identifier column",
+          "default": null,
+          "example": "product_sku",
+          "show": true,
+          "required": true,
+          "columnSelection": true
+        },
+        "customer_id_column": {
+          "type": "string",
+          "description": "Customer identifier column (required for cross_transaction sequences)",
+          "default": null,
+          "example": "customer_id",
+          "show": true,
+          "required": false,
+          "columnSelection": true
+        },
+        "timestamp_column": {
+          "type": "string",
+          "description": "Transaction timestamp/date column (recommended; required for cross_transaction)",
+          "default": null,
+          "example": "order_date",
+          "show": true,
+          "required": false,
+          "columnSelection": true
+        },
+        "min_items_per_transaction": {
+          "type": "integer",
+          "description": "Minimum items per transaction to include in within-basket analysis",
+          "default": 1,
+          "min": 1,
+          "max": 100,
+          "show": false,
+          "required": false
+        },
+        "max_itemset_length": {
+          "type": "integer",
+          "description": "Maximum itemset length to consider",
+          "default": 3,
+          "min": 2,
+          "max": 10,
+          "show": false,
+          "required": false
+        },
+        "excellent_threshold": {
+          "type": "integer",
+          "description": "Score threshold for excellent quality status",
+          "default": 90,
+          "min": 0,
+          "max": 100,
+          "show": false,
+          "required": false
+        },
+        "good_threshold": {
+          "type": "integer",
+          "description": "Score threshold for good quality status",
+          "default": 75,
+          "min": 0,
+          "max": 100,
+          "show": false,
+          "required": false
+        }
+      }
+    }
+  }
+}

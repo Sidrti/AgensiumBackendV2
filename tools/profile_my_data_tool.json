@@ -11,7 +11,6 @@
       "unified-profiler",
       "drift-detector",
       "score-risk",
-      "governance-checker",
       "test-coverage-agent",
       "readiness-rater"
     ],
@@ -36,7 +35,8 @@
       "name": "Unified Profiler",
       "description": "Comprehensive data profiling with statistics and quality metrics. Analyzes data completeness, validity, consistency, and identifies quality issues across all fields.",
       "icon": "📈",
-      "category": "Data Analysis",
+      "category": "source",
+      "isAvailable": true,
       "accuracy": "99%",
       "features": [
         "Statistical Analysis",
@@ -108,7 +108,8 @@
       "name": "Drift Detector",
       "description": "Detects changes (drift) between baseline and current datasets. Identifies statistical shifts, distribution changes, and anomalies using multiple statistical tests.",
       "icon": "�",
-      "category": "Comparison",
+      "category": "source",
+      "isAvailable": true,
       "accuracy": "97%",
       "features": [
         "Statistical Testing",
@@ -154,7 +155,8 @@
       "name": "Risk Scorer",
       "description": "Identifies PII, calculates risk scores, and assesses compliance requirements. Detects sensitive data, evaluates governance gaps, and provides security assessments.",
       "icon": "🛡️",
-      "category": "Security",
+      "category": "source",
+      "isAvailable": true,
       "accuracy": "96%",
       "features": [
         "PII Detection",
@@ -222,7 +224,8 @@
       "name": "Test Coverage Agent",
       "description": "Validates data test coverage including uniqueness, range, and format constraints. Ensures data meets quality and validation requirements for testing.",
       "icon": "🧪",
-      "category": "Testing",
+      "category": "source",
+      "isAvailable": true,
       "accuracy": "97%",
       "features": [
         "Uniqueness Testing",
@@ -325,7 +328,8 @@
       "name": "Readiness Rater",
       "description": "Rates data readiness for analysis based on quality metrics. Evaluates completeness, consistency, and schema health to determine if data is production-ready.",
       "icon": "🚦",
-      "category": "Quality Assessment",
+      "category": "source",
+      "isAvailable": true,
       "accuracy": "98%",
       "features": [
         "Readiness Scoring",

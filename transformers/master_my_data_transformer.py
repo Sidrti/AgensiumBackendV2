@@ -152,6 +152,8 @@ async def run_master_my_data_analysis(
             agent_results,
             int((time.time() - start_time) * 1000),
             analysis_id,
+            tool_id,
+            tool_def["tool"]["name"],
             current_user
         )
         
@@ -279,6 +281,8 @@ async def run_master_my_data_analysis_v2_1(
             agent_results,
             int((time.time() - start_time) * 1000),
             task.task_id,
+            task.tool_id,
+            tool_def["tool"]["name"],
             current_user
         )
         
@@ -445,6 +449,8 @@ def transform_master_my_data_response(
     agent_results: Dict[str, Any],
     execution_time_ms: int,
     analysis_id: str,
+    tool_id: str,
+    tool_name: str,
     current_user: Any = None
 ) -> Dict[str, Any]:
     """Consolidate agent outputs into unified response."""
@@ -664,7 +670,7 @@ def transform_master_my_data_response(
         cleaned_files[most_mastered_item["agent_id"]] = mastered_file_data
         print(f"Using most processed file from [{most_mastered_item['agent_id']}]: {most_mastered_item['filename']} -> {mastered_filename}")
     
-    downloader = MasterMyDataDownloads()
+    downloader = MasterMyDataDownloads(tool_id, tool_name)
 
     # Sanitize agent_results for downloads: remove potentially large mastered/cleaned file contents
     # The chosen mastered file(s) are already passed via cleaned_files, so we avoid duplicating

@@ -49,7 +49,7 @@ async def health():
 async def list_tools():
     """List all available tools."""
     from main import TOOL_DEFINITIONS
-    
+     
     tools = []
     for tool_id, tool_def in TOOL_DEFINITIONS.items():
         tools.append({
@@ -150,7 +150,7 @@ async def analyze(
                 analysis_id,
                 current_user
             )
-        elif tool_id == "analyze-my-data":
+        elif tool_id == "analyze-my-data" or tool_id == "customer-segmentation" or tool_id == "experimental-design" or tool_id == "market-basket-sequence"  or tool_id == "synthetic-control":
             final_response = await analyze_my_data_transformer.run_analyze_my_data_analysis(
                 tool_id,
                 agents,

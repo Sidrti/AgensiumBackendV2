@@ -1,27 +1,31 @@
 {
   "metadata": {
-    "analysis_id": "e3535f9f-c6f0-456c-86cb-03d0c39ee56f",
+    "analysis_id": "64780f54-9153-42a4-a54b-13ec422c57d0",
     "tool": "analyze-my-data",
-    "timestamp": "2026-01-15T13:11:12.103585Z",
-    "execution_time_ms": 3709,
+    "timestamp": "2026-01-24T09:31:06.353847Z",
+    "execution_time_ms": 6914,
     "report_version": "1.0",
-    "agents_name": [],
-    "lineage": []
+    "agents_name": [
+      "Customer Segmentation Agent"
+    ],
+    "lineage": [
+      "Customer Segmentation Agent"
+    ]
   },
   "executive_summary": [
     {
       "summary_id": "exec_agents_used",
       "title": "Agents Executed",
-      "value": "0/1",
-      "status": "warning",
-      "description": "0 of 1 agents executed successfully"
+      "value": "1/1",
+      "status": "success",
+      "description": "1 of 1 agents executed successfully"
     },
     {
       "summary_id": "exec_execution_time",
       "title": "Total Execution Time",
-      "value": "3.71s",
+      "value": "6.91s",
       "status": "excellent",
-      "description": "Analysis completed in 3.71 seconds"
+      "description": "Analysis completed in 6.91 seconds"
     },
     {
       "summary_id": "exec_total_alerts",
@@ -33,54 +37,1222 @@
     {
       "summary_id": "exec_total_issues",
       "title": "Total Issues",
-      "value": "0",
-      "status": "success",
-      "description": "0 issue(s) detected across all fields"
+      "value": "1",
+      "status": "warning",
+      "description": "1 issue(s) detected across all fields"
     },
     {
       "summary_id": "exec_total_recommendations",
       "title": "Total Recommendations",
-      "value": "0",
+      "value": "1",
       "status": "info",
-      "description": "0 actionable recommendation(s) generated"
+      "description": "1 actionable recommendation(s) generated"
+    },
+    {
+      "summary_id": "exec_segmentation_customers",
+      "title": "Customers Segmented",
+      "value": "275",
+      "status": "good",
+      "description": "Computed segments for 275 unique customers."
+    },
+    {
+      "summary_id": "exec_segmentation_top_share",
+      "title": "Top Segment Value Share",
+      "value": "82.7%",
+      "status": "excellent",
+      "description": "Share of total value contributed by the highest-ranked segment."
+    },
+    {
+      "summary_id": "exec_segmentation_input_quality",
+      "title": "Input Quality",
+      "value": "95.4",
+      "status": "excellent",
+      "description": "Invalid rows: 180 (4.6%)."
     }
   ],
   "analysis_summary": {
     "status": "success",
-    "summary": "## Executive Summary\nThe Business Analytics Analysis completed successfully in 3.71 seconds with no alerts, issues, or recommendations generated. However, the execution of the primary agent failed (0 of 1 successful), indicating a potential configuration or connectivity issue that prevented the core analytical workflow from running. Overall system health is stable, but the analysis is incomplete due to the agent execution failure.\n\n## Technical Findings\n- **Agent Execution Failure**: 0 of 1 agents executed successfully, preventing the full analysis from running and yielding no actionable insights.\n- **No Data Issues Detected**: Zero issues were found across all fields, suggesting the underlying data structure is sound but not fully processed.\n- **No Alerts or Recommendations**: The absence of alerts or recommendations indicates the analysis did not reach a stage where insights could be generated.\n- **Fast Execution Time**: The analysis completed in 3.71 seconds, showing the system is responsive but the workflow is incomplete.\n\n## Recommended Actions\n- **Priority 1: Investigate Agent Configuration**: Review and validate the agent's setup, permissions, and connectivity to resolve the execution failure and enable full analysis.\n- **Priority 2: Verify Data Source Access**: Ensure the agent has proper access to required data sources to prevent silent failures during execution.\n- **Priority 3: Implement Agent Health Monitoring**: Set up real-time monitoring for agent status to detect and alert on execution failures promptly.\n- **Priority 4: Test with a Simplified Workflow**: Run a basic test case to isolate whether the issue is with the agent or the analysis logic.\n\n## Next Steps\nRe-run the analysis after addressing the agent execution failure to generate complete insights and recommendations. Monitor agent performance and data pipeline health continuously to ensure reliable future executions.",
-    "execution_time_ms": 7594,
+    "summary": "## Executive Summary\nThe business analytics analysis completed successfully with strong overall health, segmenting 275 customers into 5 RFM segments. The model shows excellent data quality (95.4/100) and high predictive value, with the top segment contributing 82.7% of total revenue. One issue was detected, but the analysis generated a single actionable recommendation for immediate focus.\n\n## Technical Findings\n- **High Concentration of Value:** The top RFM segment accounts for 82.7% of total revenue ($624,694), indicating a highly skewed customer base where a small group drives most value.\n- **Excellent Data Quality:** Input data scored 95.4/100 with only 4.6% invalid rows (180 rows), ensuring reliable segmentation results.\n- **Efficient Execution:** The analysis completed in 6.91 seconds with zero alerts, demonstrating a stable and ready-to-deploy model.\n- **Single Critical Issue:** One issue was detected across all fields, which requires investigation to ensure model integrity before full-scale deployment.\n\n## Recommended Actions\n- **Priority 1: Investigate and resolve the single detected issue** to ensure model accuracy and prevent potential data integrity problems in future runs.\n- **Priority 2: Develop targeted retention strategies for the top segment** (82.7% value share) to protect and maximize revenue from your most valuable customers.\n- **Priority 3: Review and clean the 180 invalid rows** to improve data quality from 95.4% to near-perfect levels for future analyses.\n- **Priority 4: Create engagement campaigns for lower-value segments** to balance revenue distribution and reduce dependency on the top segment.\n\n## Next Steps\nDeploy the validated RFM model for ongoing customer segmentation and monitor segment performance monthly. Establish a data quality dashboard to track invalid row rates and ensure the single detected issue does not recur in future analyses.",
+    "execution_time_ms": 12673,
     "model_used": "xiaomi/mimo-v2-flash:free",
-    "timestamp": "2026-01-15T13:11:07.463624Z"
+    "timestamp": "2026-01-24T09:30:56.682828Z"
   },
   "summary": {
     "total_alerts": 0,
-    "total_issues": 0,
-    "total_recommendations": 0,
+    "total_issues": 1,
+    "total_recommendations": 1,
     "critical_alerts": 0,
     "high_severity_alerts": 0,
     "medium_severity_alerts": 0
   },
   "alerts": [],
-  "issues": [],
-  "recommendations": [],
-  "row_level_issues": [],
+  "issues": [
+    {
+      "issue_id": "issue_segmentation_quality",
+      "agent_id": "customer-segmentation-agent",
+      "field_name": "dataset",
+      "issue_type": "segmentation_quality",
+      "severity": "low",
+      "message": "Segmentation input quality score: 95.4/100 (excellent)."
+    }
+  ],
+  "recommendations": [
+    {
+      "recommendation_id": "rec_segmentation_activation",
+      "agent_id": "customer-segmentation-agent",
+      "field_name": "segments",
+      "priority": "medium",
+      "recommendation": "Use segment summaries to target actions: reward top segments, nurture mid segments, and run win-back campaigns for at-risk/lost segments.",
+      "timeline": "1-2 weeks"
+    }
+  ],
+  "row_level_issues": [
+    {
+      "row_index": 62,
+      "column": "Customer_ID",
+      "issue_type": "missing_customer_id",
+      "severity": "critical",
+      "message": "Missing customer identifier",
+      "value": null
+    },
+    {
+      "row_index": 72,
+      "column": "Customer_ID",
+      "issue_type": "missing_customer_id",
+      "severity": "critical",
+      "message": "Missing customer identifier",
+      "value": null
+    },
+    {
+      "row_index": 108,
+      "column": "Customer_ID",
+      "issue_type": "missing_customer_id",
+      "severity": "critical",
+      "message": "Missing customer identifier",
+      "value": null
+    },
+    {
+      "row_index": 256,
+      "column": "Customer_ID",
+      "issue_type": "missing_customer_id",
+      "severity": "critical",
+      "message": "Missing customer identifier",
+      "value": null
+    },
+    {
+      "row_index": 391,
+      "column": "Customer_ID",
+      "issue_type": "missing_customer_id",
+      "severity": "critical",
+      "message": "Missing customer identifier",
+      "value": null
+    },
+    {
+      "row_index": 420,
+      "column": "Customer_ID",
+      "issue_type": "missing_customer_id",
+      "severity": "critical",
+      "message": "Missing customer identifier",
+      "value": null
+    },
+    {
+      "row_index": 455,
+      "column": "Customer_ID",
+      "issue_type": "missing_customer_id",
+      "severity": "critical",
+      "message": "Missing customer identifier",
+      "value": null
+    },
+    {
+      "row_index": 602,
+      "column": "Customer_ID",
+      "issue_type": "missing_customer_id",
+      "severity": "critical",
+      "message": "Missing customer identifier",
+      "value": null
+    },
+    {
+      "row_index": 621,
+      "column": "Customer_ID",
+      "issue_type": "missing_customer_id",
+      "severity": "critical",
+      "message": "Missing customer identifier",
+      "value": null
+    },
+    {
+      "row_index": 817,
+      "column": "Customer_ID",
+      "issue_type": "missing_customer_id",
+      "severity": "critical",
+      "message": "Missing customer identifier",
+      "value": null
+    },
+    {
+      "row_index": 1031,
+      "column": "Customer_ID",
+      "issue_type": "missing_customer_id",
+      "severity": "critical",
+      "message": "Missing customer identifier",
+      "value": null
+    },
+    {
+      "row_index": 1074,
+      "column": "Customer_ID",
+      "issue_type": "missing_customer_id",
+      "severity": "critical",
+      "message": "Missing customer identifier",
+      "value": null
+    },
+    {
+      "row_index": 1375,
+      "column": "Customer_ID",
+      "issue_type": "missing_customer_id",
+      "severity": "critical",
+      "message": "Missing customer identifier",
+      "value": null
+    },
+    {
+      "row_index": 1431,
+      "column": "Customer_ID",
+      "issue_type": "missing_customer_id",
+      "severity": "critical",
+      "message": "Missing customer identifier",
+      "value": null
+    },
+    {
+      "row_index": 1451,
+      "column": "Customer_ID",
+      "issue_type": "missing_customer_id",
+      "severity": "critical",
+      "message": "Missing customer identifier",
+      "value": null
+    },
+    {
+      "row_index": 1483,
+      "column": "Customer_ID",
+      "issue_type": "missing_customer_id",
+      "severity": "critical",
+      "message": "Missing customer identifier",
+      "value": null
+    },
+    {
+      "row_index": 1527,
+      "column": "Customer_ID",
+      "issue_type": "missing_customer_id",
+      "severity": "critical",
+      "message": "Missing customer identifier",
+      "value": null
+    },
+    {
+      "row_index": 1592,
+      "column": "Customer_ID",
+      "issue_type": "missing_customer_id",
+      "severity": "critical",
+      "message": "Missing customer identifier",
+      "value": null
+    },
+    {
+      "row_index": 1607,
+      "column": "Customer_ID",
+      "issue_type": "missing_customer_id",
+      "severity": "critical",
+      "message": "Missing customer identifier",
+      "value": null
+    },
+    {
+      "row_index": 1623,
+      "column": "Customer_ID",
+      "issue_type": "missing_customer_id",
+      "severity": "critical",
+      "message": "Missing customer identifier",
+      "value": null
+    },
+    {
+      "row_index": 1679,
+      "column": "Customer_ID",
+      "issue_type": "missing_customer_id",
+      "severity": "critical",
+      "message": "Missing customer identifier",
+      "value": null
+    },
+    {
+      "row_index": 1685,
+      "column": "Customer_ID",
+      "issue_type": "missing_customer_id",
+      "severity": "critical",
+      "message": "Missing customer identifier",
+      "value": null
+    },
+    {
+      "row_index": 1706,
+      "column": "Customer_ID",
+      "issue_type": "missing_customer_id",
+      "severity": "critical",
+      "message": "Missing customer identifier",
+      "value": null
+    },
+    {
+      "row_index": 1751,
+      "column": "Customer_ID",
+      "issue_type": "missing_customer_id",
+      "severity": "critical",
+      "message": "Missing customer identifier",
+      "value": null
+    },
+    {
+      "row_index": 1782,
+      "column": "Customer_ID",
+      "issue_type": "missing_customer_id",
+      "severity": "critical",
+      "message": "Missing customer identifier",
+      "value": null
+    },
+    {
+      "row_index": 1809,
+      "column": "Customer_ID",
+      "issue_type": "missing_customer_id",
+      "severity": "critical",
+      "message": "Missing customer identifier",
+      "value": null
+    },
+    {
+      "row_index": 1891,
+      "column": "Customer_ID",
+      "issue_type": "missing_customer_id",
+      "severity": "critical",
+      "message": "Missing customer identifier",
+      "value": null
+    },
+    {
+      "row_index": 1975,
+      "column": "Customer_ID",
+      "issue_type": "missing_customer_id",
+      "severity": "critical",
+      "message": "Missing customer identifier",
+      "value": null
+    },
+    {
+      "row_index": 1985,
+      "column": "Customer_ID",
+      "issue_type": "missing_customer_id",
+      "severity": "critical",
+      "message": "Missing customer identifier",
+      "value": null
+    },
+    {
+      "row_index": 2040,
+      "column": "Customer_ID",
+      "issue_type": "missing_customer_id",
+      "severity": "critical",
+      "message": "Missing customer identifier",
+      "value": null
+    },
+    {
+      "row_index": 2071,
+      "column": "Customer_ID",
+      "issue_type": "missing_customer_id",
+      "severity": "critical",
+      "message": "Missing customer identifier",
+      "value": null
+    },
+    {
+      "row_index": 2170,
+      "column": "Customer_ID",
+      "issue_type": "missing_customer_id",
+      "severity": "critical",
+      "message": "Missing customer identifier",
+      "value": null
+    },
+    {
+      "row_index": 2195,
+      "column": "Customer_ID",
+      "issue_type": "missing_customer_id",
+      "severity": "critical",
+      "message": "Missing customer identifier",
+      "value": null
+    },
+    {
+      "row_index": 2209,
+      "column": "Customer_ID",
+      "issue_type": "missing_customer_id",
+      "severity": "critical",
+      "message": "Missing customer identifier",
+      "value": null
+    },
+    {
+      "row_index": 2270,
+      "column": "Customer_ID",
+      "issue_type": "missing_customer_id",
+      "severity": "critical",
+      "message": "Missing customer identifier",
+      "value": null
+    },
+    {
+      "row_index": 2345,
+      "column": "Customer_ID",
+      "issue_type": "missing_customer_id",
+      "severity": "critical",
+      "message": "Missing customer identifier",
+      "value": null
+    },
+    {
+      "row_index": 2415,
+      "column": "Customer_ID",
+      "issue_type": "missing_customer_id",
+      "severity": "critical",
+      "message": "Missing customer identifier",
+      "value": null
+    },
+    {
+      "row_index": 2565,
+      "column": "Customer_ID",
+      "issue_type": "missing_customer_id",
+      "severity": "critical",
+      "message": "Missing customer identifier",
+      "value": null
+    },
+    {
+      "row_index": 2898,
+      "column": "Customer_ID",
+      "issue_type": "missing_customer_id",
+      "severity": "critical",
+      "message": "Missing customer identifier",
+      "value": null
+    },
+    {
+      "row_index": 2929,
+      "column": "Customer_ID",
+      "issue_type": "missing_customer_id",
+      "severity": "critical",
+      "message": "Missing customer identifier",
+      "value": null
+    },
+    {
+      "row_index": 3057,
+      "column": "Customer_ID",
+      "issue_type": "missing_customer_id",
+      "severity": "critical",
+      "message": "Missing customer identifier",
+      "value": null
+    },
+    {
+      "row_index": 3131,
+      "column": "Customer_ID",
+      "issue_type": "missing_customer_id",
+      "severity": "critical",
+      "message": "Missing customer identifier",
+      "value": null
+    },
+    {
+      "row_index": 3137,
+      "column": "Customer_ID",
+      "issue_type": "missing_customer_id",
+      "severity": "critical",
+      "message": "Missing customer identifier",
+      "value": null
+    },
+    {
+      "row_index": 3197,
+      "column": "Customer_ID",
+      "issue_type": "missing_customer_id",
+      "severity": "critical",
+      "message": "Missing customer identifier",
+      "value": null
+    },
+    {
+      "row_index": 3215,
+      "column": "Customer_ID",
+      "issue_type": "missing_customer_id",
+      "severity": "critical",
+      "message": "Missing customer identifier",
+      "value": null
+    },
+    {
+      "row_index": 3218,
+      "column": "Customer_ID",
+      "issue_type": "missing_customer_id",
+      "severity": "critical",
+      "message": "Missing customer identifier",
+      "value": null
+    },
+    {
+      "row_index": 3256,
+      "column": "Customer_ID",
+      "issue_type": "missing_customer_id",
+      "severity": "critical",
+      "message": "Missing customer identifier",
+      "value": null
+    },
+    {
+      "row_index": 3304,
+      "column": "Customer_ID",
+      "issue_type": "missing_customer_id",
+      "severity": "critical",
+      "message": "Missing customer identifier",
+      "value": null
+    },
+    {
+      "row_index": 3356,
+      "column": "Customer_ID",
+      "issue_type": "missing_customer_id",
+      "severity": "critical",
+      "message": "Missing customer identifier",
+      "value": null
+    },
+    {
+      "row_index": 3391,
+      "column": "Customer_ID",
+      "issue_type": "missing_customer_id",
+      "severity": "critical",
+      "message": "Missing customer identifier",
+      "value": null
+    },
+    {
+      "row_index": 3477,
+      "column": "Customer_ID",
+      "issue_type": "missing_customer_id",
+      "severity": "critical",
+      "message": "Missing customer identifier",
+      "value": null
+    },
+    {
+      "row_index": 3592,
+      "column": "Customer_ID",
+      "issue_type": "missing_customer_id",
+      "severity": "critical",
+      "message": "Missing customer identifier",
+      "value": null
+    },
+    {
+      "row_index": 3782,
+      "column": "Customer_ID",
+      "issue_type": "missing_customer_id",
+      "severity": "critical",
+      "message": "Missing customer identifier",
+      "value": null
+    },
+    {
+      "row_index": 3821,
+      "column": "Customer_ID",
+      "issue_type": "missing_customer_id",
+      "severity": "critical",
+      "message": "Missing customer identifier",
+      "value": null
+    },
+    {
+      "row_index": 3822,
+      "column": "Customer_ID",
+      "issue_type": "missing_customer_id",
+      "severity": "critical",
+      "message": "Missing customer identifier",
+      "value": null
+    },
+    {
+      "row_index": 3848,
+      "column": "Customer_ID",
+      "issue_type": "missing_customer_id",
+      "severity": "critical",
+      "message": "Missing customer identifier",
+      "value": null
+    },
+    {
+      "row_index": 3854,
+      "column": "Customer_ID",
+      "issue_type": "missing_customer_id",
+      "severity": "critical",
+      "message": "Missing customer identifier",
+      "value": null
+    },
+    {
+      "row_index": 3856,
+      "column": "Customer_ID",
+      "issue_type": "missing_customer_id",
+      "severity": "critical",
+      "message": "Missing customer identifier",
+      "value": null
+    },
+    {
+      "row_index": 3869,
+      "column": "Customer_ID",
+      "issue_type": "missing_customer_id",
+      "severity": "critical",
+      "message": "Missing customer identifier",
+      "value": null
+    },
+    {
+      "row_index": 3909,
+      "column": "Customer_ID",
+      "issue_type": "missing_customer_id",
+      "severity": "critical",
+      "message": "Missing customer identifier",
+      "value": null
+    },
+    {
+      "row_index": 1,
+      "column": "Order_Date",
+      "issue_type": "invalid_date",
+      "severity": "high",
+      "message": "Transaction date could not be parsed",
+      "value": "not_a_date"
+    },
+    {
+      "row_index": 165,
+      "column": "Order_Date",
+      "issue_type": "invalid_date",
+      "severity": "high",
+      "message": "Transaction date could not be parsed",
+      "value": "2025-13-40"
+    },
+    {
+      "row_index": 526,
+      "column": "Order_Date",
+      "issue_type": "invalid_date",
+      "severity": "high",
+      "message": "Transaction date could not be parsed",
+      "value": "not_a_date"
+    },
+    {
+      "row_index": 630,
+      "column": "Order_Date",
+      "issue_type": "invalid_date",
+      "severity": "high",
+      "message": "Transaction date could not be parsed",
+      "value": "2025-13-40"
+    },
+    {
+      "row_index": 715,
+      "column": "Order_Date",
+      "issue_type": "invalid_date",
+      "severity": "high",
+      "message": "Transaction date could not be parsed",
+      "value": "01/35/2025"
+    },
+    {
+      "row_index": 747,
+      "column": "Order_Date",
+      "issue_type": "invalid_date",
+      "severity": "high",
+      "message": "Transaction date could not be parsed",
+      "value": "01/35/2025"
+    },
+    {
+      "row_index": 750,
+      "column": "Order_Date",
+      "issue_type": "invalid_date",
+      "severity": "high",
+      "message": "Transaction date could not be parsed",
+      "value": "2025-13-40"
+    },
+    {
+      "row_index": 910,
+      "column": "Order_Date",
+      "issue_type": "invalid_date",
+      "severity": "high",
+      "message": "Transaction date could not be parsed",
+      "value": "not_a_date"
+    },
+    {
+      "row_index": 951,
+      "column": "Order_Date",
+      "issue_type": "invalid_date",
+      "severity": "high",
+      "message": "Transaction date could not be parsed",
+      "value": "01/35/2025"
+    },
+    {
+      "row_index": 998,
+      "column": "Order_Date",
+      "issue_type": "invalid_date",
+      "severity": "high",
+      "message": "Transaction date could not be parsed",
+      "value": "01/35/2025"
+    },
+    {
+      "row_index": 1112,
+      "column": "Order_Date",
+      "issue_type": "invalid_date",
+      "severity": "high",
+      "message": "Transaction date could not be parsed",
+      "value": "2025-13-40"
+    },
+    {
+      "row_index": 1332,
+      "column": "Order_Date",
+      "issue_type": "invalid_date",
+      "severity": "high",
+      "message": "Transaction date could not be parsed",
+      "value": "2025-13-40"
+    },
+    {
+      "row_index": 1351,
+      "column": "Order_Date",
+      "issue_type": "invalid_date",
+      "severity": "high",
+      "message": "Transaction date could not be parsed",
+      "value": "01/35/2025"
+    },
+    {
+      "row_index": 1354,
+      "column": "Order_Date",
+      "issue_type": "invalid_date",
+      "severity": "high",
+      "message": "Transaction date could not be parsed",
+      "value": "not_a_date"
+    },
+    {
+      "row_index": 1473,
+      "column": "Order_Date",
+      "issue_type": "invalid_date",
+      "severity": "high",
+      "message": "Transaction date could not be parsed",
+      "value": "2025-13-40"
+    },
+    {
+      "row_index": 1508,
+      "column": "Order_Date",
+      "issue_type": "invalid_date",
+      "severity": "high",
+      "message": "Transaction date could not be parsed",
+      "value": "01/35/2025"
+    },
+    {
+      "row_index": 1515,
+      "column": "Order_Date",
+      "issue_type": "invalid_date",
+      "severity": "high",
+      "message": "Transaction date could not be parsed",
+      "value": "not_a_date"
+    },
+    {
+      "row_index": 1516,
+      "column": "Order_Date",
+      "issue_type": "invalid_date",
+      "severity": "high",
+      "message": "Transaction date could not be parsed",
+      "value": "01/35/2025"
+    },
+    {
+      "row_index": 1620,
+      "column": "Order_Date",
+      "issue_type": "invalid_date",
+      "severity": "high",
+      "message": "Transaction date could not be parsed",
+      "value": "not_a_date"
+    },
+    {
+      "row_index": 1708,
+      "column": "Order_Date",
+      "issue_type": "invalid_date",
+      "severity": "high",
+      "message": "Transaction date could not be parsed",
+      "value": "2025-13-40"
+    },
+    {
+      "row_index": 1885,
+      "column": "Order_Date",
+      "issue_type": "invalid_date",
+      "severity": "high",
+      "message": "Transaction date could not be parsed",
+      "value": "not_a_date"
+    },
+    {
+      "row_index": 1930,
+      "column": "Order_Date",
+      "issue_type": "invalid_date",
+      "severity": "high",
+      "message": "Transaction date could not be parsed",
+      "value": "2025-13-40"
+    },
+    {
+      "row_index": 2078,
+      "column": "Order_Date",
+      "issue_type": "invalid_date",
+      "severity": "high",
+      "message": "Transaction date could not be parsed",
+      "value": "not_a_date"
+    },
+    {
+      "row_index": 2282,
+      "column": "Order_Date",
+      "issue_type": "invalid_date",
+      "severity": "high",
+      "message": "Transaction date could not be parsed",
+      "value": "not_a_date"
+    },
+    {
+      "row_index": 2575,
+      "column": "Order_Date",
+      "issue_type": "invalid_date",
+      "severity": "high",
+      "message": "Transaction date could not be parsed",
+      "value": "not_a_date"
+    },
+    {
+      "row_index": 2576,
+      "column": "Order_Date",
+      "issue_type": "invalid_date",
+      "severity": "high",
+      "message": "Transaction date could not be parsed",
+      "value": "01/35/2025"
+    },
+    {
+      "row_index": 2902,
+      "column": "Order_Date",
+      "issue_type": "invalid_date",
+      "severity": "high",
+      "message": "Transaction date could not be parsed",
+      "value": "2025-13-40"
+    },
+    {
+      "row_index": 3162,
+      "column": "Order_Date",
+      "issue_type": "invalid_date",
+      "severity": "high",
+      "message": "Transaction date could not be parsed",
+      "value": "01/35/2025"
+    },
+    {
+      "row_index": 3165,
+      "column": "Order_Date",
+      "issue_type": "invalid_date",
+      "severity": "high",
+      "message": "Transaction date could not be parsed",
+      "value": "01/35/2025"
+    },
+    {
+      "row_index": 3237,
+      "column": "Order_Date",
+      "issue_type": "invalid_date",
+      "severity": "high",
+      "message": "Transaction date could not be parsed",
+      "value": "2025-13-40"
+    },
+    {
+      "row_index": 3318,
+      "column": "Order_Date",
+      "issue_type": "invalid_date",
+      "severity": "high",
+      "message": "Transaction date could not be parsed",
+      "value": "01/35/2025"
+    },
+    {
+      "row_index": 3392,
+      "column": "Order_Date",
+      "issue_type": "invalid_date",
+      "severity": "high",
+      "message": "Transaction date could not be parsed",
+      "value": "2025-13-40"
+    },
+    {
+      "row_index": 3655,
+      "column": "Order_Date",
+      "issue_type": "invalid_date",
+      "severity": "high",
+      "message": "Transaction date could not be parsed",
+      "value": "01/35/2025"
+    },
+    {
+      "row_index": 3739,
+      "column": "Order_Date",
+      "issue_type": "invalid_date",
+      "severity": "high",
+      "message": "Transaction date could not be parsed",
+      "value": "not_a_date"
+    },
+    {
+      "row_index": 3749,
+      "column": "Order_Date",
+      "issue_type": "invalid_date",
+      "severity": "high",
+      "message": "Transaction date could not be parsed",
+      "value": "not_a_date"
+    },
+    {
+      "row_index": 3919,
+      "column": "Order_Date",
+      "issue_type": "invalid_date",
+      "severity": "high",
+      "message": "Transaction date could not be parsed",
+      "value": "2025-13-40"
+    },
+    {
+      "row_index": 98,
+      "column": "Revenue",
+      "issue_type": "invalid_numeric",
+      "severity": "high",
+      "message": "Value could not be parsed as numeric",
+      "value": "NaN"
+    },
+    {
+      "row_index": 281,
+      "column": "Revenue",
+      "issue_type": "invalid_numeric",
+      "severity": "high",
+      "message": "Value could not be parsed as numeric",
+      "value": "$123.45"
+    },
+    {
+      "row_index": 770,
+      "column": "Revenue",
+      "issue_type": "invalid_numeric",
+      "severity": "high",
+      "message": "Value could not be parsed as numeric",
+      "value": "inf"
+    },
+    {
+      "row_index": 863,
+      "column": "Revenue",
+      "issue_type": "invalid_numeric",
+      "severity": "high",
+      "message": "Value could not be parsed as numeric",
+      "value": "N/A"
+    },
+    {
+      "row_index": 973,
+      "column": "Revenue",
+      "issue_type": "invalid_numeric",
+      "severity": "high",
+      "message": "Value could not be parsed as numeric",
+      "value": "$123.45"
+    },
+    {
+      "row_index": 1097,
+      "column": "Revenue",
+      "issue_type": "invalid_numeric",
+      "severity": "high",
+      "message": "Value could not be parsed as numeric",
+      "value": "1O0"
+    },
+    {
+      "row_index": 1216,
+      "column": "Revenue",
+      "issue_type": "invalid_numeric",
+      "severity": "high",
+      "message": "Value could not be parsed as numeric",
+      "value": "inf"
+    },
+    {
+      "row_index": 1278,
+      "column": "Revenue",
+      "issue_type": "invalid_numeric",
+      "severity": "high",
+      "message": "Value could not be parsed as numeric",
+      "value": "inf"
+    },
+    {
+      "row_index": 1283,
+      "column": "Revenue",
+      "issue_type": "invalid_numeric",
+      "severity": "high",
+      "message": "Value could not be parsed as numeric",
+      "value": "$123.45"
+    },
+    {
+      "row_index": 1338,
+      "column": "Revenue",
+      "issue_type": "invalid_numeric",
+      "severity": "high",
+      "message": "Value could not be parsed as numeric",
+      "value": "NaN"
+    },
+    {
+      "row_index": 1628,
+      "column": "Revenue",
+      "issue_type": "invalid_numeric",
+      "severity": "high",
+      "message": "Value could not be parsed as numeric",
+      "value": "-inf"
+    },
+    {
+      "row_index": 1707,
+      "column": "Revenue",
+      "issue_type": "invalid_numeric",
+      "severity": "high",
+      "message": "Value could not be parsed as numeric",
+      "value": "1O0"
+    },
+    {
+      "row_index": 1903,
+      "column": "Revenue",
+      "issue_type": "invalid_numeric",
+      "severity": "high",
+      "message": "Value could not be parsed as numeric",
+      "value": "N/A"
+    },
+    {
+      "row_index": 1911,
+      "column": "Revenue",
+      "issue_type": "invalid_numeric",
+      "severity": "high",
+      "message": "Value could not be parsed as numeric",
+      "value": "NaN"
+    },
+    {
+      "row_index": 1933,
+      "column": "Revenue",
+      "issue_type": "invalid_numeric",
+      "severity": "high",
+      "message": "Value could not be parsed as numeric",
+      "value": "N/A"
+    },
+    {
+      "row_index": 2101,
+      "column": "Revenue",
+      "issue_type": "invalid_numeric",
+      "severity": "high",
+      "message": "Value could not be parsed as numeric",
+      "value": "1O0"
+    },
+    {
+      "row_index": 2233,
+      "column": "Revenue",
+      "issue_type": "invalid_numeric",
+      "severity": "high",
+      "message": "Value could not be parsed as numeric",
+      "value": "-inf"
+    },
+    {
+      "row_index": 2239,
+      "column": "Revenue",
+      "issue_type": "invalid_numeric",
+      "severity": "high",
+      "message": "Value could not be parsed as numeric",
+      "value": "N/A"
+    },
+    {
+      "row_index": 2260,
+      "column": "Revenue",
+      "issue_type": "invalid_numeric",
+      "severity": "high",
+      "message": "Value could not be parsed as numeric",
+      "value": "inf"
+    },
+    {
+      "row_index": 2271,
+      "column": "Revenue",
+      "issue_type": "invalid_numeric",
+      "severity": "high",
+      "message": "Value could not be parsed as numeric",
+      "value": "1O0"
+    },
+    {
+      "row_index": 2290,
+      "column": "Revenue",
+      "issue_type": "invalid_numeric",
+      "severity": "high",
+      "message": "Value could not be parsed as numeric",
+      "value": "$123.45"
+    },
+    {
+      "row_index": 2439,
+      "column": "Revenue",
+      "issue_type": "invalid_numeric",
+      "severity": "high",
+      "message": "Value could not be parsed as numeric",
+      "value": "1O0"
+    },
+    {
+      "row_index": 2443,
+      "column": "Revenue",
+      "issue_type": "invalid_numeric",
+      "severity": "high",
+      "message": "Value could not be parsed as numeric",
+      "value": "NaN"
+    },
+    {
+      "row_index": 2569,
+      "column": "Revenue",
+      "issue_type": "invalid_numeric",
+      "severity": "high",
+      "message": "Value could not be parsed as numeric",
+      "value": "NaN"
+    },
+    {
+      "row_index": 2608,
+      "column": "Revenue",
+      "issue_type": "invalid_numeric",
+      "severity": "high",
+      "message": "Value could not be parsed as numeric",
+      "value": "N/A"
+    },
+    {
+      "row_index": 2657,
+      "column": "Revenue",
+      "issue_type": "invalid_numeric",
+      "severity": "high",
+      "message": "Value could not be parsed as numeric",
+      "value": "1O0"
+    },
+    {
+      "row_index": 2722,
+      "column": "Revenue",
+      "issue_type": "invalid_numeric",
+      "severity": "high",
+      "message": "Value could not be parsed as numeric",
+      "value": "$123.45"
+    },
+    {
+      "row_index": 2926,
+      "column": "Revenue",
+      "issue_type": "invalid_numeric",
+      "severity": "high",
+      "message": "Value could not be parsed as numeric",
+      "value": "inf"
+    },
+    {
+      "row_index": 2931,
+      "column": "Revenue",
+      "issue_type": "invalid_numeric",
+      "severity": "high",
+      "message": "Value could not be parsed as numeric",
+      "value": "-inf"
+    },
+    {
+      "row_index": 2967,
+      "column": "Revenue",
+      "issue_type": "invalid_numeric",
+      "severity": "high",
+      "message": "Value could not be parsed as numeric",
+      "value": "-inf"
+    },
+    {
+      "row_index": 2969,
+      "column": "Revenue",
+      "issue_type": "invalid_numeric",
+      "severity": "high",
+      "message": "Value could not be parsed as numeric",
+      "value": "N/A"
+    },
+    {
+      "row_index": 3063,
+      "column": "Revenue",
+      "issue_type": "invalid_numeric",
+      "severity": "high",
+      "message": "Value could not be parsed as numeric",
+      "value": "NaN"
+    },
+    {
+      "row_index": 3120,
+      "column": "Revenue",
+      "issue_type": "invalid_numeric",
+      "severity": "high",
+      "message": "Value could not be parsed as numeric",
+      "value": "NaN"
+    },
+    {
+      "row_index": 3145,
+      "column": "Revenue",
+      "issue_type": "invalid_numeric",
+      "severity": "high",
+      "message": "Value could not be parsed as numeric",
+      "value": "-inf"
+    },
+    {
+      "row_index": 3213,
+      "column": "Revenue",
+      "issue_type": "invalid_numeric",
+      "severity": "high",
+      "message": "Value could not be parsed as numeric",
+      "value": "inf"
+    },
+    {
+      "row_index": 3221,
+      "column": "Revenue",
+      "issue_type": "invalid_numeric",
+      "severity": "high",
+      "message": "Value could not be parsed as numeric",
+      "value": "$123.45"
+    },
+    {
+      "row_index": 3249,
+      "column": "Revenue",
+      "issue_type": "invalid_numeric",
+      "severity": "high",
+      "message": "Value could not be parsed as numeric",
+      "value": "inf"
+    },
+    {
+      "row_index": 3387,
+      "column": "Revenue",
+      "issue_type": "invalid_numeric",
+      "severity": "high",
+      "message": "Value could not be parsed as numeric",
+      "value": "-inf"
+    },
+    {
+      "row_index": 3395,
+      "column": "Revenue",
+      "issue_type": "invalid_numeric",
+      "severity": "high",
+      "message": "Value could not be parsed as numeric",
+      "value": "$123.45"
+    },
+    {
+      "row_index": 3412,
+      "column": "Revenue",
+      "issue_type": "invalid_numeric",
+      "severity": "high",
+      "message": "Value could not be parsed as numeric",
+      "value": "$123.45"
+    },
+    {
+      "row_index": 3414,
+      "column": "Revenue",
+      "issue_type": "invalid_numeric",
+      "severity": "high",
+      "message": "Value could not be parsed as numeric",
+      "value": "1O0"
+    },
+    {
+      "row_index": 3468,
+      "column": "Revenue",
+      "issue_type": "invalid_numeric",
+      "severity": "high",
+      "message": "Value could not be parsed as numeric",
+      "value": "N/A"
+    },
+    {
+      "row_index": 3494,
+      "column": "Revenue",
+      "issue_type": "invalid_numeric",
+      "severity": "high",
+      "message": "Value could not be parsed as numeric",
+      "value": "N/A"
+    },
+    {
+      "row_index": 3552,
+      "column": "Revenue",
+      "issue_type": "invalid_numeric",
+      "severity": "high",
+      "message": "Value could not be parsed as numeric",
+      "value": "-inf"
+    }
+  ],
   "issue_summary": {
-    "total_issues": 0,
-    "by_type": {},
+    "total_issues": 140,
+    "by_type": {
+      "missing_customer_id": 60,
+      "invalid_date": 36,
+      "invalid_numeric": 44
+    },
     "by_severity": {
-      "critical": 0,
+      "critical": 60,
       "warning": 0,
       "info": 0
     },
-    "affected_rows": 0,
-    "affected_columns": []
+    "affected_rows": 140,
+    "affected_columns": [
+      "Revenue",
+      "Customer_ID",
+      "Order_Date"
+    ]
   },
   "routing_decisions": [
     {
       "recommendation_id": "route_1",
       "next_tool": "profile-my-data",
-      "confidence_score": 0.95,
-      "reason": "The analyze-my-data tool returned 0% success with no findings, indicating a fundamental data readiness issue. Profiling is the essential first step to establish a baseline, identify quality issues, and assess risk before any analysis can succeed.",
+      "confidence_score": 0.9,
+      "reason": "After successful segmentation, profiling will establish a quality baseline and detect any drift or risks that could affect future analyses.",
       "priority": 1,
       "path": "/results/profile-my-data",
       "required_files": {
@@ -101,18 +1273,2911 @@
         "agent_parameters": {}
       },
       "expected_benefits": [
-        "Establish data quality baseline",
-        "Identify hidden data issues",
-        "Assess readiness for analysis"
+        "Quality baseline",
+        "Drift detection",
+        "Risk assessment"
       ],
-      "estimated_time_minutes": 5,
+      "estimated_time_minutes": 10,
       "execution_steps": [
         "Run Profile My Data with selected agents",
         "Review analysis results",
         "Export recommendations",
-        "Estimated time: 5 minutes"
+        "Estimated time: 10 minutes"
+      ]
+    },
+    {
+      "recommendation_id": "route_2",
+      "next_tool": "master-my-data",
+      "confidence_score": 0.85,
+      "reason": "With 5 customer segments created, master data management can help identify keys, enforce contracts, and build golden records for consistent segmentation.",
+      "priority": 2,
+      "path": "/results/master-my-data",
+      "required_files": {
+        "primary": {
+          "name": "data.csv",
+          "available": true
+        }
+      },
+      "parameters": {
+        "selected_agents": [
+          "key-identifier",
+          "contract-enforcer",
+          "semantic-mapper",
+          "survivorship-resolver",
+          "golden-record-builder",
+          "stewardship-flagger"
+        ],
+        "agent_parameters": {}
+      },
+      "expected_benefits": [
+        "Key identification",
+        "Golden records",
+        "Consistent segmentation"
+      ],
+      "estimated_time_minutes": 15,
+      "execution_steps": [
+        "Run Master My Data with selected agents",
+        "Review analysis results",
+        "Export recommendations",
+        "Estimated time: 15 minutes"
       ]
     }
   ],
-  "agent_results": {}
+  "agent_results": {
+    "customer-segmentation-agent": {
+      "status": "success",
+      "execution_time_ms": 693,
+      "summary_metrics": {
+        "total_rows_processed": 2261,
+        "total_customers": 275,
+        "segments_produced": 5,
+        "invalid_rows": 180
+      },
+      "data": {
+        "segmentation": {
+          "mode": "rfm",
+          "timeframe": "last_12_months",
+          "analysis_window": {
+            "start_date": "2025-01-10",
+            "end_date": "2026-01-10"
+          },
+          "columns_used": {
+            "customer_id_column": "Customer_ID",
+            "transaction_date_column": "Order_Date",
+            "value_column": "Revenue"
+          },
+          "metric": "revenue",
+          "scoring": {
+            "rfm_bins": 5,
+            "weights": {
+              "recency": 33,
+              "frequency": 33,
+              "monetary": 34,
+              "sum": 100
+            },
+            "segment_count": 5
+          }
+        },
+        "quality": {
+          "input_quality_score": 95.4,
+          "quality_status": "excellent",
+          "invalid_rows": 180,
+          "invalid_rate_pct": 4.59,
+          "valid_rows": 3740,
+          "rows_after_timeframe": 2261,
+          "timeframe_retained_rate_pct": 60.45
+        },
+        "segment_summary": [
+          {
+            "segment_id": 1,
+            "segment_label": "Champions",
+            "segment_description": "High value, frequent, and very recent customers.",
+            "customer_count": 53,
+            "total_value": 516430.81,
+            "avg_value": 9743.977547169812,
+            "avg_frequency": 26.07547169811321,
+            "avg_recency_days": 1.8867924528301887,
+            "value_share_pct": 82.66938866016538
+          },
+          {
+            "segment_id": 2,
+            "segment_label": "Loyal",
+            "segment_description": "Strong repeat customers with good value.",
+            "customer_count": 54,
+            "total_value": 48010.92,
+            "avg_value": 889.0911111111111,
+            "avg_frequency": 6.462962962962963,
+            "avg_recency_days": 7.648148148148148,
+            "value_share_pct": 7.685508549368129
+          },
+          {
+            "segment_id": 3,
+            "segment_label": "Potential",
+            "segment_description": "Decent customers who could be nurtured to grow.",
+            "customer_count": 56,
+            "total_value": 30334.29,
+            "avg_value": 541.68375,
+            "avg_frequency": 4.464285714285714,
+            "avg_recency_days": 12.375,
+            "value_share_pct": 4.855862898149257
+          },
+          {
+            "segment_id": 4,
+            "segment_label": "At Risk",
+            "segment_description": "Previously engaged customers showing signs of churn.",
+            "customer_count": 53,
+            "total_value": 18013.11,
+            "avg_value": 339.87,
+            "avg_frequency": 3.188679245283019,
+            "avg_recency_days": 22.169811320754718,
+            "value_share_pct": 2.883508812280801
+          },
+          {
+            "segment_id": 5,
+            "segment_label": "Lost",
+            "segment_description": "Low engagement and low value customers.",
+            "customer_count": 59,
+            "total_value": 11904.99,
+            "avg_value": 201.77949152542374,
+            "avg_frequency": 1.88135593220339,
+            "avg_recency_days": 52.355932203389834,
+            "value_share_pct": 1.9057310800364187
+          }
+        ],
+        "customer_segments_sample": [
+          {
+            "customer_id": "C0013",
+            "segment_id": 1,
+            "segment_label": "Champions",
+            "frequency": 35,
+            "monetary": 15595.6,
+            "recency_days": 1,
+            "avg_order_value": 445.5885714285714,
+            "last_purchase_date": "2026-01-09"
+          },
+          {
+            "customer_id": "C0020",
+            "segment_id": 1,
+            "segment_label": "Champions",
+            "frequency": 39,
+            "monetary": 15272.29,
+            "recency_days": 4,
+            "avg_order_value": 391.5971794871795,
+            "last_purchase_date": "2026-01-06"
+          },
+          {
+            "customer_id": "C0042",
+            "segment_id": 1,
+            "segment_label": "Champions",
+            "frequency": 41,
+            "monetary": 15228.220000000001,
+            "recency_days": 0,
+            "avg_order_value": 371.42,
+            "last_purchase_date": "2026-01-10"
+          },
+          {
+            "customer_id": "C0023",
+            "segment_id": 1,
+            "segment_label": "Champions",
+            "frequency": 34,
+            "monetary": 14407.210000000001,
+            "recency_days": 0,
+            "avg_order_value": 423.7414705882353,
+            "last_purchase_date": "2026-01-10"
+          },
+          {
+            "customer_id": "C0034",
+            "segment_id": 1,
+            "segment_label": "Champions",
+            "frequency": 33,
+            "monetary": 14134.65,
+            "recency_days": 8,
+            "avg_order_value": 428.32272727272726,
+            "last_purchase_date": "2026-01-02"
+          },
+          {
+            "customer_id": "C0014",
+            "segment_id": 1,
+            "segment_label": "Champions",
+            "frequency": 38,
+            "monetary": 14013.57,
+            "recency_days": 5,
+            "avg_order_value": 368.7781578947368,
+            "last_purchase_date": "2026-01-05"
+          },
+          {
+            "customer_id": "C0010",
+            "segment_id": 1,
+            "segment_label": "Champions",
+            "frequency": 37,
+            "monetary": 14008.96,
+            "recency_days": 0,
+            "avg_order_value": 378.6205405405405,
+            "last_purchase_date": "2026-01-10"
+          },
+          {
+            "customer_id": "C0028",
+            "segment_id": 1,
+            "segment_label": "Champions",
+            "frequency": 36,
+            "monetary": 13326.83,
+            "recency_days": 1,
+            "avg_order_value": 370.1897222222222,
+            "last_purchase_date": "2026-01-09"
+          },
+          {
+            "customer_id": "C0044",
+            "segment_id": 1,
+            "segment_label": "Champions",
+            "frequency": 34,
+            "monetary": 13267.22,
+            "recency_days": 0,
+            "avg_order_value": 390.21235294117645,
+            "last_purchase_date": "2026-01-10"
+          },
+          {
+            "customer_id": "C0015",
+            "segment_id": 1,
+            "segment_label": "Champions",
+            "frequency": 33,
+            "monetary": 13039.58,
+            "recency_days": 4,
+            "avg_order_value": 395.13878787878787,
+            "last_purchase_date": "2026-01-06"
+          },
+          {
+            "customer_id": "C0002",
+            "segment_id": 1,
+            "segment_label": "Champions",
+            "frequency": 33,
+            "monetary": 12738.84,
+            "recency_days": 1,
+            "avg_order_value": 386.0254545454545,
+            "last_purchase_date": "2026-01-09"
+          },
+          {
+            "customer_id": "C0026",
+            "segment_id": 1,
+            "segment_label": "Champions",
+            "frequency": 32,
+            "monetary": 12703.05,
+            "recency_days": 4,
+            "avg_order_value": 396.9703125,
+            "last_purchase_date": "2026-01-06"
+          },
+          {
+            "customer_id": "C0016",
+            "segment_id": 1,
+            "segment_label": "Champions",
+            "frequency": 34,
+            "monetary": 12675.8,
+            "recency_days": 1,
+            "avg_order_value": 372.8176470588235,
+            "last_purchase_date": "2026-01-09"
+          },
+          {
+            "customer_id": "C0036",
+            "segment_id": 1,
+            "segment_label": "Champions",
+            "frequency": 35,
+            "monetary": 12671.41,
+            "recency_days": 1,
+            "avg_order_value": 362.0402857142857,
+            "last_purchase_date": "2026-01-09"
+          },
+          {
+            "customer_id": "C0037",
+            "segment_id": 1,
+            "segment_label": "Champions",
+            "frequency": 34,
+            "monetary": 12581.98,
+            "recency_days": 3,
+            "avg_order_value": 370.05823529411765,
+            "last_purchase_date": "2026-01-07"
+          },
+          {
+            "customer_id": "C0024",
+            "segment_id": 1,
+            "segment_label": "Champions",
+            "frequency": 35,
+            "monetary": 12431.21,
+            "recency_days": 1,
+            "avg_order_value": 355.17742857142855,
+            "last_purchase_date": "2026-01-09"
+          },
+          {
+            "customer_id": "C0040",
+            "segment_id": 1,
+            "segment_label": "Champions",
+            "frequency": 36,
+            "monetary": 11676.44,
+            "recency_days": 1,
+            "avg_order_value": 324.34555555555556,
+            "last_purchase_date": "2026-01-09"
+          },
+          {
+            "customer_id": "C0005",
+            "segment_id": 1,
+            "segment_label": "Champions",
+            "frequency": 30,
+            "monetary": 11458.85,
+            "recency_days": 2,
+            "avg_order_value": 381.9616666666667,
+            "last_purchase_date": "2026-01-08"
+          },
+          {
+            "customer_id": "C0032",
+            "segment_id": 1,
+            "segment_label": "Champions",
+            "frequency": 27,
+            "monetary": 11414.77,
+            "recency_days": 0,
+            "avg_order_value": 422.7692592592593,
+            "last_purchase_date": "2026-01-10"
+          },
+          {
+            "customer_id": "C0018",
+            "segment_id": 1,
+            "segment_label": "Champions",
+            "frequency": 28,
+            "monetary": 11214.9,
+            "recency_days": 2,
+            "avg_order_value": 400.53214285714284,
+            "last_purchase_date": "2026-01-08"
+          },
+          {
+            "customer_id": "C0046",
+            "segment_id": 1,
+            "segment_label": "Champions",
+            "frequency": 32,
+            "monetary": 11119.82,
+            "recency_days": 0,
+            "avg_order_value": 347.494375,
+            "last_purchase_date": "2026-01-10"
+          },
+          {
+            "customer_id": "C0033",
+            "segment_id": 1,
+            "segment_label": "Champions",
+            "frequency": 29,
+            "monetary": 10950.86,
+            "recency_days": 3,
+            "avg_order_value": 377.61586206896555,
+            "last_purchase_date": "2026-01-07"
+          },
+          {
+            "customer_id": "C0035",
+            "segment_id": 1,
+            "segment_label": "Champions",
+            "frequency": 27,
+            "monetary": 10687.04,
+            "recency_days": 2,
+            "avg_order_value": 395.81629629629634,
+            "last_purchase_date": "2026-01-08"
+          },
+          {
+            "customer_id": "C0039",
+            "segment_id": 1,
+            "segment_label": "Champions",
+            "frequency": 31,
+            "monetary": 10593.960000000001,
+            "recency_days": 0,
+            "avg_order_value": 341.74064516129033,
+            "last_purchase_date": "2026-01-10"
+          },
+          {
+            "customer_id": "C0019",
+            "segment_id": 1,
+            "segment_label": "Champions",
+            "frequency": 26,
+            "monetary": 9771.39,
+            "recency_days": 0,
+            "avg_order_value": 375.8226923076923,
+            "last_purchase_date": "2026-01-10"
+          },
+          {
+            "customer_id": "C0017",
+            "segment_id": 1,
+            "segment_label": "Champions",
+            "frequency": 26,
+            "monetary": 9752.82,
+            "recency_days": 2,
+            "avg_order_value": 375.10846153846154,
+            "last_purchase_date": "2026-01-08"
+          },
+          {
+            "customer_id": "C0012",
+            "segment_id": 1,
+            "segment_label": "Champions",
+            "frequency": 26,
+            "monetary": 9542.11,
+            "recency_days": 0,
+            "avg_order_value": 367.0042307692308,
+            "last_purchase_date": "2026-01-10"
+          },
+          {
+            "customer_id": "C0041",
+            "segment_id": 1,
+            "segment_label": "Champions",
+            "frequency": 28,
+            "monetary": 9459.49,
+            "recency_days": 5,
+            "avg_order_value": 337.83892857142854,
+            "last_purchase_date": "2026-01-05"
+          },
+          {
+            "customer_id": "C0025",
+            "segment_id": 1,
+            "segment_label": "Champions",
+            "frequency": 24,
+            "monetary": 9387.91,
+            "recency_days": 1,
+            "avg_order_value": 391.16291666666666,
+            "last_purchase_date": "2026-01-09"
+          },
+          {
+            "customer_id": "C0029",
+            "segment_id": 1,
+            "segment_label": "Champions",
+            "frequency": 24,
+            "monetary": 9382.37,
+            "recency_days": 0,
+            "avg_order_value": 390.93208333333337,
+            "last_purchase_date": "2026-01-10"
+          },
+          {
+            "customer_id": "C0009",
+            "segment_id": 1,
+            "segment_label": "Champions",
+            "frequency": 25,
+            "monetary": 9277.61,
+            "recency_days": 4,
+            "avg_order_value": 371.1044,
+            "last_purchase_date": "2026-01-06"
+          },
+          {
+            "customer_id": "C0049",
+            "segment_id": 1,
+            "segment_label": "Champions",
+            "frequency": 24,
+            "monetary": 9209.5,
+            "recency_days": 0,
+            "avg_order_value": 383.7291666666667,
+            "last_purchase_date": "2026-01-10"
+          },
+          {
+            "customer_id": "C0027",
+            "segment_id": 1,
+            "segment_label": "Champions",
+            "frequency": 22,
+            "monetary": 8969.6,
+            "recency_days": 2,
+            "avg_order_value": 407.70909090909095,
+            "last_purchase_date": "2026-01-08"
+          },
+          {
+            "customer_id": "C0006",
+            "segment_id": 1,
+            "segment_label": "Champions",
+            "frequency": 25,
+            "monetary": 8604.1,
+            "recency_days": 0,
+            "avg_order_value": 344.164,
+            "last_purchase_date": "2026-01-10"
+          },
+          {
+            "customer_id": "C0008",
+            "segment_id": 1,
+            "segment_label": "Champions",
+            "frequency": 19,
+            "monetary": 8486.8,
+            "recency_days": 11,
+            "avg_order_value": 446.6736842105263,
+            "last_purchase_date": "2025-12-30"
+          },
+          {
+            "customer_id": "C0047",
+            "segment_id": 1,
+            "segment_label": "Champions",
+            "frequency": 27,
+            "monetary": 8272.52,
+            "recency_days": 0,
+            "avg_order_value": 306.38962962962967,
+            "last_purchase_date": "2026-01-10"
+          },
+          {
+            "customer_id": "C0038",
+            "segment_id": 1,
+            "segment_label": "Champions",
+            "frequency": 24,
+            "monetary": 8246.48,
+            "recency_days": 3,
+            "avg_order_value": 343.6033333333333,
+            "last_purchase_date": "2026-01-07"
+          },
+          {
+            "customer_id": "C0048",
+            "segment_id": 1,
+            "segment_label": "Champions",
+            "frequency": 19,
+            "monetary": 8117.22,
+            "recency_days": 6,
+            "avg_order_value": 427.2221052631579,
+            "last_purchase_date": "2026-01-04"
+          },
+          {
+            "customer_id": "C0030",
+            "segment_id": 1,
+            "segment_label": "Champions",
+            "frequency": 16,
+            "monetary": 7488.0,
+            "recency_days": 1,
+            "avg_order_value": 468.0,
+            "last_purchase_date": "2026-01-09"
+          },
+          {
+            "customer_id": "C0022",
+            "segment_id": 1,
+            "segment_label": "Champions",
+            "frequency": 21,
+            "monetary": 7419.16,
+            "recency_days": 2,
+            "avg_order_value": 353.29333333333335,
+            "last_purchase_date": "2026-01-08"
+          },
+          {
+            "customer_id": "C0004",
+            "segment_id": 1,
+            "segment_label": "Champions",
+            "frequency": 19,
+            "monetary": 7370.66,
+            "recency_days": 1,
+            "avg_order_value": 387.9294736842105,
+            "last_purchase_date": "2026-01-09"
+          },
+          {
+            "customer_id": "C0031",
+            "segment_id": 1,
+            "segment_label": "Champions",
+            "frequency": 20,
+            "monetary": 7266.61,
+            "recency_days": 1,
+            "avg_order_value": 363.3305,
+            "last_purchase_date": "2026-01-09"
+          },
+          {
+            "customer_id": "C0007",
+            "segment_id": 1,
+            "segment_label": "Champions",
+            "frequency": 21,
+            "monetary": 7180.87,
+            "recency_days": 2,
+            "avg_order_value": 341.94619047619045,
+            "last_purchase_date": "2026-01-08"
+          },
+          {
+            "customer_id": "C0003",
+            "segment_id": 1,
+            "segment_label": "Champions",
+            "frequency": 20,
+            "monetary": 6966.58,
+            "recency_days": 1,
+            "avg_order_value": 348.329,
+            "last_purchase_date": "2026-01-09"
+          },
+          {
+            "customer_id": "C0001",
+            "segment_id": 1,
+            "segment_label": "Champions",
+            "frequency": 18,
+            "monetary": 6895.43,
+            "recency_days": 2,
+            "avg_order_value": 383.07944444444445,
+            "last_purchase_date": "2026-01-08"
+          },
+          {
+            "customer_id": "C0050",
+            "segment_id": 1,
+            "segment_label": "Champions",
+            "frequency": 16,
+            "monetary": 6833.4,
+            "recency_days": 3,
+            "avg_order_value": 427.0875,
+            "last_purchase_date": "2026-01-07"
+          },
+          {
+            "customer_id": "C0011",
+            "segment_id": 1,
+            "segment_label": "Champions",
+            "frequency": 19,
+            "monetary": 6484.360000000001,
+            "recency_days": 1,
+            "avg_order_value": 341.2821052631579,
+            "last_purchase_date": "2026-01-09"
+          },
+          {
+            "customer_id": "C0021",
+            "segment_id": 1,
+            "segment_label": "Champions",
+            "frequency": 18,
+            "monetary": 6373.46,
+            "recency_days": 0,
+            "avg_order_value": 354.0811111111111,
+            "last_purchase_date": "2026-01-10"
+          },
+          {
+            "customer_id": "C0045",
+            "segment_id": 1,
+            "segment_label": "Champions",
+            "frequency": 12,
+            "monetary": 4351.23,
+            "recency_days": 0,
+            "avg_order_value": 362.60249999999996,
+            "last_purchase_date": "2026-01-10"
+          },
+          {
+            "customer_id": "C0043",
+            "segment_id": 1,
+            "segment_label": "Champions",
+            "frequency": 13,
+            "monetary": 4303.63,
+            "recency_days": 6,
+            "avg_order_value": 331.04846153846154,
+            "last_purchase_date": "2026-01-04"
+          },
+          {
+            "customer_id": "R0114",
+            "segment_id": 1,
+            "segment_label": "Champions",
+            "frequency": 8,
+            "monetary": 1534.51,
+            "recency_days": 2,
+            "avg_order_value": 191.81375,
+            "last_purchase_date": "2026-01-08"
+          },
+          {
+            "customer_id": "R0083",
+            "segment_id": 1,
+            "segment_label": "Champions",
+            "frequency": 9,
+            "monetary": 1260.23,
+            "recency_days": 0,
+            "avg_order_value": 140.02555555555557,
+            "last_purchase_date": "2026-01-10"
+          },
+          {
+            "customer_id": "R0183",
+            "segment_id": 1,
+            "segment_label": "Champions",
+            "frequency": 10,
+            "monetary": 1009.7,
+            "recency_days": 0,
+            "avg_order_value": 100.97,
+            "last_purchase_date": "2026-01-10"
+          },
+          {
+            "customer_id": "R0085",
+            "segment_id": 2,
+            "segment_label": "Loyal",
+            "frequency": 9,
+            "monetary": 1323.68,
+            "recency_days": 24,
+            "avg_order_value": 147.07555555555555,
+            "last_purchase_date": "2025-12-17"
+          },
+          {
+            "customer_id": "R0132",
+            "segment_id": 2,
+            "segment_label": "Loyal",
+            "frequency": 8,
+            "monetary": 1270.43,
+            "recency_days": 38,
+            "avg_order_value": 158.80375,
+            "last_purchase_date": "2025-12-03"
+          },
+          {
+            "customer_id": "R0100",
+            "segment_id": 2,
+            "segment_label": "Loyal",
+            "frequency": 7,
+            "monetary": 1262.38,
+            "recency_days": 16,
+            "avg_order_value": 180.34,
+            "last_purchase_date": "2025-12-25"
+          },
+          {
+            "customer_id": "R0134",
+            "segment_id": 2,
+            "segment_label": "Loyal",
+            "frequency": 9,
+            "monetary": 1221.55,
+            "recency_days": 0,
+            "avg_order_value": 135.72777777777776,
+            "last_purchase_date": "2026-01-10"
+          },
+          {
+            "customer_id": "R0010",
+            "segment_id": 2,
+            "segment_label": "Loyal",
+            "frequency": 9,
+            "monetary": 1162.0,
+            "recency_days": 2,
+            "avg_order_value": 129.11111111111111,
+            "last_purchase_date": "2026-01-08"
+          },
+          {
+            "customer_id": "R0004",
+            "segment_id": 2,
+            "segment_label": "Loyal",
+            "frequency": 7,
+            "monetary": 1160.4,
+            "recency_days": 4,
+            "avg_order_value": 165.77142857142857,
+            "last_purchase_date": "2026-01-06"
+          },
+          {
+            "customer_id": "R0028",
+            "segment_id": 2,
+            "segment_label": "Loyal",
+            "frequency": 9,
+            "monetary": 1143.75,
+            "recency_days": 4,
+            "avg_order_value": 127.08333333333333,
+            "last_purchase_date": "2026-01-06"
+          },
+          {
+            "customer_id": "R0190",
+            "segment_id": 2,
+            "segment_label": "Loyal",
+            "frequency": 8,
+            "monetary": 1142.24,
+            "recency_days": 26,
+            "avg_order_value": 142.78,
+            "last_purchase_date": "2025-12-15"
+          },
+          {
+            "customer_id": "R0003",
+            "segment_id": 2,
+            "segment_label": "Loyal",
+            "frequency": 7,
+            "monetary": 1086.67,
+            "recency_days": 0,
+            "avg_order_value": 155.23857142857145,
+            "last_purchase_date": "2026-01-10"
+          },
+          {
+            "customer_id": "R0073",
+            "segment_id": 2,
+            "segment_label": "Loyal",
+            "frequency": 8,
+            "monetary": 1070.78,
+            "recency_days": 6,
+            "avg_order_value": 133.8475,
+            "last_purchase_date": "2026-01-04"
+          },
+          {
+            "customer_id": "R0099",
+            "segment_id": 2,
+            "segment_label": "Loyal",
+            "frequency": 9,
+            "monetary": 1047.06,
+            "recency_days": 9,
+            "avg_order_value": 116.33999999999999,
+            "last_purchase_date": "2026-01-01"
+          },
+          {
+            "customer_id": "R0012",
+            "segment_id": 2,
+            "segment_label": "Loyal",
+            "frequency": 8,
+            "monetary": 1028.32,
+            "recency_days": 1,
+            "avg_order_value": 128.54,
+            "last_purchase_date": "2026-01-09"
+          },
+          {
+            "customer_id": "R0159",
+            "segment_id": 2,
+            "segment_label": "Loyal",
+            "frequency": 6,
+            "monetary": 1019.37,
+            "recency_days": 5,
+            "avg_order_value": 169.895,
+            "last_purchase_date": "2026-01-05"
+          },
+          {
+            "customer_id": "R0048",
+            "segment_id": 2,
+            "segment_label": "Loyal",
+            "frequency": 7,
+            "monetary": 1018.49,
+            "recency_days": 1,
+            "avg_order_value": 145.49857142857144,
+            "last_purchase_date": "2026-01-09"
+          },
+          {
+            "customer_id": "R0117",
+            "segment_id": 2,
+            "segment_label": "Loyal",
+            "frequency": 6,
+            "monetary": 998.5,
+            "recency_days": 1,
+            "avg_order_value": 166.41666666666666,
+            "last_purchase_date": "2026-01-09"
+          },
+          {
+            "customer_id": "R0077",
+            "segment_id": 2,
+            "segment_label": "Loyal",
+            "frequency": 6,
+            "monetary": 992.89,
+            "recency_days": 7,
+            "avg_order_value": 165.48166666666665,
+            "last_purchase_date": "2026-01-03"
+          },
+          {
+            "customer_id": "R0138",
+            "segment_id": 2,
+            "segment_label": "Loyal",
+            "frequency": 7,
+            "monetary": 992.89,
+            "recency_days": 7,
+            "avg_order_value": 141.84142857142857,
+            "last_purchase_date": "2026-01-03"
+          },
+          {
+            "customer_id": "R0123",
+            "segment_id": 2,
+            "segment_label": "Loyal",
+            "frequency": 6,
+            "monetary": 989.3199999999999,
+            "recency_days": 12,
+            "avg_order_value": 164.88666666666666,
+            "last_purchase_date": "2025-12-29"
+          },
+          {
+            "customer_id": "R0072",
+            "segment_id": 2,
+            "segment_label": "Loyal",
+            "frequency": 6,
+            "monetary": 984.28,
+            "recency_days": 10,
+            "avg_order_value": 164.04666666666665,
+            "last_purchase_date": "2025-12-31"
+          },
+          {
+            "customer_id": "R0101",
+            "segment_id": 2,
+            "segment_label": "Loyal",
+            "frequency": 6,
+            "monetary": 955.85,
+            "recency_days": 23,
+            "avg_order_value": 159.30833333333334,
+            "last_purchase_date": "2025-12-18"
+          },
+          {
+            "customer_id": "R0023",
+            "segment_id": 2,
+            "segment_label": "Loyal",
+            "frequency": 6,
+            "monetary": 954.81,
+            "recency_days": 8,
+            "avg_order_value": 159.135,
+            "last_purchase_date": "2026-01-02"
+          },
+          {
+            "customer_id": "R0192",
+            "segment_id": 2,
+            "segment_label": "Loyal",
+            "frequency": 8,
+            "monetary": 950.08,
+            "recency_days": 6,
+            "avg_order_value": 118.76,
+            "last_purchase_date": "2026-01-04"
+          },
+          {
+            "customer_id": "R0154",
+            "segment_id": 2,
+            "segment_label": "Loyal",
+            "frequency": 6,
+            "monetary": 921.26,
+            "recency_days": 9,
+            "avg_order_value": 153.54333333333332,
+            "last_purchase_date": "2026-01-01"
+          },
+          {
+            "customer_id": "R0128",
+            "segment_id": 2,
+            "segment_label": "Loyal",
+            "frequency": 8,
+            "monetary": 913.25,
+            "recency_days": 1,
+            "avg_order_value": 114.15625,
+            "last_purchase_date": "2026-01-09"
+          },
+          {
+            "customer_id": "R0044",
+            "segment_id": 2,
+            "segment_label": "Loyal",
+            "frequency": 6,
+            "monetary": 903.6999999999999,
+            "recency_days": 3,
+            "avg_order_value": 150.61666666666665,
+            "last_purchase_date": "2026-01-07"
+          },
+          {
+            "customer_id": "R0081",
+            "segment_id": 2,
+            "segment_label": "Loyal",
+            "frequency": 6,
+            "monetary": 897.45,
+            "recency_days": 0,
+            "avg_order_value": 149.57500000000002,
+            "last_purchase_date": "2026-01-10"
+          },
+          {
+            "customer_id": "R0074",
+            "segment_id": 2,
+            "segment_label": "Loyal",
+            "frequency": 6,
+            "monetary": 892.53,
+            "recency_days": 8,
+            "avg_order_value": 148.755,
+            "last_purchase_date": "2026-01-02"
+          },
+          {
+            "customer_id": "R0119",
+            "segment_id": 2,
+            "segment_label": "Loyal",
+            "frequency": 6,
+            "monetary": 860.2,
+            "recency_days": 7,
+            "avg_order_value": 143.36666666666667,
+            "last_purchase_date": "2026-01-03"
+          },
+          {
+            "customer_id": "R0155",
+            "segment_id": 2,
+            "segment_label": "Loyal",
+            "frequency": 7,
+            "monetary": 849.22,
+            "recency_days": 14,
+            "avg_order_value": 121.31714285714285,
+            "last_purchase_date": "2025-12-27"
+          },
+          {
+            "customer_id": "R0093",
+            "segment_id": 2,
+            "segment_label": "Loyal",
+            "frequency": 5,
+            "monetary": 839.0,
+            "recency_days": 2,
+            "avg_order_value": 167.8,
+            "last_purchase_date": "2026-01-08"
+          },
+          {
+            "customer_id": "R0170",
+            "segment_id": 2,
+            "segment_label": "Loyal",
+            "frequency": 5,
+            "monetary": 837.6800000000001,
+            "recency_days": 4,
+            "avg_order_value": 167.536,
+            "last_purchase_date": "2026-01-06"
+          },
+          {
+            "customer_id": "R0196",
+            "segment_id": 2,
+            "segment_label": "Loyal",
+            "frequency": 7,
+            "monetary": 823.48,
+            "recency_days": 23,
+            "avg_order_value": 117.64,
+            "last_purchase_date": "2025-12-18"
+          },
+          {
+            "customer_id": "R0088",
+            "segment_id": 2,
+            "segment_label": "Loyal",
+            "frequency": 6,
+            "monetary": 817.46,
+            "recency_days": 13,
+            "avg_order_value": 136.24333333333334,
+            "last_purchase_date": "2025-12-28"
+          },
+          {
+            "customer_id": "R0022",
+            "segment_id": 2,
+            "segment_label": "Loyal",
+            "frequency": 4,
+            "monetary": 815.52,
+            "recency_days": 4,
+            "avg_order_value": 203.88,
+            "last_purchase_date": "2026-01-06"
+          },
+          {
+            "customer_id": "R0129",
+            "segment_id": 2,
+            "segment_label": "Loyal",
+            "frequency": 4,
+            "monetary": 810.25,
+            "recency_days": 5,
+            "avg_order_value": 202.5625,
+            "last_purchase_date": "2026-01-05"
+          },
+          {
+            "customer_id": "R0090",
+            "segment_id": 2,
+            "segment_label": "Loyal",
+            "frequency": 6,
+            "monetary": 784.66,
+            "recency_days": 12,
+            "avg_order_value": 130.77666666666667,
+            "last_purchase_date": "2025-12-29"
+          },
+          {
+            "customer_id": "R0059",
+            "segment_id": 2,
+            "segment_label": "Loyal",
+            "frequency": 9,
+            "monetary": 777.21,
+            "recency_days": 10,
+            "avg_order_value": 86.35666666666667,
+            "last_purchase_date": "2025-12-31"
+          },
+          {
+            "customer_id": "R0111",
+            "segment_id": 2,
+            "segment_label": "Loyal",
+            "frequency": 5,
+            "monetary": 771.5,
+            "recency_days": 12,
+            "avg_order_value": 154.3,
+            "last_purchase_date": "2025-12-29"
+          },
+          {
+            "customer_id": "R0167",
+            "segment_id": 2,
+            "segment_label": "Loyal",
+            "frequency": 5,
+            "monetary": 764.25,
+            "recency_days": 8,
+            "avg_order_value": 152.85,
+            "last_purchase_date": "2026-01-02"
+          },
+          {
+            "customer_id": "R0051",
+            "segment_id": 2,
+            "segment_label": "Loyal",
+            "frequency": 5,
+            "monetary": 754.13,
+            "recency_days": 3,
+            "avg_order_value": 150.826,
+            "last_purchase_date": "2026-01-07"
+          },
+          {
+            "customer_id": "R0060",
+            "segment_id": 2,
+            "segment_label": "Loyal",
+            "frequency": 6,
+            "monetary": 737.3100000000001,
+            "recency_days": 10,
+            "avg_order_value": 122.885,
+            "last_purchase_date": "2025-12-31"
+          },
+          {
+            "customer_id": "R0165",
+            "segment_id": 2,
+            "segment_label": "Loyal",
+            "frequency": 6,
+            "monetary": 734.77,
+            "recency_days": 27,
+            "avg_order_value": 122.46166666666666,
+            "last_purchase_date": "2025-12-14"
+          },
+          {
+            "customer_id": "R0052",
+            "segment_id": 2,
+            "segment_label": "Loyal",
+            "frequency": 6,
+            "monetary": 732.33,
+            "recency_days": 7,
+            "avg_order_value": 122.055,
+            "last_purchase_date": "2026-01-03"
+          },
+          {
+            "customer_id": "R0180",
+            "segment_id": 2,
+            "segment_label": "Loyal",
+            "frequency": 6,
+            "monetary": 730.7,
+            "recency_days": 1,
+            "avg_order_value": 121.78333333333335,
+            "last_purchase_date": "2026-01-09"
+          },
+          {
+            "customer_id": "R0087",
+            "segment_id": 2,
+            "segment_label": "Loyal",
+            "frequency": 6,
+            "monetary": 721.7299999999999,
+            "recency_days": 2,
+            "avg_order_value": 120.28833333333331,
+            "last_purchase_date": "2026-01-08"
+          },
+          {
+            "customer_id": "R0024",
+            "segment_id": 2,
+            "segment_label": "Loyal",
+            "frequency": 5,
+            "monetary": 702.06,
+            "recency_days": 7,
+            "avg_order_value": 140.41199999999998,
+            "last_purchase_date": "2026-01-03"
+          },
+          {
+            "customer_id": "R0078",
+            "segment_id": 2,
+            "segment_label": "Loyal",
+            "frequency": 6,
+            "monetary": 695.3100000000001,
+            "recency_days": 0,
+            "avg_order_value": 115.885,
+            "last_purchase_date": "2026-01-10"
+          },
+          {
+            "customer_id": "R0030",
+            "segment_id": 2,
+            "segment_label": "Loyal",
+            "frequency": 6,
+            "monetary": 657.08,
+            "recency_days": 0,
+            "avg_order_value": 109.51333333333334,
+            "last_purchase_date": "2026-01-10"
+          },
+          {
+            "customer_id": "R0058",
+            "segment_id": 2,
+            "segment_label": "Loyal",
+            "frequency": 6,
+            "monetary": 655.13,
+            "recency_days": 3,
+            "avg_order_value": 109.18833333333333,
+            "last_purchase_date": "2026-01-07"
+          },
+          {
+            "customer_id": "R0164",
+            "segment_id": 2,
+            "segment_label": "Loyal",
+            "frequency": 6,
+            "monetary": 637.25,
+            "recency_days": 3,
+            "avg_order_value": 106.20833333333333,
+            "last_purchase_date": "2026-01-07"
+          },
+          {
+            "customer_id": "R0104",
+            "segment_id": 2,
+            "segment_label": "Loyal",
+            "frequency": 6,
+            "monetary": 612.85,
+            "recency_days": 3,
+            "avg_order_value": 102.14166666666667,
+            "last_purchase_date": "2026-01-07"
+          },
+          {
+            "customer_id": "R0065",
+            "segment_id": 2,
+            "segment_label": "Loyal",
+            "frequency": 5,
+            "monetary": 571.81,
+            "recency_days": 1,
+            "avg_order_value": 114.362,
+            "last_purchase_date": "2026-01-09"
+          },
+          {
+            "customer_id": "R0029",
+            "segment_id": 2,
+            "segment_label": "Loyal",
+            "frequency": 6,
+            "monetary": 529.8299999999999,
+            "recency_days": 1,
+            "avg_order_value": 88.30499999999999,
+            "last_purchase_date": "2026-01-09"
+          },
+          {
+            "customer_id": "R0140",
+            "segment_id": 2,
+            "segment_label": "Loyal",
+            "frequency": 5,
+            "monetary": 484.27,
+            "recency_days": 0,
+            "avg_order_value": 96.854,
+            "last_purchase_date": "2026-01-10"
+          },
+          {
+            "customer_id": "R0025",
+            "segment_id": 3,
+            "segment_label": "Potential",
+            "frequency": 8,
+            "monetary": 982.77,
+            "recency_days": 28,
+            "avg_order_value": 122.84625,
+            "last_purchase_date": "2025-12-13"
+          },
+          {
+            "customer_id": "R0043",
+            "segment_id": 3,
+            "segment_label": "Potential",
+            "frequency": 6,
+            "monetary": 904.99,
+            "recency_days": 30,
+            "avg_order_value": 150.83166666666668,
+            "last_purchase_date": "2025-12-11"
+          },
+          {
+            "customer_id": "R0109",
+            "segment_id": 3,
+            "segment_label": "Potential",
+            "frequency": 5,
+            "monetary": 838.94,
+            "recency_days": 79,
+            "avg_order_value": 167.788,
+            "last_purchase_date": "2025-10-23"
+          },
+          {
+            "customer_id": "R0021",
+            "segment_id": 3,
+            "segment_label": "Potential",
+            "frequency": 5,
+            "monetary": 811.62,
+            "recency_days": 40,
+            "avg_order_value": 162.324,
+            "last_purchase_date": "2025-12-01"
+          },
+          {
+            "customer_id": "R0020",
+            "segment_id": 3,
+            "segment_label": "Potential",
+            "frequency": 5,
+            "monetary": 779.87,
+            "recency_days": 27,
+            "avg_order_value": 155.974,
+            "last_purchase_date": "2025-12-14"
+          },
+          {
+            "customer_id": "R0047",
+            "segment_id": 3,
+            "segment_label": "Potential",
+            "frequency": 5,
+            "monetary": 775.8,
+            "recency_days": 22,
+            "avg_order_value": 155.16,
+            "last_purchase_date": "2025-12-19"
+          },
+          {
+            "customer_id": "R0053",
+            "segment_id": 3,
+            "segment_label": "Potential",
+            "frequency": 4,
+            "monetary": 722.12,
+            "recency_days": 12,
+            "avg_order_value": 180.53,
+            "last_purchase_date": "2025-12-29"
+          },
+          {
+            "customer_id": "R0108",
+            "segment_id": 3,
+            "segment_label": "Potential",
+            "frequency": 4,
+            "monetary": 718.21,
+            "recency_days": 14,
+            "avg_order_value": 179.5525,
+            "last_purchase_date": "2025-12-27"
+          },
+          {
+            "customer_id": "R0173",
+            "segment_id": 3,
+            "segment_label": "Potential",
+            "frequency": 5,
+            "monetary": 712.09,
+            "recency_days": 19,
+            "avg_order_value": 142.418,
+            "last_purchase_date": "2025-12-22"
+          },
+          {
+            "customer_id": "R0095",
+            "segment_id": 3,
+            "segment_label": "Potential",
+            "frequency": 4,
+            "monetary": 704.85,
+            "recency_days": 13,
+            "avg_order_value": 176.2125,
+            "last_purchase_date": "2025-12-28"
+          },
+          {
+            "customer_id": "R0120",
+            "segment_id": 3,
+            "segment_label": "Potential",
+            "frequency": 5,
+            "monetary": 696.74,
+            "recency_days": 37,
+            "avg_order_value": 139.348,
+            "last_purchase_date": "2025-12-04"
+          },
+          {
+            "customer_id": "R0156",
+            "segment_id": 3,
+            "segment_label": "Potential",
+            "frequency": 6,
+            "monetary": 694.84,
+            "recency_days": 10,
+            "avg_order_value": 115.80666666666667,
+            "last_purchase_date": "2025-12-31"
+          },
+          {
+            "customer_id": "R0135",
+            "segment_id": 3,
+            "segment_label": "Potential",
+            "frequency": 5,
+            "monetary": 688.45,
+            "recency_days": 10,
+            "avg_order_value": 137.69,
+            "last_purchase_date": "2025-12-31"
+          },
+          {
+            "customer_id": "R0091",
+            "segment_id": 3,
+            "segment_label": "Potential",
+            "frequency": 5,
+            "monetary": 671.99,
+            "recency_days": 27,
+            "avg_order_value": 134.398,
+            "last_purchase_date": "2025-12-14"
+          },
+          {
+            "customer_id": "R0063",
+            "segment_id": 3,
+            "segment_label": "Potential",
+            "frequency": 6,
+            "monetary": 660.07,
+            "recency_days": 13,
+            "avg_order_value": 110.01166666666667,
+            "last_purchase_date": "2025-12-28"
+          },
+          {
+            "customer_id": "R0042",
+            "segment_id": 3,
+            "segment_label": "Potential",
+            "frequency": 4,
+            "monetary": 658.3299999999999,
+            "recency_days": 6,
+            "avg_order_value": 164.58249999999998,
+            "last_purchase_date": "2026-01-04"
+          },
+          {
+            "customer_id": "R0064",
+            "segment_id": 3,
+            "segment_label": "Potential",
+            "frequency": 5,
+            "monetary": 647.38,
+            "recency_days": 3,
+            "avg_order_value": 129.476,
+            "last_purchase_date": "2026-01-07"
+          },
+          {
+            "customer_id": "R0084",
+            "segment_id": 3,
+            "segment_label": "Potential",
+            "frequency": 5,
+            "monetary": 641.6,
+            "recency_days": 22,
+            "avg_order_value": 128.32,
+            "last_purchase_date": "2025-12-19"
+          },
+          {
+            "customer_id": "R0158",
+            "segment_id": 3,
+            "segment_label": "Potential",
+            "frequency": 6,
+            "monetary": 640.71,
+            "recency_days": 17,
+            "avg_order_value": 106.78500000000001,
+            "last_purchase_date": "2025-12-24"
+          },
+          {
+            "customer_id": "R0163",
+            "segment_id": 3,
+            "segment_label": "Potential",
+            "frequency": 5,
+            "monetary": 608.32,
+            "recency_days": 4,
+            "avg_order_value": 121.66400000000002,
+            "last_purchase_date": "2026-01-06"
+          },
+          {
+            "customer_id": "R0007",
+            "segment_id": 3,
+            "segment_label": "Potential",
+            "frequency": 5,
+            "monetary": 606.5999999999999,
+            "recency_days": 4,
+            "avg_order_value": 121.31999999999998,
+            "last_purchase_date": "2026-01-06"
+          },
+          {
+            "customer_id": "R0070",
+            "segment_id": 3,
+            "segment_label": "Potential",
+            "frequency": 3,
+            "monetary": 596.68,
+            "recency_days": 7,
+            "avg_order_value": 198.89333333333332,
+            "last_purchase_date": "2026-01-03"
+          },
+          {
+            "customer_id": "R0143",
+            "segment_id": 3,
+            "segment_label": "Potential",
+            "frequency": 5,
+            "monetary": 585.86,
+            "recency_days": 6,
+            "avg_order_value": 117.172,
+            "last_purchase_date": "2026-01-04"
+          },
+          {
+            "customer_id": "R0032",
+            "segment_id": 3,
+            "segment_label": "Potential",
+            "frequency": 4,
+            "monetary": 577.03,
+            "recency_days": 0,
+            "avg_order_value": 144.2575,
+            "last_purchase_date": "2026-01-10"
+          },
+          {
+            "customer_id": "R0080",
+            "segment_id": 3,
+            "segment_label": "Potential",
+            "frequency": 4,
+            "monetary": 563.7,
+            "recency_days": 7,
+            "avg_order_value": 140.925,
+            "last_purchase_date": "2026-01-03"
+          },
+          {
+            "customer_id": "R0139",
+            "segment_id": 3,
+            "segment_label": "Potential",
+            "frequency": 5,
+            "monetary": 557.83,
+            "recency_days": 9,
+            "avg_order_value": 111.566,
+            "last_purchase_date": "2026-01-01"
+          },
+          {
+            "customer_id": "R0122",
+            "segment_id": 3,
+            "segment_label": "Potential",
+            "frequency": 3,
+            "monetary": 553.27,
+            "recency_days": 13,
+            "avg_order_value": 184.42333333333332,
+            "last_purchase_date": "2025-12-28"
+          },
+          {
+            "customer_id": "R0103",
+            "segment_id": 3,
+            "segment_label": "Potential",
+            "frequency": 5,
+            "monetary": 545.44,
+            "recency_days": 11,
+            "avg_order_value": 109.08800000000001,
+            "last_purchase_date": "2025-12-30"
+          },
+          {
+            "customer_id": "R0027",
+            "segment_id": 3,
+            "segment_label": "Potential",
+            "frequency": 6,
+            "monetary": 528.9300000000001,
+            "recency_days": 8,
+            "avg_order_value": 88.15500000000002,
+            "last_purchase_date": "2026-01-02"
+          },
+          {
+            "customer_id": "R0018",
+            "segment_id": 3,
+            "segment_label": "Potential",
+            "frequency": 5,
+            "monetary": 514.99,
+            "recency_days": 4,
+            "avg_order_value": 102.998,
+            "last_purchase_date": "2026-01-06"
+          },
+          {
+            "customer_id": "R0191",
+            "segment_id": 3,
+            "segment_label": "Potential",
+            "frequency": 3,
+            "monetary": 514.1,
+            "recency_days": 9,
+            "avg_order_value": 171.36666666666667,
+            "last_purchase_date": "2026-01-01"
+          },
+          {
+            "customer_id": "R0113",
+            "segment_id": 3,
+            "segment_label": "Potential",
+            "frequency": 3,
+            "monetary": 513.41,
+            "recency_days": 7,
+            "avg_order_value": 171.13666666666666,
+            "last_purchase_date": "2026-01-03"
+          },
+          {
+            "customer_id": "R0106",
+            "segment_id": 3,
+            "segment_label": "Potential",
+            "frequency": 6,
+            "monetary": 507.86,
+            "recency_days": 13,
+            "avg_order_value": 84.64333333333333,
+            "last_purchase_date": "2025-12-28"
+          },
+          {
+            "customer_id": "R0002",
+            "segment_id": 3,
+            "segment_label": "Potential",
+            "frequency": 4,
+            "monetary": 488.37,
+            "recency_days": 4,
+            "avg_order_value": 122.0925,
+            "last_purchase_date": "2026-01-06"
+          },
+          {
+            "customer_id": "R0142",
+            "segment_id": 3,
+            "segment_label": "Potential",
+            "frequency": 3,
+            "monetary": 482.78999999999996,
+            "recency_days": 0,
+            "avg_order_value": 160.92999999999998,
+            "last_purchase_date": "2026-01-10"
+          },
+          {
+            "customer_id": "R0035",
+            "segment_id": 3,
+            "segment_label": "Potential",
+            "frequency": 3,
+            "monetary": 475.9,
+            "recency_days": 3,
+            "avg_order_value": 158.63333333333333,
+            "last_purchase_date": "2026-01-07"
+          },
+          {
+            "customer_id": "R0067",
+            "segment_id": 3,
+            "segment_label": "Potential",
+            "frequency": 6,
+            "monetary": 469.51,
+            "recency_days": 15,
+            "avg_order_value": 78.25166666666667,
+            "last_purchase_date": "2025-12-26"
+          },
+          {
+            "customer_id": "R0086",
+            "segment_id": 3,
+            "segment_label": "Potential",
+            "frequency": 5,
+            "monetary": 464.49,
+            "recency_days": 21,
+            "avg_order_value": 92.898,
+            "last_purchase_date": "2025-12-20"
+          },
+          {
+            "customer_id": "R0136",
+            "segment_id": 3,
+            "segment_label": "Potential",
+            "frequency": 5,
+            "monetary": 450.39,
+            "recency_days": 10,
+            "avg_order_value": 90.078,
+            "last_purchase_date": "2025-12-31"
+          },
+          {
+            "customer_id": "R0178",
+            "segment_id": 3,
+            "segment_label": "Potential",
+            "frequency": 3,
+            "monetary": 444.29999999999995,
+            "recency_days": 6,
+            "avg_order_value": 148.1,
+            "last_purchase_date": "2026-01-04"
+          },
+          {
+            "customer_id": "R0001",
+            "segment_id": 3,
+            "segment_label": "Potential",
+            "frequency": 5,
+            "monetary": 441.72,
+            "recency_days": 9,
+            "avg_order_value": 88.34400000000001,
+            "last_purchase_date": "2026-01-01"
+          },
+          {
+            "customer_id": "R0040",
+            "segment_id": 3,
+            "segment_label": "Potential",
+            "frequency": 3,
+            "monetary": 435.99,
+            "recency_days": 3,
+            "avg_order_value": 145.33,
+            "last_purchase_date": "2026-01-07"
+          },
+          {
+            "customer_id": "R0162",
+            "segment_id": 3,
+            "segment_label": "Potential",
+            "frequency": 2,
+            "monetary": 421.67999999999995,
+            "recency_days": 1,
+            "avg_order_value": 210.83999999999997,
+            "last_purchase_date": "2026-01-09"
+          },
+          {
+            "customer_id": "R0008",
+            "segment_id": 3,
+            "segment_label": "Potential",
+            "frequency": 6,
+            "monetary": 398.11,
+            "recency_days": 25,
+            "avg_order_value": 66.35166666666667,
+            "last_purchase_date": "2025-12-16"
+          },
+          {
+            "customer_id": "R0046",
+            "segment_id": 3,
+            "segment_label": "Potential",
+            "frequency": 3,
+            "monetary": 367.31,
+            "recency_days": 6,
+            "avg_order_value": 122.43666666666667,
+            "last_purchase_date": "2026-01-04"
+          },
+          {
+            "customer_id": "R0168",
+            "segment_id": 3,
+            "segment_label": "Potential",
+            "frequency": 5,
+            "monetary": 366.27,
+            "recency_days": 13,
+            "avg_order_value": 73.25399999999999,
+            "last_purchase_date": "2025-12-28"
+          },
+          {
+            "customer_id": "R0152",
+            "segment_id": 3,
+            "segment_label": "Potential",
+            "frequency": 5,
+            "monetary": 357.17,
+            "recency_days": 9,
+            "avg_order_value": 71.434,
+            "last_purchase_date": "2026-01-01"
+          },
+          {
+            "customer_id": "R0013",
+            "segment_id": 3,
+            "segment_label": "Potential",
+            "frequency": 4,
+            "monetary": 336.53,
+            "recency_days": 3,
+            "avg_order_value": 84.1325,
+            "last_purchase_date": "2026-01-07"
+          },
+          {
+            "customer_id": "R0121",
+            "segment_id": 3,
+            "segment_label": "Potential",
+            "frequency": 4,
+            "monetary": 329.87,
+            "recency_days": 1,
+            "avg_order_value": 82.4675,
+            "last_purchase_date": "2026-01-09"
+          },
+          {
+            "customer_id": "R0160",
+            "segment_id": 3,
+            "segment_label": "Potential",
+            "frequency": 5,
+            "monetary": 328.22,
+            "recency_days": 11,
+            "avg_order_value": 65.644,
+            "last_purchase_date": "2025-12-30"
+          },
+          {
+            "customer_id": "R0131",
+            "segment_id": 3,
+            "segment_label": "Potential",
+            "frequency": 3,
+            "monetary": 315.51,
+            "recency_days": 4,
+            "avg_order_value": 105.17,
+            "last_purchase_date": "2026-01-06"
+          },
+          {
+            "customer_id": "R0036",
+            "segment_id": 3,
+            "segment_label": "Potential",
+            "frequency": 4,
+            "monetary": 313.06,
+            "recency_days": 6,
+            "avg_order_value": 78.265,
+            "last_purchase_date": "2026-01-04"
+          },
+          {
+            "customer_id": "R0186",
+            "segment_id": 3,
+            "segment_label": "Potential",
+            "frequency": 3,
+            "monetary": 285.74,
+            "recency_days": 5,
+            "avg_order_value": 95.24666666666667,
+            "last_purchase_date": "2026-01-05"
+          },
+          {
+            "customer_id": "R0187",
+            "segment_id": 3,
+            "segment_label": "Potential",
+            "frequency": 3,
+            "monetary": 278.11,
+            "recency_days": 5,
+            "avg_order_value": 92.70333333333333,
+            "last_purchase_date": "2026-01-05"
+          },
+          {
+            "customer_id": "R0199",
+            "segment_id": 3,
+            "segment_label": "Potential",
+            "frequency": 3,
+            "monetary": 200.34,
+            "recency_days": 0,
+            "avg_order_value": 66.78,
+            "last_purchase_date": "2026-01-10"
+          },
+          {
+            "customer_id": "N0021",
+            "segment_id": 3,
+            "segment_label": "Potential",
+            "frequency": 3,
+            "monetary": 157.51999999999998,
+            "recency_days": 2,
+            "avg_order_value": 52.50666666666666,
+            "last_purchase_date": "2026-01-08"
+          },
+          {
+            "customer_id": "R0144",
+            "segment_id": 4,
+            "segment_label": "At Risk",
+            "frequency": 4,
+            "monetary": 677.13,
+            "recency_days": 92,
+            "avg_order_value": 169.2825,
+            "last_purchase_date": "2025-10-10"
+          },
+          {
+            "customer_id": "R0149",
+            "segment_id": 4,
+            "segment_label": "At Risk",
+            "frequency": 4,
+            "monetary": 585.75,
+            "recency_days": 30,
+            "avg_order_value": 146.4375,
+            "last_purchase_date": "2025-12-11"
+          },
+          {
+            "customer_id": "R0057",
+            "segment_id": 4,
+            "segment_label": "At Risk",
+            "frequency": 5,
+            "monetary": 585.27,
+            "recency_days": 30,
+            "avg_order_value": 117.054,
+            "last_purchase_date": "2025-12-11"
+          },
+          {
+            "customer_id": "R0110",
+            "segment_id": 4,
+            "segment_label": "At Risk",
+            "frequency": 5,
+            "monetary": 566.67,
+            "recency_days": 78,
+            "avg_order_value": 113.33399999999999,
+            "last_purchase_date": "2025-10-24"
+          },
+          {
+            "customer_id": "R0071",
+            "segment_id": 4,
+            "segment_label": "At Risk",
+            "frequency": 3,
+            "monetary": 565.11,
+            "recency_days": 57,
+            "avg_order_value": 188.37,
+            "last_purchase_date": "2025-11-14"
+          },
+          {
+            "customer_id": "R0061",
+            "segment_id": 4,
+            "segment_label": "At Risk",
+            "frequency": 5,
+            "monetary": 548.34,
+            "recency_days": 31,
+            "avg_order_value": 109.668,
+            "last_purchase_date": "2025-12-10"
+          },
+          {
+            "customer_id": "R0148",
+            "segment_id": 4,
+            "segment_label": "At Risk",
+            "frequency": 4,
+            "monetary": 542.1700000000001,
+            "recency_days": 23,
+            "avg_order_value": 135.54250000000002,
+            "last_purchase_date": "2025-12-18"
+          },
+          {
+            "customer_id": "R0172",
+            "segment_id": 4,
+            "segment_label": "At Risk",
+            "frequency": 3,
+            "monetary": 538.15,
+            "recency_days": 21,
+            "avg_order_value": 179.38333333333333,
+            "last_purchase_date": "2025-12-20"
+          },
+          {
+            "customer_id": "R0182",
+            "segment_id": 4,
+            "segment_label": "At Risk",
+            "frequency": 4,
+            "monetary": 531.73,
+            "recency_days": 21,
+            "avg_order_value": 132.9325,
+            "last_purchase_date": "2025-12-20"
+          },
+          {
+            "customer_id": "R0175",
+            "segment_id": 4,
+            "segment_label": "At Risk",
+            "frequency": 3,
+            "monetary": 509.35,
+            "recency_days": 107,
+            "avg_order_value": 169.78333333333333,
+            "last_purchase_date": "2025-09-25"
+          },
+          {
+            "customer_id": "R0118",
+            "segment_id": 4,
+            "segment_label": "At Risk",
+            "frequency": 3,
+            "monetary": 474.65,
+            "recency_days": 39,
+            "avg_order_value": 158.21666666666667,
+            "last_purchase_date": "2025-12-02"
+          },
+          {
+            "customer_id": "R0157",
+            "segment_id": 4,
+            "segment_label": "At Risk",
+            "frequency": 3,
+            "monetary": 473.72,
+            "recency_days": 23,
+            "avg_order_value": 157.90666666666667,
+            "last_purchase_date": "2025-12-18"
+          },
+          {
+            "customer_id": "R0014",
+            "segment_id": 4,
+            "segment_label": "At Risk",
+            "frequency": 3,
+            "monetary": 450.93,
+            "recency_days": 20,
+            "avg_order_value": 150.31,
+            "last_purchase_date": "2025-12-21"
+          },
+          {
+            "customer_id": "R0033",
+            "segment_id": 4,
+            "segment_label": "At Risk",
+            "frequency": 4,
+            "monetary": 447.64,
+            "recency_days": 144,
+            "avg_order_value": 111.91,
+            "last_purchase_date": "2025-08-19"
+          },
+          {
+            "customer_id": "R0189",
+            "segment_id": 4,
+            "segment_label": "At Risk",
+            "frequency": 4,
+            "monetary": 445.30999999999995,
+            "recency_days": 14,
+            "avg_order_value": 111.32749999999999,
+            "last_purchase_date": "2025-12-27"
+          },
+          {
+            "customer_id": "R0068",
+            "segment_id": 4,
+            "segment_label": "At Risk",
+            "frequency": 4,
+            "monetary": 441.09000000000003,
+            "recency_days": 28,
+            "avg_order_value": 110.27250000000001,
+            "last_purchase_date": "2025-12-13"
+          },
+          {
+            "customer_id": "R0166",
+            "segment_id": 4,
+            "segment_label": "At Risk",
+            "frequency": 4,
+            "monetary": 423.65,
+            "recency_days": 10,
+            "avg_order_value": 105.9125,
+            "last_purchase_date": "2025-12-31"
+          },
+          {
+            "customer_id": "R0179",
+            "segment_id": 4,
+            "segment_label": "At Risk",
+            "frequency": 3,
+            "monetary": 420.12,
+            "recency_days": 13,
+            "avg_order_value": 140.04,
+            "last_purchase_date": "2025-12-28"
+          },
+          {
+            "customer_id": "R0026",
+            "segment_id": 4,
+            "segment_label": "At Risk",
+            "frequency": 4,
+            "monetary": 411.19,
+            "recency_days": 19,
+            "avg_order_value": 102.7975,
+            "last_purchase_date": "2025-12-22"
+          },
+          {
+            "customer_id": "R0116",
+            "segment_id": 4,
+            "segment_label": "At Risk",
+            "frequency": 3,
+            "monetary": 410.27,
+            "recency_days": 14,
+            "avg_order_value": 136.75666666666666,
+            "last_purchase_date": "2025-12-27"
+          },
+          {
+            "customer_id": "R0115",
+            "segment_id": 4,
+            "segment_label": "At Risk",
+            "frequency": 3,
+            "monetary": 407.88,
+            "recency_days": 15,
+            "avg_order_value": 135.96,
+            "last_purchase_date": "2025-12-26"
+          },
+          {
+            "customer_id": "R0062",
+            "segment_id": 4,
+            "segment_label": "At Risk",
+            "frequency": 2,
+            "monetary": 372.06,
+            "recency_days": 3,
+            "avg_order_value": 186.03,
+            "last_purchase_date": "2026-01-07"
+          },
+          {
+            "customer_id": "R0006",
+            "segment_id": 4,
+            "segment_label": "At Risk",
+            "frequency": 2,
+            "monetary": 371.03,
+            "recency_days": 13,
+            "avg_order_value": 185.515,
+            "last_purchase_date": "2025-12-28"
+          },
+          {
+            "customer_id": "R0079",
+            "segment_id": 4,
+            "segment_label": "At Risk",
+            "frequency": 4,
+            "monetary": 354.44,
+            "recency_days": 8,
+            "avg_order_value": 88.61,
+            "last_purchase_date": "2026-01-02"
+          },
+          {
+            "customer_id": "R0174",
+            "segment_id": 4,
+            "segment_label": "At Risk",
+            "frequency": 3,
+            "monetary": 338.25,
+            "recency_days": 10,
+            "avg_order_value": 112.75,
+            "last_purchase_date": "2025-12-31"
+          },
+          {
+            "customer_id": "R0127",
+            "segment_id": 4,
+            "segment_label": "At Risk",
+            "frequency": 3,
+            "monetary": 335.76,
+            "recency_days": 14,
+            "avg_order_value": 111.92,
+            "last_purchase_date": "2025-12-27"
+          },
+          {
+            "customer_id": "R0133",
+            "segment_id": 4,
+            "segment_label": "At Risk",
+            "frequency": 4,
+            "monetary": 329.51,
+            "recency_days": 22,
+            "avg_order_value": 82.3775,
+            "last_purchase_date": "2025-12-19"
+          },
+          {
+            "customer_id": "R0195",
+            "segment_id": 4,
+            "segment_label": "At Risk",
+            "frequency": 4,
+            "monetary": 314.20000000000005,
+            "recency_days": 25,
+            "avg_order_value": 78.55000000000001,
+            "last_purchase_date": "2025-12-16"
+          },
+          {
+            "customer_id": "R0097",
+            "segment_id": 4,
+            "segment_label": "At Risk",
+            "frequency": 3,
+            "monetary": 299.96,
+            "recency_days": 17,
+            "avg_order_value": 99.98666666666666,
+            "last_purchase_date": "2025-12-24"
+          },
+          {
+            "customer_id": "R0094",
+            "segment_id": 4,
+            "segment_label": "At Risk",
+            "frequency": 3,
+            "monetary": 296.33,
+            "recency_days": 25,
+            "avg_order_value": 98.77666666666666,
+            "last_purchase_date": "2025-12-16"
+          },
+          {
+            "customer_id": "R0082",
+            "segment_id": 4,
+            "segment_label": "At Risk",
+            "frequency": 3,
+            "monetary": 292.1,
+            "recency_days": 21,
+            "avg_order_value": 97.36666666666667,
+            "last_purchase_date": "2025-12-20"
+          },
+          {
+            "customer_id": "R0016",
+            "segment_id": 4,
+            "segment_label": "At Risk",
+            "frequency": 3,
+            "monetary": 284.71,
+            "recency_days": 11,
+            "avg_order_value": 94.90333333333332,
+            "last_purchase_date": "2025-12-30"
+          },
+          {
+            "customer_id": "R0184",
+            "segment_id": 4,
+            "segment_label": "At Risk",
+            "frequency": 3,
+            "monetary": 272.78999999999996,
+            "recency_days": 27,
+            "avg_order_value": 90.92999999999999,
+            "last_purchase_date": "2025-12-14"
+          },
+          {
+            "customer_id": "R0009",
+            "segment_id": 4,
+            "segment_label": "At Risk",
+            "frequency": 4,
+            "monetary": 266.39,
+            "recency_days": 13,
+            "avg_order_value": 66.5975,
+            "last_purchase_date": "2025-12-28"
+          },
+          {
+            "customer_id": "R0041",
+            "segment_id": 4,
+            "segment_label": "At Risk",
+            "frequency": 2,
+            "monetary": 264.29,
+            "recency_days": 9,
+            "avg_order_value": 132.145,
+            "last_purchase_date": "2026-01-01"
+          },
+          {
+            "customer_id": "R0038",
+            "segment_id": 4,
+            "segment_label": "At Risk",
+            "frequency": 2,
+            "monetary": 262.56,
+            "recency_days": 7,
+            "avg_order_value": 131.28,
+            "last_purchase_date": "2026-01-03"
+          },
+          {
+            "customer_id": "R0171",
+            "segment_id": 4,
+            "segment_label": "At Risk",
+            "frequency": 3,
+            "monetary": 253.08999999999997,
+            "recency_days": 26,
+            "avg_order_value": 84.36333333333333,
+            "last_purchase_date": "2025-12-15"
+          },
+          {
+            "customer_id": "R0188",
+            "segment_id": 4,
+            "segment_label": "At Risk",
+            "frequency": 4,
+            "monetary": 252.45,
+            "recency_days": 7,
+            "avg_order_value": 63.1125,
+            "last_purchase_date": "2026-01-03"
+          },
+          {
+            "customer_id": "R0177",
+            "segment_id": 4,
+            "segment_label": "At Risk",
+            "frequency": 3,
+            "monetary": 251.18,
+            "recency_days": 5,
+            "avg_order_value": 83.72666666666667,
+            "last_purchase_date": "2026-01-05"
+          },
+          {
+            "customer_id": "N0014",
+            "segment_id": 4,
+            "segment_label": "At Risk",
+            "frequency": 3,
+            "monetary": 242.88,
+            "recency_days": 10,
+            "avg_order_value": 80.96,
+            "last_purchase_date": "2025-12-31"
+          },
+          {
+            "customer_id": "N0023",
+            "segment_id": 4,
+            "segment_label": "At Risk",
+            "frequency": 3,
+            "monetary": 219.01,
+            "recency_days": 6,
+            "avg_order_value": 73.00333333333333,
+            "last_purchase_date": "2026-01-04"
+          },
+          {
+            "customer_id": "R0045",
+            "segment_id": 4,
+            "segment_label": "At Risk",
+            "frequency": 2,
+            "monetary": 195.16,
+            "recency_days": 0,
+            "avg_order_value": 97.58,
+            "last_purchase_date": "2026-01-10"
+          },
+          {
+            "customer_id": "N0007",
+            "segment_id": 4,
+            "segment_label": "At Risk",
+            "frequency": 3,
+            "monetary": 188.52,
+            "recency_days": 4,
+            "avg_order_value": 62.84,
+            "last_purchase_date": "2026-01-06"
+          },
+          {
+            "customer_id": "R0181",
+            "segment_id": 4,
+            "segment_label": "At Risk",
+            "frequency": 3,
+            "monetary": 180.01,
+            "recency_days": 11,
+            "avg_order_value": 60.00333333333333,
+            "last_purchase_date": "2025-12-30"
+          },
+          {
+            "customer_id": "N0020",
+            "segment_id": 4,
+            "segment_label": "At Risk",
+            "frequency": 2,
+            "monetary": 176.32,
+            "recency_days": 0,
+            "avg_order_value": 88.16,
+            "last_purchase_date": "2026-01-10"
+          },
+          {
+            "customer_id": "N0013",
+            "segment_id": 4,
+            "segment_label": "At Risk",
+            "frequency": 3,
+            "monetary": 153.59,
+            "recency_days": 10,
+            "avg_order_value": 51.196666666666665,
+            "last_purchase_date": "2025-12-31"
+          },
+          {
+            "customer_id": "N0018",
+            "segment_id": 4,
+            "segment_label": "At Risk",
+            "frequency": 3,
+            "monetary": 151.66000000000003,
+            "recency_days": 10,
+            "avg_order_value": 50.55333333333334,
+            "last_purchase_date": "2025-12-31"
+          },
+          {
+            "customer_id": "N0004",
+            "segment_id": 4,
+            "segment_label": "At Risk",
+            "frequency": 2,
+            "monetary": 134.71,
+            "recency_days": 1,
+            "avg_order_value": 67.355,
+            "last_purchase_date": "2026-01-09"
+          },
+          {
+            "customer_id": "N0028",
+            "segment_id": 4,
+            "segment_label": "At Risk",
+            "frequency": 3,
+            "monetary": 124.6,
+            "recency_days": 9,
+            "avg_order_value": 41.53333333333333,
+            "last_purchase_date": "2026-01-01"
+          },
+          {
+            "customer_id": "N0008",
+            "segment_id": 4,
+            "segment_label": "At Risk",
+            "frequency": 3,
+            "monetary": 117.3,
+            "recency_days": 13,
+            "avg_order_value": 39.1,
+            "last_purchase_date": "2025-12-28"
+          },
+          {
+            "customer_id": "N0012",
+            "segment_id": 4,
+            "segment_label": "At Risk",
+            "frequency": 3,
+            "monetary": 94.65,
+            "recency_days": 8,
+            "avg_order_value": 31.55,
+            "last_purchase_date": "2026-01-02"
+          },
+          {
+            "customer_id": "N0024",
+            "segment_id": 4,
+            "segment_label": "At Risk",
+            "frequency": 2,
+            "monetary": 94.6,
+            "recency_days": 0,
+            "avg_order_value": 47.3,
+            "last_purchase_date": "2026-01-10"
+          },
+          {
+            "customer_id": "N0015",
+            "segment_id": 4,
+            "segment_label": "At Risk",
+            "frequency": 1,
+            "monetary": 72.88,
+            "recency_days": 1,
+            "avg_order_value": 72.88,
+            "last_purchase_date": "2026-01-09"
+          },
+          {
+            "customer_id": "R0145",
+            "segment_id": 5,
+            "segment_label": "Lost",
+            "frequency": 4,
+            "monetary": 430.36,
+            "recency_days": 33,
+            "avg_order_value": 107.59,
+            "last_purchase_date": "2025-12-08"
+          },
+          {
+            "customer_id": "R0050",
+            "segment_id": 5,
+            "segment_label": "Lost",
+            "frequency": 2,
+            "monetary": 367.61,
+            "recency_days": 97,
+            "avg_order_value": 183.805,
+            "last_purchase_date": "2025-10-05"
+          },
+          {
+            "customer_id": "R0200",
+            "segment_id": 5,
+            "segment_label": "Lost",
+            "frequency": 2,
+            "monetary": 358.0,
+            "recency_days": 194,
+            "avg_order_value": 179.0,
+            "last_purchase_date": "2025-06-30"
+          },
+          {
+            "customer_id": "R0005",
+            "segment_id": 5,
+            "segment_label": "Lost",
+            "frequency": 3,
+            "monetary": 348.18,
+            "recency_days": 38,
+            "avg_order_value": 116.06,
+            "last_purchase_date": "2025-12-03"
+          },
+          {
+            "customer_id": "R0124",
+            "segment_id": 5,
+            "segment_label": "Lost",
+            "frequency": 2,
+            "monetary": 341.29999999999995,
+            "recency_days": 276,
+            "avg_order_value": 170.64999999999998,
+            "last_purchase_date": "2025-04-09"
+          },
+          {
+            "customer_id": "R0055",
+            "segment_id": 5,
+            "segment_label": "Lost",
+            "frequency": 2,
+            "monetary": 328.92999999999995,
+            "recency_days": 33,
+            "avg_order_value": 164.46499999999997,
+            "last_purchase_date": "2025-12-08"
+          },
+          {
+            "customer_id": "R0126",
+            "segment_id": 5,
+            "segment_label": "Lost",
+            "frequency": 2,
+            "monetary": 324.6,
+            "recency_days": 27,
+            "avg_order_value": 162.3,
+            "last_purchase_date": "2025-12-14"
+          },
+          {
+            "customer_id": "R0017",
+            "segment_id": 5,
+            "segment_label": "Lost",
+            "frequency": 3,
+            "monetary": 317.12,
+            "recency_days": 30,
+            "avg_order_value": 105.70666666666666,
+            "last_purchase_date": "2025-12-11"
+          },
+          {
+            "customer_id": "R0193",
+            "segment_id": 5,
+            "segment_label": "Lost",
+            "frequency": 2,
+            "monetary": 316.65,
+            "recency_days": 15,
+            "avg_order_value": 158.325,
+            "last_purchase_date": "2025-12-26"
+          },
+          {
+            "customer_id": "R0125",
+            "segment_id": 5,
+            "segment_label": "Lost",
+            "frequency": 2,
+            "monetary": 315.48,
+            "recency_days": 22,
+            "avg_order_value": 157.74,
+            "last_purchase_date": "2025-12-19"
+          },
+          {
+            "customer_id": "R0169",
+            "segment_id": 5,
+            "segment_label": "Lost",
+            "frequency": 2,
+            "monetary": 303.0,
+            "recency_days": 46,
+            "avg_order_value": 151.5,
+            "last_purchase_date": "2025-11-25"
+          },
+          {
+            "customer_id": "R0092",
+            "segment_id": 5,
+            "segment_label": "Lost",
+            "frequency": 2,
+            "monetary": 297.15,
+            "recency_days": 32,
+            "avg_order_value": 148.575,
+            "last_purchase_date": "2025-12-09"
+          },
+          {
+            "customer_id": "R0102",
+            "segment_id": 5,
+            "segment_label": "Lost",
+            "frequency": 2,
+            "monetary": 287.75,
+            "recency_days": 302,
+            "avg_order_value": 143.875,
+            "last_purchase_date": "2025-03-14"
+          },
+          {
+            "customer_id": "R0031",
+            "segment_id": 5,
+            "segment_label": "Lost",
+            "frequency": 3,
+            "monetary": 287.74,
+            "recency_days": 34,
+            "avg_order_value": 95.91333333333334,
+            "last_purchase_date": "2025-12-07"
+          },
+          {
+            "customer_id": "R0069",
+            "segment_id": 5,
+            "segment_label": "Lost",
+            "frequency": 2,
+            "monetary": 278.94,
+            "recency_days": 86,
+            "avg_order_value": 139.47,
+            "last_purchase_date": "2025-10-16"
+          },
+          {
+            "customer_id": "R0019",
+            "segment_id": 5,
+            "segment_label": "Lost",
+            "frequency": 3,
+            "monetary": 278.49,
+            "recency_days": 31,
+            "avg_order_value": 92.83,
+            "last_purchase_date": "2025-12-10"
+          },
+          {
+            "customer_id": "R0153",
+            "segment_id": 5,
+            "segment_label": "Lost",
+            "frequency": 2,
+            "monetary": 274.04,
+            "recency_days": 20,
+            "avg_order_value": 137.02,
+            "last_purchase_date": "2025-12-21"
+          },
+          {
+            "customer_id": "R0194",
+            "segment_id": 5,
+            "segment_label": "Lost",
+            "frequency": 2,
+            "monetary": 273.49,
+            "recency_days": 19,
+            "avg_order_value": 136.745,
+            "last_purchase_date": "2025-12-22"
+          },
+          {
+            "customer_id": "R0056",
+            "segment_id": 5,
+            "segment_label": "Lost",
+            "frequency": 2,
+            "monetary": 268.37,
+            "recency_days": 30,
+            "avg_order_value": 134.185,
+            "last_purchase_date": "2025-12-11"
+          },
+          {
+            "customer_id": "R0137",
+            "segment_id": 5,
+            "segment_label": "Lost",
+            "frequency": 2,
+            "monetary": 264.48,
+            "recency_days": 98,
+            "avg_order_value": 132.24,
+            "last_purchase_date": "2025-10-04"
+          },
+          {
+            "customer_id": "R0176",
+            "segment_id": 5,
+            "segment_label": "Lost",
+            "frequency": 2,
+            "monetary": 264.09000000000003,
+            "recency_days": 47,
+            "avg_order_value": 132.04500000000002,
+            "last_purchase_date": "2025-11-24"
+          },
+          {
+            "customer_id": "R0039",
+            "segment_id": 5,
+            "segment_label": "Lost",
+            "frequency": 4,
+            "monetary": 259.56,
+            "recency_days": 36,
+            "avg_order_value": 64.89,
+            "last_purchase_date": "2025-12-05"
+          },
+          {
+            "customer_id": "N0002",
+            "segment_id": 5,
+            "segment_label": "Lost",
+            "frequency": 3,
+            "monetary": 242.14,
+            "recency_days": 30,
+            "avg_order_value": 80.71333333333332,
+            "last_purchase_date": "2025-12-11"
+          },
+          {
+            "customer_id": "N0006",
+            "segment_id": 5,
+            "segment_label": "Lost",
+            "frequency": 3,
+            "monetary": 239.83999999999997,
+            "recency_days": 23,
+            "avg_order_value": 79.94666666666666,
+            "last_purchase_date": "2025-12-18"
+          },
+          {
+            "customer_id": "R0185",
+            "segment_id": 5,
+            "segment_label": "Lost",
+            "frequency": 1,
+            "monetary": 233.09,
+            "recency_days": 27,
+            "avg_order_value": 233.09,
+            "last_purchase_date": "2025-12-14"
+          },
+          {
+            "customer_id": "R0107",
+            "segment_id": 5,
+            "segment_label": "Lost",
+            "frequency": 2,
+            "monetary": 225.84,
+            "recency_days": 17,
+            "avg_order_value": 112.92,
+            "last_purchase_date": "2025-12-24"
+          },
+          {
+            "customer_id": "R0015",
+            "segment_id": 5,
+            "segment_label": "Lost",
+            "frequency": 1,
+            "monetary": 225.15,
+            "recency_days": 12,
+            "avg_order_value": 225.15,
+            "last_purchase_date": "2025-12-29"
+          },
+          {
+            "customer_id": "R0112",
+            "segment_id": 5,
+            "segment_label": "Lost",
+            "frequency": 1,
+            "monetary": 222.31,
+            "recency_days": 20,
+            "avg_order_value": 222.31,
+            "last_purchase_date": "2025-12-21"
+          },
+          {
+            "customer_id": "R0096",
+            "segment_id": 5,
+            "segment_label": "Lost",
+            "frequency": 2,
+            "monetary": 215.26,
+            "recency_days": 34,
+            "avg_order_value": 107.63,
+            "last_purchase_date": "2025-12-07"
+          },
+          {
+            "customer_id": "R0141",
+            "segment_id": 5,
+            "segment_label": "Lost",
+            "frequency": 1,
+            "monetary": 215.09,
+            "recency_days": 31,
+            "avg_order_value": 215.09,
+            "last_purchase_date": "2025-12-10"
+          },
+          {
+            "customer_id": "R0037",
+            "segment_id": 5,
+            "segment_label": "Lost",
+            "frequency": 2,
+            "monetary": 209.19,
+            "recency_days": 22,
+            "avg_order_value": 104.595,
+            "last_purchase_date": "2025-12-19"
+          },
+          {
+            "customer_id": "R0049",
+            "segment_id": 5,
+            "segment_label": "Lost",
+            "frequency": 3,
+            "monetary": 204.54,
+            "recency_days": 14,
+            "avg_order_value": 68.17999999999999,
+            "last_purchase_date": "2025-12-27"
+          },
+          {
+            "customer_id": "R0011",
+            "segment_id": 5,
+            "segment_label": "Lost",
+            "frequency": 1,
+            "monetary": 203.11,
+            "recency_days": 96,
+            "avg_order_value": 203.11,
+            "last_purchase_date": "2025-10-06"
+          },
+          {
+            "customer_id": "R0198",
+            "segment_id": 5,
+            "segment_label": "Lost",
+            "frequency": 2,
+            "monetary": 199.85,
+            "recency_days": 32,
+            "avg_order_value": 99.925,
+            "last_purchase_date": "2025-12-09"
+          },
+          {
+            "customer_id": "N0016",
+            "segment_id": 5,
+            "segment_label": "Lost",
+            "frequency": 2,
+            "monetary": 188.27,
+            "recency_days": 25,
+            "avg_order_value": 94.135,
+            "last_purchase_date": "2025-12-16"
+          },
+          {
+            "customer_id": "N0022",
+            "segment_id": 5,
+            "segment_label": "Lost",
+            "frequency": 3,
+            "monetary": 176.66,
+            "recency_days": 28,
+            "avg_order_value": 58.88666666666666,
+            "last_purchase_date": "2025-12-13"
+          },
+          {
+            "customer_id": "R0105",
+            "segment_id": 5,
+            "segment_label": "Lost",
+            "frequency": 2,
+            "monetary": 175.83,
+            "recency_days": 17,
+            "avg_order_value": 87.915,
+            "last_purchase_date": "2025-12-24"
+          },
+          {
+            "customer_id": "R0089",
+            "segment_id": 5,
+            "segment_label": "Lost",
+            "frequency": 1,
+            "monetary": 172.71,
+            "recency_days": 27,
+            "avg_order_value": 172.71,
+            "last_purchase_date": "2025-12-14"
+          },
+          {
+            "customer_id": "N0011",
+            "segment_id": 5,
+            "segment_label": "Lost",
+            "frequency": 2,
+            "monetary": 163.64999999999998,
+            "recency_days": 25,
+            "avg_order_value": 81.82499999999999,
+            "last_purchase_date": "2025-12-16"
+          },
+          {
+            "customer_id": "N0010",
+            "segment_id": 5,
+            "segment_label": "Lost",
+            "frequency": 3,
+            "monetary": 159.99,
+            "recency_days": 19,
+            "avg_order_value": 53.330000000000005,
+            "last_purchase_date": "2025-12-22"
+          },
+          {
+            "customer_id": "N0009",
+            "segment_id": 5,
+            "segment_label": "Lost",
+            "frequency": 2,
+            "monetary": 129.94,
+            "recency_days": 41,
+            "avg_order_value": 64.97,
+            "last_purchase_date": "2025-11-30"
+          },
+          {
+            "customer_id": "R0151",
+            "segment_id": 5,
+            "segment_label": "Lost",
+            "frequency": 1,
+            "monetary": 129.9,
+            "recency_days": 37,
+            "avg_order_value": 129.9,
+            "last_purchase_date": "2025-12-04"
+          },
+          {
+            "customer_id": "R0161",
+            "segment_id": 5,
+            "segment_label": "Lost",
+            "frequency": 2,
+            "monetary": 127.46000000000001,
+            "recency_days": 32,
+            "avg_order_value": 63.730000000000004,
+            "last_purchase_date": "2025-12-09"
+          },
+          {
+            "customer_id": "R0034",
+            "segment_id": 5,
+            "segment_label": "Lost",
+            "frequency": 2,
+            "monetary": 121.88,
+            "recency_days": 47,
+            "avg_order_value": 60.94,
+            "last_purchase_date": "2025-11-24"
+          },
+          {
+            "customer_id": "N0017",
+            "segment_id": 5,
+            "segment_label": "Lost",
+            "frequency": 2,
+            "monetary": 116.84,
+            "recency_days": 33,
+            "avg_order_value": 58.42,
+            "last_purchase_date": "2025-12-08"
+          },
+          {
+            "customer_id": "N0005",
+            "segment_id": 5,
+            "segment_label": "Lost",
+            "frequency": 1,
+            "monetary": 115.99,
+            "recency_days": 11,
+            "avg_order_value": 115.99,
+            "last_purchase_date": "2025-12-30"
+          },
+          {
+            "customer_id": "N0029",
+            "segment_id": 5,
+            "segment_label": "Lost",
+            "frequency": 1,
+            "monetary": 103.45,
+            "recency_days": 20,
+            "avg_order_value": 103.45,
+            "last_purchase_date": "2025-12-21"
+          },
+          {
+            "customer_id": "N0019",
+            "segment_id": 5,
+            "segment_label": "Lost",
+            "frequency": 1,
+            "monetary": 94.1,
+            "recency_days": 12,
+            "avg_order_value": 94.1,
+            "last_purchase_date": "2025-12-29"
+          },
+          {
+            "customer_id": "R0066",
+            "segment_id": 5,
+            "segment_label": "Lost",
+            "frequency": 1,
+            "monetary": 76.9,
+            "recency_days": 47,
+            "avg_order_value": 76.9,
+            "last_purchase_date": "2025-11-24"
+          },
+          {
+            "customer_id": "N0025",
+            "segment_id": 5,
+            "segment_label": "Lost",
+            "frequency": 1,
+            "monetary": 74.21,
+            "recency_days": 27,
+            "avg_order_value": 74.21,
+            "last_purchase_date": "2025-12-14"
+          },
+          {
+            "customer_id": "N0030",
+            "segment_id": 5,
+            "segment_label": "Lost",
+            "frequency": 2,
+            "monetary": 65.35,
+            "recency_days": 31,
+            "avg_order_value": 32.675,
+            "last_purchase_date": "2025-12-10"
+          },
+          {
+            "customer_id": "R0197",
+            "segment_id": 5,
+            "segment_label": "Lost",
+            "frequency": 1,
+            "monetary": 54.11,
+            "recency_days": 21,
+            "avg_order_value": 54.11,
+            "last_purchase_date": "2025-12-20"
+          },
+          {
+            "customer_id": "N0003",
+            "segment_id": 5,
+            "segment_label": "Lost",
+            "frequency": 1,
+            "monetary": 51.11,
+            "recency_days": 24,
+            "avg_order_value": 51.11,
+            "last_purchase_date": "2025-12-17"
+          },
+          {
+            "customer_id": "R0130",
+            "segment_id": 5,
+            "segment_label": "Lost",
+            "frequency": 1,
+            "monetary": 46.05,
+            "recency_days": 342,
+            "avg_order_value": 46.05,
+            "last_purchase_date": "2025-02-02"
+          },
+          {
+            "customer_id": "R0146",
+            "segment_id": 5,
+            "segment_label": "Lost",
+            "frequency": 1,
+            "monetary": 37.54,
+            "recency_days": 257,
+            "avg_order_value": 37.54,
+            "last_purchase_date": "2025-04-28"
+          },
+          {
+            "customer_id": "N0027",
+            "segment_id": 5,
+            "segment_label": "Lost",
+            "frequency": 1,
+            "monetary": 30.27,
+            "recency_days": 9,
+            "avg_order_value": 30.27,
+            "last_purchase_date": "2026-01-01"
+          },
+          {
+            "customer_id": "N0026",
+            "segment_id": 5,
+            "segment_label": "Lost",
+            "frequency": 1,
+            "monetary": 25.28,
+            "recency_days": 27,
+            "avg_order_value": 25.28,
+            "last_purchase_date": "2025-12-14"
+          },
+          {
+            "customer_id": "N0001",
+            "segment_id": 5,
+            "segment_label": "Lost",
+            "frequency": 1,
+            "monetary": 24.59,
+            "recency_days": 14,
+            "avg_order_value": 24.59,
+            "last_purchase_date": "2025-12-27"
+          },
+          {
+            "customer_id": "R0150",
+            "segment_id": 5,
+            "segment_label": "Lost",
+            "frequency": 1,
+            "monetary": 22.17,
+            "recency_days": 12,
+            "avg_order_value": 22.17,
+            "last_purchase_date": "2025-12-29"
+          }
+        ]
+      },
+      "timestamp": ""
+    }
+  }
 }

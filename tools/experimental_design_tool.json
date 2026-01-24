@@ -1,0 +1,101 @@
+{
+  "tool": {
+    "id": "experimental-design",
+    "name": "Experimental Design",
+    "description": "Calculates statistically valid A/B test sample sizes using baseline rate, minimum detectable lift, and significance level.",
+    "icon": "📐",
+    "category": "analyze",
+    "isAvailable": true,
+    "version": "1.0.0",
+    "available_agents": ["experimental-design-agent"],
+    "files": {
+      "primary": {
+        "description": "Aggregate or transaction-level dataset with conversion or outcome columns used to estimate baseline rates and variability (required)",
+        "required": true,
+        "formats": ["csv", "xlsx", "json"],
+        "max_size_mb": 500
+      }
+    }
+  },
+  "agents": {
+    "experimental-design-agent": {
+      "id": "experimental-design-agent",
+      "name": "Experimental Design Agent",
+      "description": "Calculates statistically valid A/B test sample sizes using baseline rate, minimum detectable lift, and significance level.",
+      "icon": "📐",
+      "category": "analyze",
+      "isAvailable": true,
+      "accuracy": "95%",
+      "features": [
+        "Baseline Conversion Rate Input",
+        "Minimum Detectable Lift",
+        "Two-Tailed Power Analysis",
+        "Sample Size Calculation",
+        "Feasibility Warnings"
+      ],
+      "input": {
+        "type": "CSV, JSON, XLSX"
+      },
+      "version": "1.0.0",
+      "required_files": ["primary"],
+      "parameters": {
+        "significance_level": {
+          "type": "float",
+          "description": "Desired statistical significance level",
+          "default": 0.95,
+          "allowed": [0.9, 0.95, 0.99],
+          "example": 0.95,
+          "show": true,
+          "required": false
+        },
+        "baseline_rate": {
+          "type": "float",
+          "description": "Baseline conversion/response rate (0-1)",
+          "default": 0.02,
+          "min": 0,
+          "max": 1,
+          "example": 0.02,
+          "show": true,
+          "required": false
+        },
+        "min_detectable_lift": {
+          "type": "float",
+          "description": "Minimum detectable lift as a percentage",
+          "default": 5,
+          "min": 0,
+          "max": 100,
+          "example": 5,
+          "show": true,
+          "required": false
+        },
+        "total_population_size": {
+          "type": "integer",
+          "description": "Optional total audience size for feasibility checks",
+          "default": null,
+          "min": 0,
+          "example": 100000,
+          "show": true,
+          "required": false
+        },
+        "excellent_threshold": {
+          "type": "integer",
+          "description": "Score threshold for excellent quality status",
+          "default": 90,
+          "min": 0,
+          "max": 100,
+          "show": false,
+          "required": false
+        },
+        "good_threshold": {
+          "type": "integer",
+          "description": "Score threshold for good quality status",
+          "default": 75,
+          "min": 0,
+          "max": 100,
+          "show": false,
+          "required": false
+        }
+      }
+    }
+  }
+}

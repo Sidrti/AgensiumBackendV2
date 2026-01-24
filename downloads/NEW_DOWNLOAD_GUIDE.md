@@ -92,15 +92,20 @@ For tools that modify data (Clean/Master), the `BaseDownloader` handles the logi
 To create a new downloader (e.g., `AnalyzeMyDataDownloads`), follow these steps:
 
 ### Step 1: Inheritance and Init
-Pass the `tool_id` (matches `tool.json`) and a display name to `super().__init__`.
+Pass the `tool_id` (matches `tool.json`) and a display name to `super().__init__`. It is recommended to accept these as arguments for flexibility.
 
 ```python
 from openpyxl import Workbook
-from downloads.downloads_utils import BaseDownloader
+from downloads.downloads_utils import BaseDownloader, load_tool_config
 
 class AnalyzeMyDataDownloads(BaseDownloader):
-    def __init__(self):
-        super().__init__("analyze-my-data", "Analyze My Data")
+    def __init__(self, tool_id: str, tool_display_name: str = None):
+        # Fallback: Load from config if display name is missing
+        if not tool_display_name:
+            config = load_tool_config(tool_id)
+            tool_display_name = config.get("tool", {}).get("name", tool_id)
+            
+        super().__init__(tool_id, tool_display_name)
 ```
 
 ### Step 2: Implement `create_tool_specific_sheets`

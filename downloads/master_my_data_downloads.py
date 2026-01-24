@@ -7,13 +7,16 @@ Uses BaseDownloader for standardized report generation.
 from typing import Dict, Any
 from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill
-from downloads.downloads_utils import BaseDownloader
+from downloads.downloads_utils import BaseDownloader, load_tool_config
 
 class MasterMyDataDownloads(BaseDownloader):
     """Handles comprehensive downloads for master-my-data tool."""
     
-    def __init__(self):
-        super().__init__("master-my-data", "Master My Data")
+    def __init__(self, tool_id: str, tool_display_name: str = None):
+        if not tool_display_name:
+            config = load_tool_config(tool_id)
+            tool_display_name = config.get("tool", {}).get("name", tool_id)
+        super().__init__(tool_id, tool_display_name)
         
     def create_tool_specific_sheets(self, wb: Workbook, agent_results: Dict[str, Any]):
         """Create tool-specific analysis sheets."""

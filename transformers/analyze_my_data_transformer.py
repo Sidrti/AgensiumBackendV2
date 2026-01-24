@@ -148,6 +148,8 @@ async def run_analyze_my_data_analysis(
             agent_results,
             int((time.time() - start_time) * 1000),
             analysis_id,
+            tool_id,
+            tool_def["tool"]["name"],
             current_user
         )
         
@@ -277,6 +279,8 @@ async def run_analyze_my_data_analysis_v2_1(
             agent_results,
             int((time.time() - start_time) * 1000),
             task.task_id,
+            task.tool_id,
+            tool_def["tool"]["name"],
             current_user
         )
         
@@ -391,6 +395,8 @@ def transform_analyze_my_data_response(
     agent_results: Dict[str, Any],
     execution_time_ms: int,
     analysis_id: str,
+    tool_id: str,
+    tool_name: str,
     current_user: Any = None
 ) -> Dict[str, Any]:
     """Consolidate agent outputs into unified response."""
@@ -557,7 +563,7 @@ def transform_analyze_my_data_response(
     all_row_level_issues = all_row_level_issues[:1000]
     
     # ==================== DOWNLOADS ====================
-    downloader = AnalyzeMyDataDownloads()
+    downloader = AnalyzeMyDataDownloads(tool_id, tool_name)
     downloads = downloader.generate_downloads(
         agent_results=agent_results,
         analysis_id=analysis_id,

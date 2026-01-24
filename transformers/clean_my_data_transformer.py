@@ -152,6 +152,8 @@ async def run_clean_my_data_analysis(
             agent_results,
             int((time.time() - start_time) * 1000),
             analysis_id,
+            tool_id,
+            tool_def["tool"]["name"],
             current_user
         )
         
@@ -279,6 +281,8 @@ async def run_clean_my_data_analysis_v2_1(
             agent_results,
             int((time.time() - start_time) * 1000),
             task.task_id,
+            task.tool_id,
+            tool_def["tool"]["name"],
             current_user
         )
         
@@ -445,6 +449,8 @@ def transform_clean_my_data_response(
     agent_results: Dict[str, Any],
     execution_time_ms: int,
     analysis_id: str,
+    tool_id: str,
+    tool_name: str,
     current_user: Any = None
 ) -> Dict[str, Any]:
     """Consolidate agent outputs into unified response."""
@@ -669,7 +675,7 @@ def transform_clean_my_data_response(
         cleaned_files[most_cleaned_item["agent_id"]] = cleaned_file_data
         print(f"Using most processed file from [{most_cleaned_item['agent_id']}]: {most_cleaned_item['filename']} -> {cleaned_filename}")
     
-    downloader = CleanMyDataDownloads()
+    downloader = CleanMyDataDownloads(tool_id, tool_name)
 
     # Sanitize agent_results for downloads: remove potentially large cleaned_file contents
     # cleaned files are passed explicitly via cleaned_files parameter so we don't need to include

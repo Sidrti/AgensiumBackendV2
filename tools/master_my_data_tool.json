@@ -36,7 +36,8 @@
       "name": "Key Identifier",
       "description": "Analyzes the structural properties of a dataset and proposes candidate primary keys, foreign keys, and entity keys based on statistical inference and heuristics. Essential for uniquely identifying records before deduplication and entity resolution.",
       "icon": "🔑",
-      "category": "Data Structure",
+      "category": "source",
+      "isAvailable": true,
       "accuracy": "99%",
       "features": [
         "Primary Key Detection",
@@ -177,7 +178,8 @@
       "name": "Contract Enforcer",
       "description": "Enforces predefined data contracts to ensure data is strictly compliant with external system requirements. Acts as a quality control gateway validating structural (schema) and value (content) constraints. Supports auto-transformation for compliance.",
       "icon": "📜",
-      "category": "Governance",
+      "category": "source",
+      "isAvailable": true,
       "accuracy": "98%",
       "features": [
         "Schema Validation",
@@ -321,7 +323,8 @@
       "name": "Semantic Mapper",
       "description": "Maps input column names, keywords, and values to a standardized semantic schema. Ensures data from different sources with inconsistent column names or terminology is unified into one consistent structure.",
       "icon": "🗺️",
-      "category": "Data Standardization",
+      "category": "source",
+      "isAvailable": true,
       "accuracy": "95%",
       "features": [
         "Column Name Standardization",
@@ -444,7 +447,8 @@
       "name": "Survivorship Resolver",
       "description": "Determines which field values should 'survive' when multiple sources provide different or conflicting values. Applies business rules, scoring logic, and priority models to pick the best possible value before the GoldenRecordBuilder constructs the final Golden Record.",
       "icon": "⚔️",
-      "category": "Conflict Resolution",
+      "category": "source",
+      "isAvailable": true,
       "accuracy": "96%",
       "features": [
         "Conflict Detection",
@@ -581,7 +585,8 @@
       "name": "Golden Record Builder",
       "description": "Creates the final unified, conflict-resolved, highest-quality version of a record (Golden Record). Merges records from multiple sources using survivorship rules to create a single source of truth.",
       "icon": "🏆",
-      "category": "Master Data",
+      "category": "source",
+      "isAvailable": true,
       "accuracy": "97%",
       "features": [
         "Record Clustering",
@@ -728,7 +733,8 @@
       "name": "Stewardship Flagger",
       "description": "Identifies data issues that require human review or intervention. Automatically flags suspicious, incomplete, inconsistent, or low-confidence data so Data Stewards can take action. Acts as the quality gatekeeper of the entire data pipeline.",
       "icon": "🚩",
-      "category": "Governance",
+      "category": "source",
+      "isAvailable": true,
       "accuracy": "95%",
       "features": [
         "Missing Required Field Detection",

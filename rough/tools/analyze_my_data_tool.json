@@ -34,7 +34,8 @@
       "name": "Customer Segmentation Agent",
       "description": "Classifies customers into value-based or behavior-based segments using decile logic or weighted RFM modeling for targeted strategy and prioritization.",
       "icon": "👥",
-      "category": "Segmentation",
+      "category": "analyze",
+      "isAvailable": true,
       "accuracy": "97%",
       "features": [
         "Value Segmentation (Deciles / Quantiles)",
@@ -189,7 +190,8 @@
       "name": "Market Basket & Sequence Agent",
       "description": "Finds product co-purchase rules (within basket) and next-purchase sequences (cross transaction) to support bundling, promotions, and intent prediction.",
       "icon": "🛒",
-      "category": "Association & Sequence",
+      "category": "analyze",
+      "isAvailable": true,
       "accuracy": "96%",
       "features": [
         "Frequent Itemsets (Apriori / FP-Growth)",
@@ -353,7 +355,8 @@
       "name": "Experimental Design Agent",
       "description": "Calculates statistically valid A/B test sample sizes using baseline rate, minimum detectable lift, and significance level.",
       "icon": "📐",
-      "category": "Experimentation",
+      "category": "analyze",
+      "isAvailable": true,
       "accuracy": "95%",
       "features": [
         "Baseline Conversion Rate Input",
@@ -431,7 +434,8 @@
       "name": "Synthetic Control Agent",
       "description": "Measures campaign impact without randomized control by constructing a statistically similar synthetic control population.",
       "icon": "🧬",
-      "category": "Causal Inference",
+      "category": "analyze",
+      "isAvailable": true,
       "accuracy": "94%",
       "features": [
         "Synthetic Control Construction",
