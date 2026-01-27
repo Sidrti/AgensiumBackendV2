@@ -26,7 +26,7 @@ class ChatAgent:
     def __init__(
         self,
         api_key: Optional[str] = None,
-        model: str = "xiaomi/mimo-v2-flash:free",
+        model: str = "google/gemma-3-27b-it:free",
         site_url: Optional[str] = None,
         site_name: Optional[str] = None,
     ):
@@ -35,7 +35,7 @@ class ChatAgent:
 
         Args:
             api_key: OpenRouter API key (defaults to OPENROUTER_API_KEY env var)
-            model: Model name to use (default: xiaomi/mimo-v2-flash:free)
+            model: Model name to use (default: google/gemma-3-27b-it:free)
             site_url: Your site URL for OpenRouter rankings (optional)
             site_name: Your site name for OpenRouter rankings (optional)
         """

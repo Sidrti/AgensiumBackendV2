@@ -546,8 +546,10 @@ def transform_profile_my_data_response(
         from ai.routing_decision_ai import RoutingDecisionAI
         routing_ai = RoutingDecisionAI()
         routing_decisions = routing_ai.get_routing_decisions(
-            current_tool="profile-my-data",
+            current_tool=tool_id,
             agent_results=agent_results,
+            executive_summary=executive_summary,
+            analysis_summary=analysis_summary,
             primary_filename="data.csv",
             baseline_filename=None,
             current_parameters=None

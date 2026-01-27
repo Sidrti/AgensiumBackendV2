@@ -23,6 +23,7 @@ from db import models, schemas
 from db.models import TaskStatus
 from auth.dependencies import get_current_active_verified_user
 from services.s3_service import s3_service
+from transformers.transformers_utils import get_transformer
 
 
 router = APIRouter(prefix="/tasks", tags=["tasks"])
@@ -371,36 +372,18 @@ async def _execute_task_background(task_id: str, user_id: int):
         # Execute based on tool
         result = None
         try:
-            if task.tool_id == "profile-my-data":
-                from transformers import profile_my_data_transformer
-                result = await profile_my_data_transformer.run_profile_my_data_analysis_v2_1(
-                    task=task,
-                    current_user=current_user,
-                    db=db
-                )
-            elif task.tool_id == "clean-my-data":
-                from transformers import clean_my_data_transformer
-                result = await clean_my_data_transformer.run_clean_my_data_analysis_v2_1(
-                    task=task,
-                    current_user=current_user,
-                    db=db
-                )
-            elif task.tool_id == "master-my-data":
-                from transformers import master_my_data_transformer
-                result = await master_my_data_transformer.run_master_my_data_analysis_v2_1(
-                    task=task,
-                    current_user=current_user,
-                    db=db
-                )
-            elif task.tool_id == "analyze-my-data" or task.tool_id == "customer-segmentation" or task.tool_id == "experimental-design" or task.tool_id == "market-basket-sequence"  or task.tool_id == "synthetic-control":
-                from transformers import analyze_my_data_transformer
-                result = await analyze_my_data_transformer.run_analyze_my_data_analysis_v2_1(
-                    task=task,
-                    current_user=current_user,
-                    db=db
-                )
-            else:
-                result = {"status": "error", "error": f"Unknown tool: {task.tool_id}", "error_code": "UNKNOWN_TOOL"}
+            # Get the appropriate transformer
+            transformer = get_transformer(task.tool_id)
+            
+            # Execute transformer
+            result = await transformer(
+                task=task,
+                current_user=current_user,
+                db=db
+            )
+        except ValueError as e:
+            # Unknown tool_id
+            result = {"status": "error", "error": str(e), "error_code": "UNKNOWN_TOOL"}
         except Exception as e:
             result = {"status": "error", "error": str(e), "error_code": "INTERNAL_ERROR"}
 

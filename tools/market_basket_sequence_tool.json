@@ -44,7 +44,7 @@
           "description": "Optional industry context to improve recommendations",
           "default": null,
           "example": "hardware",
-          "show": true,
+          "show": false,
           "required": false
         },
         "mode": {
@@ -53,7 +53,7 @@
           "default": "within_basket",
           "allowed": ["within_basket", "cross_transaction"],
           "example": "within_basket",
-          "show": true,
+          "show": false,
           "required": false
         },
         "algorithm": {
@@ -70,7 +70,7 @@
           "default": 0.02,
           "min": 0,
           "max": 1,
-          "show": true,
+          "show": false,
           "required": false
         },
         "confidence": {
@@ -79,7 +79,7 @@
           "default": 0.3,
           "min": 0,
           "max": 1,
-          "show": true,
+          "show": false,
           "required": false
         },
         "lift": {
@@ -88,7 +88,7 @@
           "default": 1.2,
           "min": 0,
           "max": 100,
-          "show": true,
+          "show": false,
           "required": false
         },
         "gap_days": {
@@ -97,7 +97,7 @@
           "default": 14,
           "min": 0,
           "max": 365,
-          "show": true,
+          "show": false,
           "required": false
         },
         "top_n_rules": {

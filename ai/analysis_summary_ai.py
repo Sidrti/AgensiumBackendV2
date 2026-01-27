@@ -41,7 +41,7 @@ class AnalysisSummaryAI:
     def __init__(
         self,
         api_key: Optional[str] = None,
-        model: str = "xiaomi/mimo-v2-flash:free", # xiaomi/mimo-v2-flash:free
+        model: str = "google/gemma-3-27b-it:free", # google/gemma-3-27b-it:free
         site_url: Optional[str] = None,
         site_name: Optional[str] = None,
     ):

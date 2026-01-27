@@ -45,7 +45,7 @@
           "default": "rfm",
           "allowed": ["value", "rfm"],
           "example": "rfm",
-          "show": true,
+          "show": false,
           "required": false
         },
         "timeframe": {
@@ -88,7 +88,7 @@
           "default": 5,
           "min": 2,
           "max": 10,
-          "show": true,
+          "show": false,
           "required": false
         },
         "customer_id_column": {
@@ -124,7 +124,7 @@
           "default": 33,
           "min": 0,
           "max": 100,
-          "show": true,
+          "show": false,
           "required": false
         },
         "rfm_frequency_weight": {
@@ -133,7 +133,7 @@
           "default": 33,
           "min": 0,
           "max": 100,
-          "show": true,
+          "show": false,
           "required": false
         },
         "rfm_monetary_weight": {
@@ -142,7 +142,7 @@
           "default": 34,
           "min": 0,
           "max": 100,
-          "show": true,
+          "show": false,
           "required": false
         },
         "rfm_bins": {

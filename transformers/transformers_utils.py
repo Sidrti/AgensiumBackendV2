@@ -2,11 +2,104 @@
 import io
 import json
 import os
+import sys
 import base64
 from pathlib import Path
 import pandas as pd
 from typing import Dict, List, Any, Optional, Union
 from fastapi import UploadFile, HTTPException
+
+
+# =============================================================================
+# TRANSFORMER MAPPING
+# =============================================================================
+
+def get_transformer(tool_id: str):
+    """
+    Get the appropriate transformer function for a tool_id (v2.1 API).
+    
+    Lazy imports to avoid circular dependencies and improve startup time.
+    Uses the same import pattern as routes.py which works correctly.
+    
+    CRITICAL: Ensures backend directory is in sys.path before importing transformers.
+    This is needed in worker subprocess where path modifications from startup may not persist.
+    
+    Args:
+        tool_id: The tool identifier (profile-my-data, clean-my-data, master-my-data, analyze-my-data, etc.)
+        
+    Returns:
+        Async transformer function (v2.1 API)
+        
+    Raises:
+        ValueError: If tool_id is unknown
+    """
+    # CRITICAL: Ensure backend directory is in sys.path
+    # This is needed in the worker subprocess which may not have inherited the path modifications
+    backend_dir = str(Path(__file__).resolve().parent.parent)
+    if backend_dir not in sys.path:
+        sys.path.insert(0, backend_dir)
+    
+    # Import the module first (same pattern as routes.py), then get the function
+    if tool_id == "profile-my-data":
+        from transformers import profile_my_data_transformer
+        return profile_my_data_transformer.run_profile_my_data_analysis_v2_1
+    
+    elif tool_id == "clean-my-data":
+        from transformers import clean_my_data_transformer
+        return clean_my_data_transformer.run_clean_my_data_analysis_v2_1
+    
+    elif tool_id == "master-my-data":
+        from transformers import master_my_data_transformer
+        return master_my_data_transformer.run_master_my_data_analysis_v2_1
+
+    elif tool_id == "analyze-my-data" or tool_id == "customer-segmentation" or tool_id == "experimental-design" or tool_id == "market-basket-sequence" or tool_id == "synthetic-control":
+        from transformers import analyze_my_data_transformer
+        return analyze_my_data_transformer.run_analyze_my_data_analysis_v2_1
+    
+    else:
+        raise ValueError(f"Unknown tool_id: {tool_id}")
+
+
+def get_transformer_legacy(tool_id: str):
+    """
+    Get the appropriate transformer function for a tool_id (legacy API).
+    
+    Lazy imports to avoid circular dependencies and improve startup time.
+    This version is for the legacy /analyze endpoint.
+    
+    Args:
+        tool_id: The tool identifier (profile-my-data, clean-my-data, master-my-data, analyze-my-data, etc.)
+        
+    Returns:
+        Async transformer function (legacy API)
+        
+    Raises:
+        ValueError: If tool_id is unknown
+    """
+    # Import the module first, then get the function
+    if tool_id == "profile-my-data":
+        from transformers import profile_my_data_transformer
+        return profile_my_data_transformer.run_profile_my_data_analysis
+    
+    elif tool_id == "clean-my-data":
+        from transformers import clean_my_data_transformer
+        return clean_my_data_transformer.run_clean_my_data_analysis
+    
+    elif tool_id == "master-my-data":
+        from transformers import master_my_data_transformer
+        return master_my_data_transformer.run_master_my_data_analysis
+
+    elif tool_id == "analyze-my-data" or tool_id == "customer-segmentation" or tool_id == "experimental-design" or tool_id == "market-basket-sequence" or tool_id == "synthetic-control":
+        from transformers import analyze_my_data_transformer
+        return analyze_my_data_transformer.run_analyze_my_data_analysis
+    
+    else:
+        raise ValueError(f"Unknown tool_id: {tool_id}")
+
+
+# =============================================================================
+# FILE UTILITIES
+# =============================================================================
 
 
 def get_required_files(tool_id: str, agents: List[str]) -> Dict[str, Dict[str, Any]]:
