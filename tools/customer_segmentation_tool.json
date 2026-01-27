@@ -52,7 +52,7 @@
           "type": "string",
           "description": "Time window to analyze",
           "default": "last_12_months",
-          "allowed": ["ytd", "last_12_months", "custom"],
+          "allowed": ["ytd", "last_12_months"],
           "example": "last_12_months",
           "show": true,
           "required": false
@@ -62,7 +62,7 @@
           "description": "Custom start date (ISO format YYYY-MM-DD). Used only when timeframe=custom.",
           "default": null,
           "example": "2025-01-01",
-          "show": true,
+          "show": false,
           "required": false
         },
         "custom_end_date": {
@@ -70,7 +70,7 @@
           "description": "Custom end date (ISO format YYYY-MM-DD). Used only when timeframe=custom.",
           "default": null,
           "example": "2025-12-31",
-          "show": true,
+          "show": false,
           "required": false
         },
         "metric": {
@@ -105,8 +105,8 @@
           "description": "Transaction/order date column",
           "default": null,
           "example": "order_date",
-          "show": true,
-          "required": true,
+          "show": false,
+          "required": false,
           "columnSelection": true
         },
         "value_column": {
