@@ -62,6 +62,7 @@
           "description": "Custom start date (ISO format YYYY-MM-DD). Used only when timeframe=custom.",
           "default": null,
           "example": "2025-01-01",
+          "datepicker": true,
           "show": true,
           "required": false
         },
@@ -70,6 +71,7 @@
           "description": "Custom end date (ISO format YYYY-MM-DD). Used only when timeframe=custom.",
           "default": null,
           "example": "2025-12-31",
+          "datepicker": true,
           "show": true,
           "required": false
         },
