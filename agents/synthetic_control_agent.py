@@ -966,6 +966,17 @@ def execute_synthetic_control_agent(
                 "match_confidence_score": match_confidence,
                 "quality_status": quality_status,
             },
+            "overrides": {
+                "customer_id_column": customer_id_column,
+                "transaction_date_column": transaction_date_column,
+                "value_column": value_column,
+                "pre_period_start_date": str(pre_period_start_date) if pre_period_start_date else None,
+                "pre_period_end_date": str(pre_period_end_date) if pre_period_end_date else None,
+                "treatment_start_date": str(treatment_start_date) if treatment_start_date else None,
+                "treatment_end_date": str(treatment_end_date) if treatment_end_date else None,
+                "excellent_threshold": excellent_threshold,
+                "good_threshold": good_threshold
+            }
         }
 
         ai_analysis_text = "\n".join([

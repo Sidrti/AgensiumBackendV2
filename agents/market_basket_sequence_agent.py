@@ -358,6 +358,24 @@ def execute_market_basket_sequence_agent(
                     "customer_id_column": customer_col,
                     "timestamp_column": timestamp_col,
                 },
+            },
+            "overrides": {
+                "industry": industry,
+                "mode": mode,
+                "algorithm": algorithm,
+                "support": support,
+                "confidence": confidence,
+                "lift": lift,
+                "gap_days": gap_days,
+                "top_n_rules": top_n_rules,
+                "transaction_id_column": transaction_id_column,
+                "product_id_column": product_id_column,
+                "customer_id_column": customer_id_column,
+                "timestamp_column": timestamp_column,
+                "min_items_per_transaction": min_items_per_transaction,
+                "max_itemset_length": max_itemset_length,
+                "excellent_threshold": excellent_threshold,
+                "good_threshold": good_threshold
             }
         }
 

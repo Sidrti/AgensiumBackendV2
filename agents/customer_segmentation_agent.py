@@ -759,6 +759,23 @@ def execute_customer_segmentation_agent(
             },
             "segment_summary": segment_rows,
             "customer_segments_sample": sample_rows,
+            "overrides": {
+                "mode": mode,
+                "timeframe": timeframe,
+                "custom_start_date": str(custom_start_date) if custom_start_date else None,
+                "custom_end_date": str(custom_end_date) if custom_end_date else None,
+                "metric": metric,
+                "segment_count": segment_count,
+                "customer_id_column": customer_id_column,
+                "transaction_date_column": transaction_date_column,
+                "value_column": value_column,
+                "rfm_recency_weight": rfm_recency_weight,
+                "rfm_frequency_weight": rfm_frequency_weight,
+                "rfm_monetary_weight": rfm_monetary_weight,
+                "rfm_bins": rfm_bins,
+                "excellent_threshold": excellent_threshold,
+                "good_threshold": good_threshold
+            }
         }
 
         ai_analysis_text = "\n".join([

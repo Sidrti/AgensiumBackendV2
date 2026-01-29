@@ -544,6 +544,14 @@ def execute_experimental_design_agent(
                 "quality_status": quality_status,
             },
             "dataset_info": dataset_stats if dataset_stats else None,
+            "overrides": {
+                "significance_level": significance_level,
+                "baseline_rate": baseline_rate,
+                "min_detectable_lift": min_detectable_lift,
+                "total_population_size": total_population_size,
+                "excellent_threshold": excellent_threshold,
+                "good_threshold": good_threshold
+            }
         }
 
         ai_analysis_text = "\n".join([

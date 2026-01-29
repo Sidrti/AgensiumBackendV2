@@ -49,7 +49,87 @@ The return dictionary **MUST** contain the following keys:
 | `ai_analysis_text` | `str` | Natural language summary for LLM consumption. |
 | `cleaned_file` | `Dict` | **(Optional)** Only for agents that modify data. Contains base64 encoded file. |
 
-## 4. Code Template
+## 4. Overrides Documentation
+
+### What is `overrides`?
+
+The `overrides` object is a metadata artifact that mirrors back the **effective runtime parameters** used during agent execution. It provides auditability and traceability by documenting which parameters (user-provided or defaults) were actually applied.
+
+### Why Include `overrides`?
+
+- **Traceability:** Downstream systems and UI can verify exactly which settings were applied
+- **Auditability:** Enables reproducibility and debugging of agent runs
+- **Consistency:** All agents should follow this pattern for a uniform API contract
+
+### When to Include It
+
+**ALL agents must include `overrides` in the `data` object** (except for error responses where `data` is absent).
+
+### What to Include
+
+Capture **all input parameters** read via `parameters.get()` calls, including:
+- User-provided values from the frontend
+- Default values used when parameters were omitted
+- Derived parameters computed from inputs
+
+### Code Pattern
+
+Always add `overrides` to the `data` dictionary **before the final return statement**:
+
+```python
+# 1. Parse all parameters with defaults
+param1 = parameters.get("param1", "default_value")
+param2 = parameters.get("param2", 42)
+param3 = parameters.get("param3", True)
+
+try:
+    # ... agent logic ...
+    
+    # 2. Build the data object
+    data = {
+        "analysis_results": [...],
+        "key_metrics": {...},
+        # ... other analysis outputs ...
+    }
+    
+    # 3. Add overrides BEFORE the return statement
+    data["overrides"] = {
+        "param1": param1,
+        "param2": param2,
+        "param3": param3,
+    }
+    
+    # 4. Return with data containing overrides
+    return {
+        "status": "success",
+        "agent_id": "my-agent",
+        "agent_name": "My Agent",
+        "execution_time_ms": int((time.time() - start_time) * 1000),
+        "summary_metrics": {...},
+        "data": data,  # overrides nested inside data
+        "alerts": [...],
+        "issues": [...],
+        # ... other response fields ...
+    }
+except Exception as e:
+    # In error responses, data is absent, so no overrides
+    return {
+        "status": "error",
+        "agent_id": "my-agent",
+        "error": str(e),
+        "execution_time_ms": int((time.time() - start_time) * 1000)
+    }
+```
+
+### Key Points
+
+- `overrides` goes **inside the `data` object**, not at the top level of the return dictionary
+- Use direct assignment: `data["overrides"] = {...}` **before return**
+- **Do NOT** use spread operator like `"data": {...data, "overrides": {...}}`
+- Include **all** parameters extracted via `parameters.get()` calls
+- In **error responses**, there is no `data` object, so `overrides` is not included
+
+## 5. Code Template
 
 ```python
 """
@@ -75,100 +155,106 @@ def _convert_numpy_types(obj):
     return obj
 
 def execute_my_new_agent(
-    file_contents: bytes,
-    filename: str,
-    parameters: Optional[Dict[str, Any]] = None
-) -> Dict[str, Any]:
-    """
-    Docstring explaining the function.
-    """
-    start_time = time.time()
-    parameters = parameters or {}
+     file_contents: bytes,
+     filename: str,
+     parameters: Optional[Dict[str, Any]] = None
+ ) -> Dict[str, Any]:
+     """
+     Docstring explaining the function.
+     """
+     start_time = time.time()
+     parameters = parameters or {}
 
-    # 1. Parse Parameters with Defaults
-    # Always provide sensible defaults matching the tool.json definition
-    threshold = parameters.get("threshold", 0.5)
-    
-    try:
-        # 2. Input Validation
-        if not filename.endswith('.csv'):
+     # 1. Parse Parameters with Defaults
+     # Always provide sensible defaults matching the tool.json definition
+     threshold = parameters.get("threshold", 0.5)
+     
+     try:
+         # 2. Input Validation
+         if not filename.endswith('.csv'):
+              return {
+                 "status": "error",
+                 "agent_id": "my-new-agent",
+                 "error": f"Unsupported file format: {filename}. Only CSV is supported.",
+                 "execution_time_ms": int((time.time() - start_time) * 1000)
+             }
+
+         # 3. Data Loading (Polars)
+         try:
+             df = pl.read_csv(io.BytesIO(file_contents), ignore_errors=True)
+             if df.height == 0:
+                 raise ValueError("File is empty")
+         except Exception as e:
              return {
-                "status": "error",
-                "agent_id": "my-new-agent",
-                "error": f"Unsupported file format: {filename}. Only CSV is supported.",
-                "execution_time_ms": int((time.time() - start_time) * 1000)
-            }
+                 "status": "error",
+                 "agent_id": "my-new-agent",
+                 "error": f"Failed to parse CSV: {str(e)}",
+                 "execution_time_ms": int((time.time() - start_time) * 1000)
+             }
 
-        # 3. Data Loading (Polars)
-        try:
-            df = pl.read_csv(io.BytesIO(file_contents), ignore_errors=True)
-            if df.height == 0:
-                raise ValueError("File is empty")
-        except Exception as e:
-            return {
-                "status": "error",
-                "agent_id": "my-new-agent",
-                "error": f"Failed to parse CSV: {str(e)}",
-                "execution_time_ms": int((time.time() - start_time) * 1000)
-            }
+         # 4. Core Logic
+         # Delegate complex logic to private helper functions (_)
+         # For modification agents:
+         # df_cleaned, transformation_log = _apply_fixes(df, parameters)
+         
+         # For analysis agents:
+         analysis_result = _perform_analysis(df, threshold)
 
-        # 4. Core Logic
-        # Delegate complex logic to private helper functions (_)
-        # For modification agents:
-        # df_cleaned, transformation_log = _apply_fixes(df, parameters)
-        
-        # For analysis agents:
-        analysis_result = _perform_analysis(df, threshold)
+         # 5. Generate Standard Artifacts
+         alerts = _generate_alerts(analysis_result)
+         issues = _generate_issues(analysis_result)
+         row_level_issues = _generate_row_level_issues(df, analysis_result) # CAP AT 1000!
+         recommendations = _generate_recommendations(analysis_result)
+         
+         # 6. Optional: Generate Cleaned File (For Fixing Agents)
+         cleaned_file_payload = None
+         # if agent_modifies_data:
+         #     output = io.BytesIO()
+         #     df_cleaned.write_csv(output)
+         #     cleaned_bytes = output.getvalue()
+         #     cleaned_file_payload = {
+         #         "filename": f"cleaned_{filename}",
+         #         "content": base64.b64encode(cleaned_bytes).decode('utf-8'),
+         #         "size_bytes": len(cleaned_bytes),
+         #         "format": "csv"
+         #     }
 
-        # 5. Generate Standard Artifacts
-        alerts = _generate_alerts(analysis_result)
-        issues = _generate_issues(analysis_result)
-        row_level_issues = _generate_row_level_issues(df, analysis_result) # CAP AT 1000!
-        recommendations = _generate_recommendations(analysis_result)
-        
-        # 6. Optional: Generate Cleaned File (For Fixing Agents)
-        cleaned_file_payload = None
-        # if agent_modifies_data:
-        #     output = io.BytesIO()
-        #     df_cleaned.write_csv(output)
-        #     cleaned_bytes = output.getvalue()
-        #     cleaned_file_payload = {
-        #         "filename": f"cleaned_{filename}",
-        #         "content": base64.b64encode(cleaned_bytes).decode('utf-8'),
-        #         "size_bytes": len(cleaned_bytes),
-        #         "format": "csv"
-        #     }
+         # 7. Build data object with overrides
+         data = analysis_result
+         data["overrides"] = {
+             "threshold": threshold,
+         }
 
-        # 7. Construct Response
-        return {
-            "status": "success",
-            "agent_id": "my-new-agent",
-            "agent_name": "My New Agent",
-            "execution_time_ms": int((time.time() - start_time) * 1000),
-            "summary_metrics": {
-                "total_rows_processed": df.height,
-                "key_metric_1": analysis_result["some_count"],
-            },
-            "data": analysis_result,
-            "alerts": alerts,
-            "issues": issues,
-            "row_level_issues": row_level_issues[:1000], # Enforce limit
-            "issue_summary": {
-                "total_issues": len(row_level_issues),
-                "by_type": {}, # Populate counts
-                "by_severity": {} # Populate counts
-            },
-            "recommendations": recommendations,
-            "executive_summary": [{
-                 "summary_id": "exec_summary_1",
-                 "title": "Main Insight",
-                 "value": "85/100",
-                 "status": "good", # excellent, good, warning, critical
-                 "description": "Brief textual summary."
-            }],
-            "ai_analysis_text": "Text block for LLM consumption...",
-            "cleaned_file": cleaned_file_payload # Optional
-        }
+         # 8. Construct Response
+         return {
+             "status": "success",
+             "agent_id": "my-new-agent",
+             "agent_name": "My New Agent",
+             "execution_time_ms": int((time.time() - start_time) * 1000),
+             "summary_metrics": {
+                 "total_rows_processed": df.height,
+                 "key_metric_1": analysis_result["some_count"],
+             },
+             "data": data,  # data now contains overrides
+             "alerts": alerts,
+             "issues": issues,
+             "row_level_issues": row_level_issues[:1000], # Enforce limit
+             "issue_summary": {
+                 "total_issues": len(row_level_issues),
+                 "by_type": {}, # Populate counts
+                 "by_severity": {} # Populate counts
+             },
+             "recommendations": recommendations,
+             "executive_summary": [{
+                  "summary_id": "exec_summary_1",
+                  "title": "Main Insight",
+                  "value": "85/100",
+                  "status": "good", # excellent, good, warning, critical
+                  "description": "Brief textual summary."
+             }],
+             "ai_analysis_text": "Text block for LLM consumption...",
+             "cleaned_file": cleaned_file_payload # Optional
+         }
 
     except Exception as e:
         # Global Error Handler
@@ -186,7 +272,7 @@ def _perform_analysis(df: pl.DataFrame, threshold: float) -> Dict[str, Any]:
     pass
 ```
 
-## 5. Artifact Details
+## 6. Artifact Details
 
 ### `alerts` (List[Dict])
 High-level notifications displayed prominently.
@@ -251,7 +337,7 @@ Summary cards for the dashboard.
 }
 ```
 
-## 6. Best Practices
+## 7. Best Practices
 
 1.  **Polars over Pandas:** Use Polars for data manipulation for performance.
 2.  **Robust Error Handling:** Always wrap the main execution in a `try...except` block that returns a valid JSON error response, not a raw 500 stack trace.
