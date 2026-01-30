@@ -39,7 +39,7 @@ class RoutingDecisionAI:
     def __init__(
         self,
         api_key: Optional[str] = None,
-        model: str = "google/gemma-3-27b-it:free",
+        model: str = "nvidia/nemotron-3-nano-30b-a3b:free",
         site_url: Optional[str] = None,
         site_name: Optional[str] = None,
     ):
@@ -48,7 +48,7 @@ class RoutingDecisionAI:
         
         Args:
             api_key: OpenRouter API key (defaults to OPENROUTER_API_KEY env var)
-            model: Model name to use (default: google/gemma-3-27b-it:free)
+            model: Model name to use (default: nvidia/nemotron-3-nano-30b-a3b:free)
             site_url: Your site URL for OpenRouter rankings (optional)
             site_name: Your site name for OpenRouter rankings (optional)
         """
