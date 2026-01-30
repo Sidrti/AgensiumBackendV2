@@ -867,7 +867,23 @@ def execute_score_risk(
                 "risk_summary": risk_summary,
                 "row_level_issues": row_level_issues[:100],
                 "issue_summary": issue_summary,
+                "defaults": {
+                    "pii_sample_size": 100,
+                    "high_risk_threshold": 70,
+                    "medium_risk_threshold": 40,
+                    "pii_detection_enabled": True,
+                    "sensitive_field_detection_enabled": True,
+                    "governance_check_enabled": True
+                },
                 "overrides": {
+                    "pii_sample_size": parameters.get("pii_sample_size"),
+                    "high_risk_threshold": parameters.get("high_risk_threshold"),
+                    "medium_risk_threshold": parameters.get("medium_risk_threshold"),
+                    "pii_detection_enabled": parameters.get("pii_detection_enabled"),
+                    "sensitive_field_detection_enabled": parameters.get("sensitive_field_detection_enabled"),
+                    "governance_check_enabled": parameters.get("governance_check_enabled")
+                },
+                "parameters": {
                     "pii_sample_size": pii_sample_size,
                     "high_risk_threshold": high_risk_threshold,
                     "medium_risk_threshold": medium_risk_threshold,

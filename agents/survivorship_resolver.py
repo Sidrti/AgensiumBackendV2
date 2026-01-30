@@ -305,12 +305,31 @@ def execute_survivorship_resolver(
                       f"Average confidence: {avg_confidence:.2f}.",
             "row_level_issues": row_level_issues[:100],
             "issue_summary": issue_summary,
+            "defaults": {
+                "default_rule": "quality_score",
+                "min_confidence_threshold": 0.5,
+                "source_column": None,
+                "timestamp_column": None,
+                "excellent_threshold": 90,
+                "good_threshold": 75
+            },
             "overrides": {
+                "match_key_columns": parameters.get("match_key_columns"),
+                "default_rule": parameters.get("default_rule"),
+                "min_confidence_threshold": parameters.get("min_confidence_threshold"),
+                "source_column": parameters.get("source_column"),
+                "timestamp_column": parameters.get("timestamp_column"),
+                "excellent_threshold": parameters.get("excellent_threshold"),
+                "good_threshold": parameters.get("good_threshold")
+            },
+            "parameters": {
                 "match_key_columns": match_key_columns,
                 "default_rule": default_rule,
                 "min_confidence_threshold": min_confidence_threshold,
                 "source_column": source_column,
-                "timestamp_column": timestamp_column
+                "timestamp_column": timestamp_column,
+                "excellent_threshold": excellent_threshold,
+                "good_threshold": good_threshold
             }
         }
         

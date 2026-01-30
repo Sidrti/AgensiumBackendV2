@@ -846,7 +846,23 @@ def execute_unified_profiler(
             "data": {
                 "fields": field_profiles,
                 "quality_summary": quality_summary,
+                "defaults": {
+                    "null_alert_threshold": 50,
+                    "categorical_threshold": 20,
+                    "categorical_ratio_threshold": 0.05,
+                    "top_n_values": 10,
+                    "outlier_iqr_multiplier": 1.5,
+                    "outlier_alert_threshold": 5
+                },
                 "overrides": {
+                    "null_alert_threshold": parameters.get("null_alert_threshold"),
+                    "categorical_threshold": parameters.get("categorical_threshold"),
+                    "categorical_ratio_threshold": parameters.get("categorical_ratio_threshold"),
+                    "top_n_values": parameters.get("top_n_values"),
+                    "outlier_iqr_multiplier": parameters.get("outlier_iqr_multiplier"),
+                    "outlier_alert_threshold": parameters.get("outlier_alert_threshold")
+                },
+                "parameters": {
                     "null_alert_threshold": null_alert_threshold,
                     "categorical_threshold": categorical_threshold,
                     "categorical_ratio_threshold": categorical_ratio_threshold,

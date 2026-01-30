@@ -250,7 +250,29 @@ def execute_type_fixer(
             "summary": f"Type fixing completed. Quality: {quality_status}. Processed {len(original_df)} rows, fixed {len(fix_log)} type issues.",
             "row_level_issues": row_level_issues[:100],  # Limit to first 100
             "issue_summary": issue_summary,
+            "defaults": {
+                "auto_convert_numeric": True,
+                "auto_convert_datetime": True,
+                "auto_convert_category": True,
+                "preserve_mixed_types": False,
+                "type_reduction_weight": 0.5,
+                "data_retention_weight": 0.3,
+                "column_retention_weight": 0.2,
+                "excellent_threshold": 90,
+                "good_threshold": 75
+            },
             "overrides": {
+                "auto_convert_numeric": parameters.get("auto_convert_numeric"),
+                "auto_convert_datetime": parameters.get("auto_convert_datetime"),
+                "auto_convert_category": parameters.get("auto_convert_category"),
+                "preserve_mixed_types": parameters.get("preserve_mixed_types"),
+                "type_reduction_weight": parameters.get("type_reduction_weight"),
+                "data_retention_weight": parameters.get("data_retention_weight"),
+                "column_retention_weight": parameters.get("column_retention_weight"),
+                "excellent_threshold": parameters.get("excellent_threshold"),
+                "good_threshold": parameters.get("good_threshold")
+            },
+            "parameters": {
                 "auto_convert_numeric": auto_convert_numeric,
                 "auto_convert_datetime": auto_convert_datetime,
                 "auto_convert_category": auto_convert_category,

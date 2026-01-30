@@ -289,10 +289,38 @@ def execute_lineage_tracer(
                       f"{transformations_tracked} transformation(s) tracked.",
             "row_level_issues": row_level_issues[:100],
             "issue_summary": issue_summary,
+            "defaults": {
+                "previous_lineage": [],
+                "source_metadata": {},
+                "execution_context": {},
+                "source_system": "unknown",
+                "track_column_lineage": True,
+                "track_row_fingerprints": False,
+                "max_fingerprint_rows": 1000,
+                "excellent_threshold": 90,
+                "good_threshold": 75
+            },
             "overrides": {
+                "previous_lineage": parameters.get("previous_lineage"),
+                "source_metadata": parameters.get("source_metadata"),
+                "execution_context": parameters.get("execution_context"),
+                "source_system": parameters.get("source_system"),
+                "track_column_lineage": parameters.get("track_column_lineage"),
+                "track_row_fingerprints": parameters.get("track_row_fingerprints"),
+                "max_fingerprint_rows": parameters.get("max_fingerprint_rows"),
+                "excellent_threshold": parameters.get("excellent_threshold"),
+                "good_threshold": parameters.get("good_threshold")
+            },
+            "parameters": {
+                "previous_lineage": previous_lineage,
+                "source_metadata": source_metadata,
+                "execution_context": execution_context,
                 "source_system": source_system,
                 "track_column_lineage": track_column_lineage,
-                "track_row_fingerprints": track_row_fingerprints
+                "track_row_fingerprints": track_row_fingerprints,
+                "max_fingerprint_rows": max_fingerprint_rows,
+                "excellent_threshold": excellent_threshold,
+                "good_threshold": good_threshold
             }
         }
         

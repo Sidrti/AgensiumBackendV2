@@ -966,7 +966,22 @@ def execute_synthetic_control_agent(
                 "match_confidence_score": match_confidence,
                 "quality_status": quality_status,
             },
+            "defaults": {
+                "excellent_threshold": 90,
+                "good_threshold": 75
+            },
             "overrides": {
+                "customer_id_column": parameters.get("customer_id_column"),
+                "transaction_date_column": parameters.get("transaction_date_column"),
+                "value_column": parameters.get("value_column"),
+                "pre_period_start_date": parameters.get("pre_period_start_date"),
+                "pre_period_end_date": parameters.get("pre_period_end_date"),
+                "treatment_start_date": parameters.get("treatment_start_date"),
+                "treatment_end_date": parameters.get("treatment_end_date"),
+                "excellent_threshold": parameters.get("excellent_threshold"),
+                "good_threshold": parameters.get("good_threshold")
+            },
+            "parameters": {
                 "customer_id_column": customer_id_column,
                 "transaction_date_column": transaction_date_column,
                 "value_column": value_column,

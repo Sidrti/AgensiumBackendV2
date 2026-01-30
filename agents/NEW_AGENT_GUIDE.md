@@ -4,9 +4,9 @@ This document outlines the standard pattern and architecture for creating new ag
 
 ## 1. File Structure & Naming
 
--   **File Name:** Snake_case (e.g., `my_new_agent.py`).
--   **Location:** `backend/agents/` directory.
--   **Imports:** Standard imports should include `polars`, `numpy`, `io`, `time`, and `typing`.
+- **File Name:** Snake_case (e.g., `my_new_agent.py`).
+- **Location:** `backend/agents/` directory.
+- **Imports:** Standard imports should include `polars`, `numpy`, `io`, `time`, and `typing`.
 
 ## 2. Main Entry Point
 
@@ -24,95 +24,119 @@ def execute_my_agent_name(
 
 ### Arguments
 
--   `file_contents` (**bytes**): The raw binary content of the file to be processed.
--   `filename` (**str**): The original name of the file (used for validation, e.g., checking `.csv` extension).
--   `parameters` (**Optional[Dict[str, Any]]**): Configuration parameters passed from the frontend/API (typically defined in `tools/my_agent_tool.json`).
+- `file_contents` (**bytes**): The raw binary content of the file to be processed.
+- `filename` (**str**): The original name of the file (used for validation, e.g., checking `.csv` extension).
+- `parameters` (**Optional[Dict[str, Any]]**): Configuration parameters passed from the frontend/API (typically defined in `tools/my_agent_tool.json`).
 
 ## 3. Standard Return Structure
 
 The return dictionary **MUST** contain the following keys:
 
-| Key | Type | Description |
-| :--- | :--- | :--- |
-| `status` | `str` | `"success"` or `"error"`. |
-| `agent_id` | `str` | Kebab-case ID (e.g., `"my-new-agent"`). |
-| `agent_name` | `str` | Human-readable name (e.g., `"My New Agent"`). |
-| `execution_time_ms` | `int` | Execution time in milliseconds. |
-| `summary_metrics` | `Dict` | High-level counters (e.g., `total_rows_processed`, `issues_found`). |
-| `data` | `Dict` | The core analysis results specific to the agent. |
-| `alerts` | `List[Dict]` | High-priority notifications for the dashboard. |
-| `issues` | `List[Dict]` | General system or column-level issues. |
-| `row_level_issues` | `List[Dict]` | Specific row/cell issues. **Limit to 1000 items.** |
-| `issue_summary` | `Dict` | Aggregated counts of issues by type and severity. |
-| `recommendations` | `List[Dict]` | Actionable advice for the user. |
-| `executive_summary` | `List[Dict]` | High-level summary cards for the UI. |
-| `ai_analysis_text` | `str` | Natural language summary for LLM consumption. |
-| `cleaned_file` | `Dict` | **(Optional)** Only for agents that modify data. Contains base64 encoded file. |
+| Key                 | Type         | Description                                                                    |
+| :------------------ | :----------- | :----------------------------------------------------------------------------- |
+| `status`            | `str`        | `"success"` or `"error"`.                                                      |
+| `agent_id`          | `str`        | Kebab-case ID (e.g., `"my-new-agent"`).                                        |
+| `agent_name`        | `str`        | Human-readable name (e.g., `"My New Agent"`).                                  |
+| `execution_time_ms` | `int`        | Execution time in milliseconds.                                                |
+| `summary_metrics`   | `Dict`       | High-level counters (e.g., `total_rows_processed`, `issues_found`).            |
+| `data`              | `Dict`       | The core analysis results specific to the agent.                               |
+| `alerts`            | `List[Dict]` | High-priority notifications for the dashboard.                                 |
+| `issues`            | `List[Dict]` | General system or column-level issues.                                         |
+| `row_level_issues`  | `List[Dict]` | Specific row/cell issues. **Limit to 1000 items.**                             |
+| `issue_summary`     | `Dict`       | Aggregated counts of issues by type and severity.                              |
+| `recommendations`   | `List[Dict]` | Actionable advice for the user.                                                |
+| `executive_summary` | `List[Dict]` | High-level summary cards for the UI.                                           |
+| `ai_analysis_text`  | `str`        | Natural language summary for LLM consumption.                                  |
+| `cleaned_file`      | `Dict`       | **(Optional)** Only for agents that modify data. Contains base64 encoded file. |
 
-## 4. Overrides Documentation
+## 4. Parameter Structure Documentation
 
-### What is `overrides`?
+### Three-Object Parameter Pattern
 
-The `overrides` object is a metadata artifact that mirrors back the **effective runtime parameters** used during agent execution. It provides auditability and traceability by documenting which parameters (user-provided or defaults) were actually applied.
+All agents must implement a **three-object parameter structure** for complete transparency and auditability. This pattern provides clear visibility into default values, user-supplied parameters, and final merged values.
 
-### Why Include `overrides`?
+### The Three Objects
 
-- **Traceability:** Downstream systems and UI can verify exactly which settings were applied
-- **Auditability:** Enables reproducibility and debugging of agent runs
-- **Consistency:** All agents should follow this pattern for a uniform API contract
+1. **`defaults`** - Built-in default values hardcoded in the agent
+2. **`overrides`** - User-supplied values from the API request (may be `None` if not provided)
+3. **`parameters`** - Final merged values actually used during execution
+
+### Why This Pattern?
+
+- **Transparency:** Frontend can see exactly what defaults the agent uses
+- **Debugging:** Clear distinction between user input and system defaults
+- **Auditability:** Complete parameter provenance for reproducibility
+- **Consistency:** Uniform API contract across all agents
 
 ### When to Include It
 
-**ALL agents must include `overrides` in the `data` object** (except for error responses where `data` is absent).
+**ALL agents must include all three objects in the `data` object** (except for error responses where `data` is absent).
 
 ### What to Include
 
-Capture **all input parameters** read via `parameters.get()` calls, including:
-- User-provided values from the frontend
-- Default values used when parameters were omitted
-- Derived parameters computed from inputs
+Each object captures **all parameters** extracted via `parameters.get()` or `safe_get_*()` calls:
+
+- **defaults**: Hardcoded default values (second argument of `parameters.get()`)
+- **overrides**: Results of `parameters.get()` calls (returns user value or `None`)
+- **parameters**: Final variable values used in agent logic
 
 ### Code Pattern
 
-Always add `overrides` to the `data` dictionary **before the final return statement**:
+Always add the three objects to the `data` dictionary **before the final return statement**:
 
 ```python
 # 1. Parse all parameters with defaults
 param1 = parameters.get("param1", "default_value")
 param2 = parameters.get("param2", 42)
 param3 = parameters.get("param3", True)
+param4 = safe_get_list(parameters, "param4", [])
 
 try:
-    # ... agent logic ...
-    
+    # ... agent logic using param1, param2, param3, param4 ...
+
     # 2. Build the data object
     data = {
         "analysis_results": [...],
         "key_metrics": {...},
         # ... other analysis outputs ...
     }
-    
-    # 3. Add overrides BEFORE the return statement
+
+    # 3. Add three-object parameter structure BEFORE the return statement
+    data["defaults"] = {
+        "param1": "default_value",
+        "param2": 42,
+        "param3": True,
+        "param4": []
+    }
+
     data["overrides"] = {
+        "param1": parameters.get("param1"),
+        "param2": parameters.get("param2"),
+        "param3": parameters.get("param3"),
+        "param4": parameters.get("param4")
+    }
+
+    data["parameters"] = {
         "param1": param1,
         "param2": param2,
         "param3": param3,
+        "param4": param4
     }
-    
-    # 4. Return with data containing overrides
+
+    # 4. Return with data containing all three objects
     return {
         "status": "success",
         "agent_id": "my-agent",
         "agent_name": "My Agent",
         "execution_time_ms": int((time.time() - start_time) * 1000),
         "summary_metrics": {...},
-        "data": data,  # overrides nested inside data
+        "data": data,  # Contains defaults, overrides, and parameters
         "alerts": [...],
         "issues": [...],
         # ... other response fields ...
     }
 except Exception as e:
-    # In error responses, data is absent, so no overrides
+    # In error responses, data is absent, so no parameter objects
     return {
         "status": "error",
         "agent_id": "my-agent",
@@ -123,11 +147,14 @@ except Exception as e:
 
 ### Key Points
 
-- `overrides` goes **inside the `data` object**, not at the top level of the return dictionary
-- Use direct assignment: `data["overrides"] = {...}` **before return**
-- **Do NOT** use spread operator like `"data": {...data, "overrides": {...}}`
-- Include **all** parameters extracted via `parameters.get()` calls
-- In **error responses**, there is no `data` object, so `overrides` is not included
+- All three objects go **inside the `data` object**, not at the top level
+- Use direct assignment: `data["defaults"] = {...}` **before return**
+- **Do NOT** use spread operator like `"data": {...data, "defaults": {...}}`
+- Include **all** parameters extracted via `parameters.get()` or `safe_get_*()` calls
+- **defaults** contains literal hardcoded values (same as second argument in `.get()`)
+- **overrides** contains `parameters.get()` results (user value or `None`)
+- **parameters** contains the actual variable values used
+- In **error responses**, there is no `data` object, so no parameter objects are included
 
 ## 5. Code Template
 
@@ -168,7 +195,7 @@ def execute_my_new_agent(
      # 1. Parse Parameters with Defaults
      # Always provide sensible defaults matching the tool.json definition
      threshold = parameters.get("threshold", 0.5)
-     
+
      try:
          # 2. Input Validation
          if not filename.endswith('.csv'):
@@ -196,7 +223,7 @@ def execute_my_new_agent(
          # Delegate complex logic to private helper functions (_)
          # For modification agents:
          # df_cleaned, transformation_log = _apply_fixes(df, parameters)
-         
+
          # For analysis agents:
          analysis_result = _perform_analysis(df, threshold)
 
@@ -205,7 +232,7 @@ def execute_my_new_agent(
          issues = _generate_issues(analysis_result)
          row_level_issues = _generate_row_level_issues(df, analysis_result) # CAP AT 1000!
          recommendations = _generate_recommendations(analysis_result)
-         
+
          # 6. Optional: Generate Cleaned File (For Fixing Agents)
          cleaned_file_payload = None
          # if agent_modifies_data:
@@ -219,9 +246,18 @@ def execute_my_new_agent(
          #         "format": "csv"
          #     }
 
-         # 7. Build data object with overrides
+         # 7. Build data object with three-object parameter structure
          data = analysis_result
+
+         data["defaults"] = {
+             "threshold": 0.5,
+         }
+
          data["overrides"] = {
+             "threshold": parameters.get("threshold"),
+         }
+
+         data["parameters"] = {
              "threshold": threshold,
          }
 
@@ -275,7 +311,9 @@ def _perform_analysis(df: pl.DataFrame, threshold: float) -> Dict[str, Any]:
 ## 6. Artifact Details
 
 ### `alerts` (List[Dict])
+
 High-level notifications displayed prominently.
+
 ```json
 {
     "alert_id": "unique_id",
@@ -288,52 +326,60 @@ High-level notifications displayed prominently.
 ```
 
 ### `issues` (List[Dict])
+
 General issues found during processing.
+
 ```json
 {
-    "issue_id": "unique_id",
-    "agent_id": "agent-id",
-    "field_name": "field_or_scope",
-    "issue_type": "type_code",
-    "severity": "high",
-    "message": "Description of the issue"
+  "issue_id": "unique_id",
+  "agent_id": "agent-id",
+  "field_name": "field_or_scope",
+  "issue_type": "type_code",
+  "severity": "high",
+  "message": "Description of the issue"
 }
 ```
 
 ### `row_level_issues` (List[Dict])
+
 Specific problems tied to a row/column index. Used for highlighting in the UI grid. **Limit this list (e.g., to 1000 items) to prevent performance issues.**
+
 ```json
 {
-    "row_index": 0,
-    "column": "column_name",
-    "issue_type": "type_code",
-    "severity": "warning",
-    "message": "Specific error message",
-    "value": "The bad value"
+  "row_index": 0,
+  "column": "column_name",
+  "issue_type": "type_code",
+  "severity": "warning",
+  "message": "Specific error message",
+  "value": "The bad value"
 }
 ```
 
 ### `issue_summary` (Dict)
+
 Aggregated counts for the frontend dashboard.
+
 ```json
 {
-    "total_issues": 150,
-    "by_type": { "null_value": 50, "type_mismatch": 100 },
-    "by_severity": { "warning": 140, "critical": 10 },
-    "affected_rows": 120,
-    "affected_columns": ["col1", "col2"]
+  "total_issues": 150,
+  "by_type": { "null_value": 50, "type_mismatch": 100 },
+  "by_severity": { "warning": 140, "critical": 10 },
+  "affected_rows": 120,
+  "affected_columns": ["col1", "col2"]
 }
 ```
 
 ### `executive_summary` (List[Dict])
+
 Summary cards for the dashboard.
+
 ```json
 {
-    "summary_id": "exec_1",
-    "title": "Quality Score",
-    "value": "95.0",
-    "status": "excellent",
-    "description": "Overall data quality is excellent."
+  "summary_id": "exec_1",
+  "title": "Quality Score",
+  "value": "95.0",
+  "status": "excellent",
+  "description": "Overall data quality is excellent."
 }
 ```
 

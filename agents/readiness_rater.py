@@ -919,7 +919,21 @@ def execute_readiness_rater(
                 },
                 "component_scores": component_scores,
                 "deductions": deductions,
+                "defaults": {
+                    "ready_threshold": 80,
+                    "needs_review_threshold": 50,
+                    "completeness_weight": 0.3,
+                    "consistency_weight": 0.3,
+                    "schema_health_weight": 0.4
+                },
                 "overrides": {
+                    "ready_threshold": parameters.get("ready_threshold"),
+                    "needs_review_threshold": parameters.get("needs_review_threshold"),
+                    "completeness_weight": parameters.get("completeness_weight"),
+                    "consistency_weight": parameters.get("consistency_weight"),
+                    "schema_health_weight": parameters.get("schema_health_weight")
+                },
+                "parameters": {
                     "ready_threshold": ready_threshold,
                     "needs_review_threshold": needs_review_threshold,
                     "completeness_weight": completeness_weight,

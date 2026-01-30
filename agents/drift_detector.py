@@ -730,7 +730,17 @@ def execute_drift_detector(
                     "fields_with_drift": drift_detected_count,
                     "dataset_stability": dataset_stability
                 },
+                "defaults": {
+                    "statistical_test": "kolmogorov_smirnov",
+                    "significance_level": 0.05,
+                    "min_sample_size": 100
+                },
                 "overrides": {
+                    "statistical_test": parameters.get("statistical_test"),
+                    "significance_level": parameters.get("significance_level"),
+                    "min_sample_size": parameters.get("min_sample_size")
+                },
+                "parameters": {
                     "statistical_test": statistical_test,
                     "significance_level": significance_level,
                     "min_sample_size": min_sample_size

@@ -700,7 +700,21 @@ def execute_test_coverage(
                 "test_coverage_issues": test_issues,
                 "row_level_issues": row_level_issues[:100],
                 "issue_summary": issue_summary,
+                "defaults": {
+                    "uniqueness_weight": 0.4,
+                    "range_weight": 0.3,
+                    "format_weight": 0.3,
+                    "excellent_threshold": 90,
+                    "good_threshold": 75
+                },
                 "overrides": {
+                    "uniqueness_weight": parameters.get("uniqueness_weight"),
+                    "range_weight": parameters.get("range_weight"),
+                    "format_weight": parameters.get("format_weight"),
+                    "excellent_threshold": parameters.get("excellent_threshold"),
+                    "good_threshold": parameters.get("good_threshold")
+                },
+                "parameters": {
                     "uniqueness_weight": uniqueness_weight,
                     "range_weight": range_weight,
                     "format_weight": format_weight,

@@ -591,11 +591,41 @@ def execute_stewardship_flagger(
                       f"Critical: {critical_count}, High: {high_count}, Medium: {medium_count}.",
             "row_level_issues": row_level_issues[:100],
             "issue_summary": issue_summary,
+            "defaults": {
+                "required_columns": [],
+                "confidence_columns": [],
+                "duplicate_key_columns": [],
+                "business_rules": [],
+                "field_validation_rules": {},
+                "outlier_thresholds": {"age": {"min": 0, "max": 120}, "percentage": {"min": 0, "max": 100}, "year": {"min": 1900, "max": 2100}},
+                "confidence_threshold": 0.7,
+                "severity_weights": {"critical": 4, "high": 3, "medium": 2, "low": 1},
+                "excellent_threshold": 90,
+                "good_threshold": 75
+            },
             "overrides": {
+                "required_columns": parameters.get("required_columns"),
+                "confidence_columns": parameters.get("confidence_columns"),
+                "duplicate_key_columns": parameters.get("duplicate_key_columns"),
+                "business_rules": parameters.get("business_rules"),
+                "field_validation_rules": parameters.get("field_validation_rules"),
+                "outlier_thresholds": parameters.get("outlier_thresholds"),
+                "confidence_threshold": parameters.get("confidence_threshold"),
+                "severity_weights": parameters.get("severity_weights"),
+                "excellent_threshold": parameters.get("excellent_threshold"),
+                "good_threshold": parameters.get("good_threshold")
+            },
+            "parameters": {
                 "required_columns": required_columns,
-                "confidence_threshold": confidence_threshold,
+                "confidence_columns": confidence_columns,
                 "duplicate_key_columns": duplicate_key_columns,
-                "business_rules_count": len(business_rules)
+                "business_rules": business_rules,
+                "field_validation_rules": field_validation_rules,
+                "outlier_thresholds": outlier_thresholds,
+                "confidence_threshold": confidence_threshold,
+                "severity_weights": severity_weights,
+                "excellent_threshold": excellent_threshold,
+                "good_threshold": good_threshold
             }
         }
         

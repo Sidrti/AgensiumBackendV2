@@ -563,14 +563,47 @@ def execute_contract_enforcer(
                       f"{len(violations)} violations found, {len(transformations)} transformations applied.",
             "row_level_issues": row_level_issues[:100],
             "issue_summary": issue_summary,
+            "defaults": {
+                "auto_transform": True,
+                "strict_mode": False,
+                "drop_extra_columns": True,
+                "rename_columns": True,
+                "cast_types": True,
+                "enforce_values": True,
+                "default_value_strategy": "null",
+                "structural_compliance_weight": 0.4,
+                "value_compliance_weight": 0.4,
+                "transformation_success_weight": 0.2,
+                "excellent_threshold": 95,
+                "good_threshold": 80
+            },
             "overrides": {
+                "auto_transform": parameters.get("auto_transform"),
+                "strict_mode": parameters.get("strict_mode"),
+                "drop_extra_columns": parameters.get("drop_extra_columns"),
+                "rename_columns": parameters.get("rename_columns"),
+                "cast_types": parameters.get("cast_types"),
+                "enforce_values": parameters.get("enforce_values"),
+                "default_value_strategy": parameters.get("default_value_strategy"),
+                "structural_compliance_weight": parameters.get("structural_compliance_weight"),
+                "value_compliance_weight": parameters.get("value_compliance_weight"),
+                "transformation_success_weight": parameters.get("transformation_success_weight"),
+                "excellent_threshold": parameters.get("excellent_threshold"),
+                "good_threshold": parameters.get("good_threshold")
+            },
+            "parameters": {
                 "auto_transform": auto_transform,
                 "strict_mode": strict_mode,
                 "drop_extra_columns": drop_extra_columns,
                 "rename_columns": rename_columns,
                 "cast_types": cast_types,
                 "enforce_values": enforce_values,
-                "default_value_strategy": default_value_strategy
+                "default_value_strategy": default_value_strategy,
+                "structural_compliance_weight": structural_compliance_weight,
+                "value_compliance_weight": value_compliance_weight,
+                "transformation_success_weight": transformation_success_weight,
+                "excellent_threshold": excellent_threshold,
+                "good_threshold": good_threshold
             }
         }
         

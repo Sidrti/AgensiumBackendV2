@@ -238,12 +238,42 @@ def execute_governance(
             "governance_issues": governance_issues,
             "row_level_issues": row_level_issues[:100],
             "issue_summary": issue_summary,
+            "defaults": {
+                "required_lineage_fields": [],
+                "required_consent_fields": [],
+                "required_classification_fields": [],
+                "lineage_weight": 0.3,
+                "consent_weight": 0.4,
+                "classification_weight": 0.3,
+                "compliance_threshold": 80,
+                "needs_review_threshold": 60,
+                "pii_patterns": {
+                    "email": r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b",
+                    "phone": r"\b\d{3}[-.]?\d{3}[-.]?\d{4}\b",
+                    "ssn": r"\b\d{3}-\d{2}-\d{4}\b"
+                }
+            },
             "overrides": {
+                "required_lineage_fields": parameters.get("required_lineage_fields"),
+                "required_consent_fields": parameters.get("required_consent_fields"),
+                "required_classification_fields": parameters.get("required_classification_fields"),
+                "lineage_weight": parameters.get("lineage_weight"),
+                "consent_weight": parameters.get("consent_weight"),
+                "classification_weight": parameters.get("classification_weight"),
+                "compliance_threshold": parameters.get("compliance_threshold"),
+                "needs_review_threshold": parameters.get("needs_review_threshold"),
+                "pii_patterns": parameters.get("pii_patterns")
+            },
+            "parameters": {
+                "required_lineage_fields": required_lineage_fields,
+                "required_consent_fields": required_consent_fields,
+                "required_classification_fields": required_classification_fields,
                 "lineage_weight": lineage_weight,
                 "consent_weight": consent_weight,
                 "classification_weight": classification_weight,
                 "compliance_threshold": compliance_threshold,
-                "needs_review_threshold": needs_review_threshold
+                "needs_review_threshold": needs_review_threshold,
+                "pii_patterns": pii_patterns
             }
         }
         

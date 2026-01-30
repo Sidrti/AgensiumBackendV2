@@ -312,12 +312,47 @@ def execute_master_writeback_agent(
                       f"Data integrity: {data_integrity_score:.1f}%.",
             "row_level_issues": row_level_issues,
             "issue_summary": issue_summary,
+            "defaults": {
+                "pipeline_results": {},
+                "lineage_data": [],
+                "flagged_record_ids": [],
+                "include_metadata_columns": True,
+                "include_audit_trail": True,
+                "output_format": "csv",
+                "version_suffix": datetime.utcnow().strftime("%Y%m%d_%H%M%S"),
+                "drop_internal_columns": True,
+                "min_quality_score": 0.0,
+                "exclude_flagged_records": False,
+                "excellent_threshold": 90,
+                "good_threshold": 75
+            },
             "overrides": {
+                "pipeline_results": parameters.get("pipeline_results"),
+                "lineage_data": parameters.get("lineage_data"),
+                "flagged_record_ids": parameters.get("flagged_record_ids"),
+                "include_metadata_columns": parameters.get("include_metadata_columns"),
+                "include_audit_trail": parameters.get("include_audit_trail"),
+                "output_format": parameters.get("output_format"),
+                "version_suffix": parameters.get("version_suffix"),
+                "drop_internal_columns": parameters.get("drop_internal_columns"),
+                "min_quality_score": parameters.get("min_quality_score"),
+                "exclude_flagged_records": parameters.get("exclude_flagged_records"),
+                "excellent_threshold": parameters.get("excellent_threshold"),
+                "good_threshold": parameters.get("good_threshold")
+            },
+            "parameters": {
+                "pipeline_results": pipeline_results,
+                "lineage_data": lineage_data,
+                "flagged_record_ids": flagged_record_ids,
                 "include_metadata_columns": include_metadata_columns,
                 "include_audit_trail": include_audit_trail,
+                "output_format": output_format,
+                "version_suffix": version_suffix,
                 "drop_internal_columns": drop_internal_columns,
                 "min_quality_score": min_quality_score,
-                "exclude_flagged_records": exclude_flagged_records
+                "exclude_flagged_records": exclude_flagged_records,
+                "excellent_threshold": excellent_threshold,
+                "good_threshold": good_threshold
             }
         }
         

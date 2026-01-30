@@ -330,14 +330,50 @@ def execute_key_identifier(
                       f"{len(candidate_foreign_keys)} foreign key candidates.",
             "row_level_issues": row_level_issues[:100],
             "issue_summary": issue_summary,
+            "defaults": {
+                "reference_tables": {},
+                "pk_uniqueness_threshold": 99.0,
+                "pk_null_threshold": 0.0,
+                "entity_key_uniqueness_min": 50.0,
+                "entity_key_uniqueness_max": 99.0,
+                "fk_overlap_threshold": 70.0,
+                "analyze_composite_keys": True,
+                "max_composite_key_columns": 3,
+                "uniqueness_weight": 0.4,
+                "null_density_weight": 0.3,
+                "pattern_weight": 0.3,
+                "excellent_threshold": 90,
+                "good_threshold": 75
+            },
             "overrides": {
+                "reference_tables": parameters.get("reference_tables"),
+                "pk_uniqueness_threshold": parameters.get("pk_uniqueness_threshold"),
+                "pk_null_threshold": parameters.get("pk_null_threshold"),
+                "entity_key_uniqueness_min": parameters.get("entity_key_uniqueness_min"),
+                "entity_key_uniqueness_max": parameters.get("entity_key_uniqueness_max"),
+                "fk_overlap_threshold": parameters.get("fk_overlap_threshold"),
+                "analyze_composite_keys": parameters.get("analyze_composite_keys"),
+                "max_composite_key_columns": parameters.get("max_composite_key_columns"),
+                "uniqueness_weight": parameters.get("uniqueness_weight"),
+                "null_density_weight": parameters.get("null_density_weight"),
+                "pattern_weight": parameters.get("pattern_weight"),
+                "excellent_threshold": parameters.get("excellent_threshold"),
+                "good_threshold": parameters.get("good_threshold")
+            },
+            "parameters": {
+                "reference_tables": reference_tables,
                 "pk_uniqueness_threshold": pk_uniqueness_threshold,
                 "pk_null_threshold": pk_null_threshold,
                 "entity_key_uniqueness_min": entity_key_uniqueness_min,
                 "entity_key_uniqueness_max": entity_key_uniqueness_max,
                 "fk_overlap_threshold": fk_overlap_threshold,
                 "analyze_composite_keys": analyze_composite_keys,
-                "max_composite_key_columns": max_composite_key_columns
+                "max_composite_key_columns": max_composite_key_columns,
+                "uniqueness_weight": uniqueness_weight,
+                "null_density_weight": null_density_weight,
+                "pattern_weight": pattern_weight,
+                "excellent_threshold": excellent_threshold,
+                "good_threshold": good_threshold
             }
         }
         

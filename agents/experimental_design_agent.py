@@ -544,7 +544,23 @@ def execute_experimental_design_agent(
                 "quality_status": quality_status,
             },
             "dataset_info": dataset_stats if dataset_stats else None,
+            "defaults": {
+                "significance_level": 0.95,
+                "baseline_rate": 0.02,
+                "min_detectable_lift": 5.0,
+                "total_population_size": None,
+                "excellent_threshold": 90,
+                "good_threshold": 75
+            },
             "overrides": {
+                "significance_level": parameters.get("significance_level"),
+                "baseline_rate": parameters.get("baseline_rate"),
+                "min_detectable_lift": parameters.get("min_detectable_lift"),
+                "total_population_size": parameters.get("total_population_size"),
+                "excellent_threshold": parameters.get("excellent_threshold"),
+                "good_threshold": parameters.get("good_threshold")
+            },
+            "parameters": {
                 "significance_level": significance_level,
                 "baseline_rate": baseline_rate,
                 "min_detectable_lift": min_detectable_lift,

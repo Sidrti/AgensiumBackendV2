@@ -268,13 +268,47 @@ def execute_golden_record_builder(
                       f"{conflicts_resolved} conflicts resolved.",
             "row_level_issues": row_level_issues[:100],
             "issue_summary": issue_summary,
+            "defaults": {
+                "match_key_columns": [],
+                "match_key_weights": {},
+                "survivorship_rules": {},
+                "source_priority": {},
+                "source_column": None,
+                "timestamp_column": None,
+                "default_survivorship_rule": "most_complete",
+                "min_trust_score": 0.5,
+                "enable_fuzzy_matching": False,
+                "fuzzy_threshold": 80.0,
+                "excellent_threshold": 90,
+                "good_threshold": 75
+            },
             "overrides": {
+                "match_key_columns": parameters.get("match_key_columns"),
+                "match_key_weights": parameters.get("match_key_weights"),
+                "survivorship_rules": parameters.get("survivorship_rules"),
+                "source_priority": parameters.get("source_priority"),
+                "source_column": parameters.get("source_column"),
+                "timestamp_column": parameters.get("timestamp_column"),
+                "default_survivorship_rule": parameters.get("default_survivorship_rule"),
+                "min_trust_score": parameters.get("min_trust_score"),
+                "enable_fuzzy_matching": parameters.get("enable_fuzzy_matching"),
+                "fuzzy_threshold": parameters.get("fuzzy_threshold"),
+                "excellent_threshold": parameters.get("excellent_threshold"),
+                "good_threshold": parameters.get("good_threshold")
+            },
+            "parameters": {
                 "match_key_columns": match_key_columns,
                 "match_key_weights": match_key_weights,
-                "default_survivorship_rule": default_survivorship_rule,
+                "survivorship_rules": survivorship_rules,
+                "source_priority": source_priority,
                 "source_column": source_column,
                 "timestamp_column": timestamp_column,
-                "min_trust_score": min_trust_score
+                "default_survivorship_rule": default_survivorship_rule,
+                "min_trust_score": min_trust_score,
+                "enable_fuzzy_matching": enable_fuzzy_matching,
+                "fuzzy_threshold": fuzzy_threshold,
+                "excellent_threshold": excellent_threshold,
+                "good_threshold": good_threshold
             }
         }
         

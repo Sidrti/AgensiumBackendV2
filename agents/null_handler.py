@@ -233,10 +233,32 @@ def execute_null_handler(
             "imputation_log": imputation_log,
             "summary": f"Null handling completed. Quality: {quality_status}. Processed {original_df.height} rows, handled {null_analysis['total_nulls_detected']} null values.",
             "row_level_issues": row_level_issues[:100],  # Limit to first 100
+            "defaults": {
+                "column_strategies": {},
+                "fill_values": {},
+                "global_strategy": "column_specific",
+                "knn_neighbors": 5,
+                "null_reduction_weight": 0.5,
+                "data_retention_weight": 0.3,
+                "column_retention_weight": 0.2,
+                "excellent_threshold": 90,
+                "good_threshold": 75
+            },
             "overrides": {
-                "global_strategy": global_strategy,
+                "column_strategies": parameters.get("column_strategies"),
+                "fill_values": parameters.get("fill_values"),
+                "global_strategy": parameters.get("global_strategy"),
+                "knn_neighbors": parameters.get("knn_neighbors"),
+                "null_reduction_weight": parameters.get("null_reduction_weight"),
+                "data_retention_weight": parameters.get("data_retention_weight"),
+                "column_retention_weight": parameters.get("column_retention_weight"),
+                "excellent_threshold": parameters.get("excellent_threshold"),
+                "good_threshold": parameters.get("good_threshold")
+            },
+            "parameters": {
                 "column_strategies": column_strategies,
                 "fill_values": fill_values,
+                "global_strategy": global_strategy,
                 "knn_neighbors": knn_neighbors,
                 "null_reduction_weight": null_reduction_weight,
                 "data_retention_weight": data_retention_weight,

@@ -180,7 +180,33 @@ def execute_outlier_remover(
             "removal_log": removal_log,
             "summary": f"Outlier removal completed. Quality: {quality_status}. Processed {original_df.height} rows, handled {total_outliers} outliers.",
             "row_level_issues": outlier_issues[:100],  # Limit to first 100
+            "defaults": {
+                "detection_method": "iqr",
+                "removal_strategy": "remove",
+                "z_threshold": 3.0,
+                "iqr_multiplier": 1.5,
+                "lower_percentile": 1.0,
+                "upper_percentile": 99.0,
+                "outlier_reduction_weight": 0.5,
+                "data_retention_weight": 0.3,
+                "column_retention_weight": 0.2,
+                "excellent_threshold": 90,
+                "good_threshold": 75
+            },
             "overrides": {
+                "detection_method": parameters.get("detection_method"),
+                "removal_strategy": parameters.get("removal_strategy"),
+                "z_threshold": parameters.get("z_threshold"),
+                "iqr_multiplier": parameters.get("iqr_multiplier"),
+                "lower_percentile": parameters.get("lower_percentile"),
+                "upper_percentile": parameters.get("upper_percentile"),
+                "outlier_reduction_weight": parameters.get("outlier_reduction_weight"),
+                "data_retention_weight": parameters.get("data_retention_weight"),
+                "column_retention_weight": parameters.get("column_retention_weight"),
+                "excellent_threshold": parameters.get("excellent_threshold"),
+                "good_threshold": parameters.get("good_threshold")
+            },
+            "parameters": {
                 "detection_method": detection_method,
                 "removal_strategy": removal_strategy,
                 "z_threshold": z_threshold,

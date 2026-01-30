@@ -259,10 +259,41 @@ def execute_semantic_mapper(
                       f"average confidence: {avg_confidence:.2f}",
             "row_level_issues": row_level_issues[:100],
             "issue_summary": issue_summary,
+            "defaults": {
+                "custom_column_mappings": {},
+                "custom_value_mappings": {},
+                "confidence_threshold": 0.7,
+                "auto_detect_semantics": True,
+                "apply_mappings": True,
+                "name_similarity_weight": 0.4,
+                "pattern_match_weight": 0.3,
+                "value_analysis_weight": 0.3,
+                "excellent_threshold": 90,
+                "good_threshold": 75
+            },
             "overrides": {
+                "custom_column_mappings": parameters.get("custom_column_mappings"),
+                "custom_value_mappings": parameters.get("custom_value_mappings"),
+                "confidence_threshold": parameters.get("confidence_threshold"),
+                "auto_detect_semantics": parameters.get("auto_detect_semantics"),
+                "apply_mappings": parameters.get("apply_mappings"),
+                "name_similarity_weight": parameters.get("name_similarity_weight"),
+                "pattern_match_weight": parameters.get("pattern_match_weight"),
+                "value_analysis_weight": parameters.get("value_analysis_weight"),
+                "excellent_threshold": parameters.get("excellent_threshold"),
+                "good_threshold": parameters.get("good_threshold")
+            },
+            "parameters": {
+                "custom_column_mappings": custom_column_mappings,
+                "custom_value_mappings": custom_value_mappings,
                 "confidence_threshold": confidence_threshold,
                 "auto_detect_semantics": auto_detect_semantics,
-                "apply_mappings": apply_mappings
+                "apply_mappings": apply_mappings,
+                "name_similarity_weight": name_similarity_weight,
+                "pattern_match_weight": pattern_match_weight,
+                "value_analysis_weight": value_analysis_weight,
+                "excellent_threshold": excellent_threshold,
+                "good_threshold": good_threshold
             }
         }
         
