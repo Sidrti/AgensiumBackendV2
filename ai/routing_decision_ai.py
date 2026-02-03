@@ -12,7 +12,7 @@ Logic:
     4. Returns routing decision with tool path, required files, and parameters
 
 Architecture:
-    - Tools are loaded dynamically from backend/tools/*.json files
+    - Tools are loaded from cached tool definitions (tool_registry)
     - analysis_summary provides AI-generated text summary of the analysis
     - executive_summary provides structured KPIs and metrics
     - success_rate is still calculated from agent_results for reliability
@@ -20,10 +20,9 @@ Architecture:
 
 import os
 import json
-import glob
-import time
+from tool_registry import get_tool_definitions
 from typing import Dict, Any, List, Optional
-from datetime import datetime
+
 
 try:
     from openai import OpenAI
@@ -52,8 +51,8 @@ class RoutingDecisionAI:
             site_url: Your site URL for OpenRouter rankings (optional)
             site_name: Your site name for OpenRouter rankings (optional)
         """
-        # Dynamically load available tools from JSON files
-        self.available_tools = self._load_tools_from_json()
+        # Load available tools from cached tool definitions
+        self.available_tools = self._load_tools_from_registry()
         
         # Configure OpenRouter API
         self.api_key = api_key or os.getenv("OPENROUTER_API_KEY")
@@ -80,78 +79,63 @@ class RoutingDecisionAI:
                 self.openai_client = None
                 self.use_ai = False
 
-    def _load_tools_from_json(self) -> Dict[str, Dict[str, Any]]:
+    def _load_tools_from_registry(self, force_reload: bool = False) -> Dict[str, Dict[str, Any]]:
         """
-        Dynamically load all available tools from the tools folder JSON files.
-        
+        Load available tools from cached tool definitions.
+
         Returns:
-            Dictionary of tool_id -> tool info containing name, description, agents, 
+            Dictionary of tool_id -> tool info containing name, description, agents,
             required files, optional files, and use cases.
         """
         available_tools = {}
-        
-        # Get the tools directory path relative to this file
-        current_dir = os.path.dirname(os.path.abspath(__file__))
-        tools_dir = os.path.join(os.path.dirname(current_dir), "tools")
-        
-        # Find all JSON files in the tools directory
-        json_pattern = os.path.join(tools_dir, "*.json")
-        json_files = glob.glob(json_pattern)
-        
-        for json_file in json_files:
-            try:
-                with open(json_file, 'r', encoding='utf-8') as f:
-                    tool_data = json.load(f)
-                
-                # Extract tool info from JSON structure
-                tool_info = tool_data.get("tool", {})
-                tool_id = tool_info.get("id")
-                
-                if not tool_id:
-                    continue
-                
-                # Skip if tool is not available
-                if not tool_info.get("isAvailable", True):
-                    continue
-                
-                # Extract file requirements
-                files_config = tool_info.get("files", {})
-                required_files = []
-                optional_files = []
-                
-                for file_key, file_config in files_config.items():
-                    if file_config.get("required", False):
-                        required_files.append(file_key)
-                    else:
-                        optional_files.append(file_key)
-                
-                # Extract agent list
-                agents = tool_info.get("available_agents", [])
-                
-                # Build use cases from agent descriptions
-                use_cases = []
-                agents_data = tool_data.get("agents", {})
-                for agent_id, agent_info in agents_data.items():
-                    features = agent_info.get("features", [])
-                    if features:
-                        use_cases.extend(features[:2])  # Take up to 2 features per agent
-                
-                # Limit use cases to avoid too long lists
-                use_cases = use_cases[:8]
-                
-                available_tools[tool_id] = {
-                    "name": tool_info.get("name", tool_id),
-                    "description": tool_info.get("description", ""),
-                    "category": tool_info.get("category", ""),
-                    "agents": agents,
-                    "requires_files": required_files,
-                    "optional_files": optional_files,
-                    "use_cases": use_cases
-                }
-                
-            except Exception as e:
-                print(f"Warning: Failed to load tool from {json_file}: {str(e)}")
+
+        tool_definitions = get_tool_definitions(force_reload=force_reload)
+
+        for tool_id, tool_data in tool_definitions.items():
+            # Extract tool info from JSON structure
+            tool_info = tool_data.get("tool", {})
+
+            if not tool_info:
                 continue
+
+            # Skip if tool is not available
+            if not tool_info.get("isAvailable", True):
+                continue
+
+            # Extract file requirements
+            files_config = tool_info.get("files", {})
+            required_files = []
+            optional_files = []
+
+            for file_key, file_config in files_config.items():
+                if file_config.get("required", False):
+                    required_files.append(file_key)
+                else:
+                    optional_files.append(file_key)
+
+            # Extract agent list
+            agents = tool_info.get("available_agents", [])
+
+            # Build use cases from agent descriptions
+            use_cases = []
+            agents_data = tool_data.get("agents", {})
+            for agent_id, agent_info in agents_data.items():
+                features = agent_info.get("features", [])
+                if features:
+                    use_cases.extend(features[:2])  # Take up to 2 features per agent
+
+            # Limit use cases to avoid too long lists
+            use_cases = use_cases[:8]
+
+            available_tools[tool_id] = {
+                "name": tool_info.get("name", tool_id),
+                "description": tool_info.get("description", ""),
+                "category": tool_info.get("category", ""),
+                "agents": agents,
+                "requires_files": required_files,
+                "optional_files": optional_files,
+                "use_cases": use_cases
+            }
         
         if not available_tools:
             print("Warning: No tools loaded from JSON files. Check tools directory.")
@@ -162,7 +146,7 @@ class RoutingDecisionAI:
 
     def reload_tools(self) -> None:
         """Reload tools from JSON files (useful if tools are added/modified)."""
-        self.available_tools = self._load_tools_from_json()
+        self.available_tools = self._load_tools_from_registry(force_reload=True)
 
     def get_routing_decisions(
         self,

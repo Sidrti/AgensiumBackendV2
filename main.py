@@ -9,7 +9,6 @@ Architecture:
 4. Routes handle agent execution and response transformation
 """
 
-import json
 import os
 import sys
 from dotenv import load_dotenv
@@ -30,6 +29,7 @@ from billing.exceptions import BillingException
 from db import models, database
 from fastapi.responses import JSONResponse
 from auth.exceptions import AuthException
+from tool_registry import get_tool_definitions
 
 # Create database tables - wrapped in try-except to prevent startup failures
 # Note: create_all is currently causing a silent crash on some environments.
@@ -72,31 +72,11 @@ app.add_middleware(
 
 # Load tool definitions from tools directory
 TOOL_DEFINITIONS = {}
-TOOLS_DIR = os.path.join(os.path.dirname(__file__), "tools")
 
 def load_tool_definitions():
-    """Dynamically load all tool definitions from tools directory"""
+    """Dynamically load all tool definitions from tools registry"""
     global TOOL_DEFINITIONS
-    
-    try:
-        # List all JSON files in tools directory
-        if os.path.exists(TOOLS_DIR):
-            for filename in os.listdir(TOOLS_DIR):
-                if filename.endswith("_tool.json"):
-                    filepath = os.path.join(TOOLS_DIR, filename)
-                    try:
-                        with open(filepath, "r", encoding="utf-8") as f:
-                            tool_def = json.load(f)
-                            # Extract tool ID from definition
-                            tool_id = tool_def.get("tool", {}).get("id", filename.replace("_tool.json", ""))
-                            TOOL_DEFINITIONS[tool_id] = tool_def
-                            print(f"✓ Loaded tool: {tool_id} from {filename}")
-                    except Exception as e:
-                        print(f"Warning: Could not load tool from {filename}: {e}")
-        else:
-            print(f"Warning: Tools directory not found at {TOOLS_DIR}")
-    except Exception as e:
-        print(f"Warning: Error loading tool definitions: {e}")
+    TOOL_DEFINITIONS = get_tool_definitions(force_reload=True)
 
 # Load tools on startup
 load_tool_definitions()

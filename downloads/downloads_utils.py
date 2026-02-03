@@ -558,6 +558,15 @@ class BaseDownloader:
 def load_tool_config(tool_id: str) -> Dict[str, Any]:
     """Load tool configuration from JSON file."""
     try:
+        from tool_registry import get_tool_definitions
+        tool_definitions = get_tool_definitions()
+        tool_config = tool_definitions.get(tool_id)
+        if tool_config:
+            return tool_config
+    except Exception as e:
+        print(f"Warning: Failed to load tool config from registry for {tool_id}: {str(e)}")
+
+    try:
         current_dir = os.path.dirname(os.path.abspath(__file__))
         project_root = os.path.dirname(current_dir)
         tools_dir = os.path.join(project_root, 'tools')
