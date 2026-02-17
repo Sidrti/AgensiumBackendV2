@@ -131,7 +131,7 @@
           "min": 0,
           "example": 120,
           "show_example": false,
-          "show_description": false,
+          "show_description": true,
           "show": true,
           "required": false
         },
