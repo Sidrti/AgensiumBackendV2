@@ -16,7 +16,7 @@ from fastapi import UploadFile, HTTPException
 
 from ai.analysis_summary_ai import AnalysisSummaryAI
 from downloads.analyze_my_data_downloads import AnalyzeMyDataDownloads
-from agents import customer_segmentation_agent, market_basket_sequence_agent, experimental_design_agent, synthetic_control_agent
+from agents import customer_segmentation_agent, market_basket_sequence_agent, experimental_design_agent, synthetic_control_agent, control_group_holdout_planner_agent
 from transformers.transformers_utils import (
     get_required_files,
     validate_files,
@@ -199,27 +199,31 @@ async def run_analyze_my_data_analysis_v2_1(
         # Read input files from S3
         print(f"[V2.1] Reading input files from S3 for task {task.task_id}")
         input_files = s3_service.list_input_files(task.user_id, task.task_id)
-        
-        if not input_files:
+
+        # Allow tools with no required files (e.g., form-only planners)
+        required_files = get_required_files(task.tool_id, task.agents)
+        has_required_file = any(f.get("required") for f in required_files.values())
+
+        if not input_files and has_required_file:
             return {
                 "status": "error",
                 "error": "No input files found in S3",
                 "error_code": "NO_INPUT_FILES"
             }
-        
-        # Build files_map from S3 files
+
+        # Build files_map from S3 files (may be empty)
         files_map = {}
-        for file_info in input_files:
+        for file_info in input_files or []:
             filename = file_info['filename']
-            
+
             # Determine file key (primary, baseline)
             file_key = determine_file_key(filename)
-            
+
             # Download file content
             content = s3_service.get_file_bytes(file_info['key'])
             files_map[file_key] = (content, filename)
             print(f"[V2.1] Loaded {file_key}: {filename} ({len(content)} bytes)")
-        
+
         # Convert files to CSV if needed
         files_map = convert_files_to_csv(files_map)
         
@@ -380,6 +384,14 @@ def _execute_agent(
             primary_filename,
             baseline_bytes,
             baseline_filename,
+            parameters
+        )
+
+    elif agent_id == "control-group-holdout-planner-agent":
+        # Form-only planner (no files required)
+        return control_group_holdout_planner_agent.execute_control_group_holdout_planner_agent(
+            None,
+            None,
             parameters
         )
     

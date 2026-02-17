@@ -1,0 +1,566 @@
+{
+  "tool": {
+    "id": "control-group-holdout-planner",
+    "name": "Control Group Holdout Planner",
+    "description": "Plans statistically valid control (holdout) group sizes across up to 10 segments. Estimates required users, duration, and revenue opportunity cost for holdouts under configurable confidence and power.",
+    "icon": "🧮",
+    "category": "analyze",
+    "isAvailable": true,
+    "version": "1.0.0",
+    "available_agents": ["control-group-holdout-planner-agent"],
+    "files": {}
+  },
+  "agents": {
+    "control-group-holdout-planner-agent": {
+      "id": "control-group-holdout-planner-agent",
+      "name": "Control Group Holdout Planner Agent",
+      "description": "Computes per-segment sample sizes and timelines for an imbalanced holdout split, plus aggregate totals and holdout opportunity cost.",
+      "icon": "🧮",
+      "category": "analyze",
+      "isAvailable": true,
+      "accuracy": "95%",
+      "features": [
+        "Imbalanced Holdout Split Adjustment",
+        "Per-Segment Required Users",
+        "Duration (Days) Estimation",
+        "Holdout Opportunity Cost Estimate",
+        "Under-Powered / Small Control Warning",
+        "Aggregate Dashboard Totals"
+      ],
+      "input": {
+        "type": "Form inputs (no files required)"
+      },
+      "version": "1.0.0",
+      "required_files": [],
+      "parameters": {
+        "holdout_ratio": {
+          "type": "integer",
+          "description": "Holdout (control) ratio as a percentage (R).",
+          "default": 10,
+          "min": 1,
+          "max": 50,
+          "example": 10,
+          "show": true,
+          "required": false
+        },
+        "confidence_level": {
+          "type": "float",
+          "description": "Confidence level (1 - alpha).",
+          "default": 0.95,
+          "allowed": [0.9, 0.95, 0.99],
+          "example": 0.95,
+          "show": true,
+          "required": false
+        },
+        "statistical_power": {
+          "type": "float",
+          "description": "Statistical power (1 - beta).",
+          "default": 0.8,
+          "allowed": [0.8, 0.9],
+          "example": 0.8,
+          "show": true,
+          "required": false
+        },
+        "segment_count": {
+          "type": "integer",
+          "description": "Number of segments to plan (up to 10).",
+          "default": 1,
+          "min": 1,
+          "max": 10,
+          "example": 3,
+          "show": true,
+          "required": false
+        },
+
+        "segment_1_name": {
+          "type": "string",
+          "description": "Segment name (Segment 1).",
+          "default": "Segment 1",
+          "example": "Segment 1",
+          "show": true,
+          "required": false
+        },
+        "segment_1_daily_traffic": {
+          "type": "integer",
+          "description": "Daily traffic (unique visitors per day) for Segment 1 (T).",
+          "default": 10000,
+          "min": 1,
+          "example": 10000,
+          "show": true,
+          "required": false
+        },
+        "segment_1_baseline": {
+          "type": "float",
+          "description": "Baseline conversion rate (%) for Segment 1 (p1).",
+          "default": 4.5,
+          "min": 0,
+          "max": 100,
+          "example": 4.5,
+          "show": true,
+          "required": false
+        },
+        "segment_1_lift": {
+          "type": "float",
+          "description": "Expected relative lift (%) for Segment 1 (L).",
+          "default": 8,
+          "min": 0,
+          "max": 500,
+          "example": 8,
+          "show": true,
+          "required": false
+        },
+        "segment_1_value": {
+          "type": "float",
+          "description": "Revenue value per conversion for Segment 1 (V).",
+          "default": 120,
+          "min": 0,
+          "example": 120,
+          "show": true,
+          "required": false
+        },
+
+        "segment_2_name": {
+          "type": "string",
+          "description": "Segment name (Segment 2).",
+          "default": "Segment 2",
+          "example": "Segment 2",
+          "show": true,
+          "required": false
+        },
+        "segment_2_daily_traffic": {
+          "type": "integer",
+          "description": "Daily traffic (unique visitors per day) for Segment 2 (T).",
+          "default": 10000,
+          "min": 1,
+          "example": 10000,
+          "show": true,
+          "required": false
+        },
+        "segment_2_baseline": {
+          "type": "float",
+          "description": "Baseline conversion rate (%) for Segment 2 (p1).",
+          "default": 4.5,
+          "min": 0,
+          "max": 100,
+          "example": 4.5,
+          "show": true,
+          "required": false
+        },
+        "segment_2_lift": {
+          "type": "float",
+          "description": "Expected relative lift (%) for Segment 2 (L).",
+          "default": 8,
+          "min": 0,
+          "max": 500,
+          "example": 8,
+          "show": true,
+          "required": false
+        },
+        "segment_2_value": {
+          "type": "float",
+          "description": "Revenue value per conversion for Segment 2 (V).",
+          "default": 120,
+          "min": 0,
+          "example": 120,
+          "show": true,
+          "required": false
+        },
+
+        "segment_3_name": {
+          "type": "string",
+          "description": "Segment name (Segment 3).",
+          "default": "Segment 3",
+          "example": "Segment 3",
+          "show": true,
+          "required": false
+        },
+        "segment_3_daily_traffic": {
+          "type": "integer",
+          "description": "Daily traffic (unique visitors per day) for Segment 3 (T).",
+          "default": 10000,
+          "min": 1,
+          "example": 10000,
+          "show": true,
+          "required": false
+        },
+        "segment_3_baseline": {
+          "type": "float",
+          "description": "Baseline conversion rate (%) for Segment 3 (p1).",
+          "default": 4.5,
+          "min": 0,
+          "max": 100,
+          "example": 4.5,
+          "show": true,
+          "required": false
+        },
+        "segment_3_lift": {
+          "type": "float",
+          "description": "Expected relative lift (%) for Segment 3 (L).",
+          "default": 8,
+          "min": 0,
+          "max": 500,
+          "example": 8,
+          "show": true,
+          "required": false
+        },
+        "segment_3_value": {
+          "type": "float",
+          "description": "Revenue value per conversion for Segment 3 (V).",
+          "default": 120,
+          "min": 0,
+          "example": 120,
+          "show": true,
+          "required": false
+        },
+
+        "segment_4_name": {
+          "type": "string",
+          "description": "Segment name (Segment 4).",
+          "default": "Segment 4",
+          "example": "Segment 4",
+          "show": true,
+          "required": false
+        },
+        "segment_4_daily_traffic": {
+          "type": "integer",
+          "description": "Daily traffic (unique visitors per day) for Segment 4 (T).",
+          "default": 10000,
+          "min": 1,
+          "example": 10000,
+          "show": true,
+          "required": false
+        },
+        "segment_4_baseline": {
+          "type": "float",
+          "description": "Baseline conversion rate (%) for Segment 4 (p1).",
+          "default": 4.5,
+          "min": 0,
+          "max": 100,
+          "example": 4.5,
+          "show": true,
+          "required": false
+        },
+        "segment_4_lift": {
+          "type": "float",
+          "description": "Expected relative lift (%) for Segment 4 (L).",
+          "default": 8,
+          "min": 0,
+          "max": 500,
+          "example": 8,
+          "show": true,
+          "required": false
+        },
+        "segment_4_value": {
+          "type": "float",
+          "description": "Revenue value per conversion for Segment 4 (V).",
+          "default": 120,
+          "min": 0,
+          "example": 120,
+          "show": true,
+          "required": false
+        },
+
+        "segment_5_name": {
+          "type": "string",
+          "description": "Segment name (Segment 5).",
+          "default": "Segment 5",
+          "example": "Segment 5",
+          "show": true,
+          "required": false
+        },
+        "segment_5_daily_traffic": {
+          "type": "integer",
+          "description": "Daily traffic (unique visitors per day) for Segment 5 (T).",
+          "default": 10000,
+          "min": 1,
+          "example": 10000,
+          "show": true,
+          "required": false
+        },
+        "segment_5_baseline": {
+          "type": "float",
+          "description": "Baseline conversion rate (%) for Segment 5 (p1).",
+          "default": 4.5,
+          "min": 0,
+          "max": 100,
+          "example": 4.5,
+          "show": true,
+          "required": false
+        },
+        "segment_5_lift": {
+          "type": "float",
+          "description": "Expected relative lift (%) for Segment 5 (L).",
+          "default": 8,
+          "min": 0,
+          "max": 500,
+          "example": 8,
+          "show": true,
+          "required": false
+        },
+        "segment_5_value": {
+          "type": "float",
+          "description": "Revenue value per conversion for Segment 5 (V).",
+          "default": 120,
+          "min": 0,
+          "example": 120,
+          "show": true,
+          "required": false
+        },
+
+        "segment_6_name": {
+          "type": "string",
+          "description": "Segment name (Segment 6).",
+          "default": "Segment 6",
+          "example": "Segment 6",
+          "show": true,
+          "required": false
+        },
+        "segment_6_daily_traffic": {
+          "type": "integer",
+          "description": "Daily traffic (unique visitors per day) for Segment 6 (T).",
+          "default": 10000,
+          "min": 1,
+          "example": 10000,
+          "show": true,
+          "required": false
+        },
+        "segment_6_baseline": {
+          "type": "float",
+          "description": "Baseline conversion rate (%) for Segment 6 (p1).",
+          "default": 4.5,
+          "min": 0,
+          "max": 100,
+          "example": 4.5,
+          "show": true,
+          "required": false
+        },
+        "segment_6_lift": {
+          "type": "float",
+          "description": "Expected relative lift (%) for Segment 6 (L).",
+          "default": 8,
+          "min": 0,
+          "max": 500,
+          "example": 8,
+          "show": true,
+          "required": false
+        },
+        "segment_6_value": {
+          "type": "float",
+          "description": "Revenue value per conversion for Segment 6 (V).",
+          "default": 120,
+          "min": 0,
+          "example": 120,
+          "show": true,
+          "required": false
+        },
+
+        "segment_7_name": {
+          "type": "string",
+          "description": "Segment name (Segment 7).",
+          "default": "Segment 7",
+          "example": "Segment 7",
+          "show": true,
+          "required": false
+        },
+        "segment_7_daily_traffic": {
+          "type": "integer",
+          "description": "Daily traffic (unique visitors per day) for Segment 7 (T).",
+          "default": 10000,
+          "min": 1,
+          "example": 10000,
+          "show": true,
+          "required": false
+        },
+        "segment_7_baseline": {
+          "type": "float",
+          "description": "Baseline conversion rate (%) for Segment 7 (p1).",
+          "default": 4.5,
+          "min": 0,
+          "max": 100,
+          "example": 4.5,
+          "show": true,
+          "required": false
+        },
+        "segment_7_lift": {
+          "type": "float",
+          "description": "Expected relative lift (%) for Segment 7 (L).",
+          "default": 8,
+          "min": 0,
+          "max": 500,
+          "example": 8,
+          "show": true,
+          "required": false
+        },
+        "segment_7_value": {
+          "type": "float",
+          "description": "Revenue value per conversion for Segment 7 (V).",
+          "default": 120,
+          "min": 0,
+          "example": 120,
+          "show": true,
+          "required": false
+        },
+
+        "segment_8_name": {
+          "type": "string",
+          "description": "Segment name (Segment 8).",
+          "default": "Segment 8",
+          "example": "Segment 8",
+          "show": true,
+          "required": false
+        },
+        "segment_8_daily_traffic": {
+          "type": "integer",
+          "description": "Daily traffic (unique visitors per day) for Segment 8 (T).",
+          "default": 10000,
+          "min": 1,
+          "example": 10000,
+          "show": true,
+          "required": false
+        },
+        "segment_8_baseline": {
+          "type": "float",
+          "description": "Baseline conversion rate (%) for Segment 8 (p1).",
+          "default": 4.5,
+          "min": 0,
+          "max": 100,
+          "example": 4.5,
+          "show": true,
+          "required": false
+        },
+        "segment_8_lift": {
+          "type": "float",
+          "description": "Expected relative lift (%) for Segment 8 (L).",
+          "default": 8,
+          "min": 0,
+          "max": 500,
+          "example": 8,
+          "show": true,
+          "required": false
+        },
+        "segment_8_value": {
+          "type": "float",
+          "description": "Revenue value per conversion for Segment 8 (V).",
+          "default": 120,
+          "min": 0,
+          "example": 120,
+          "show": true,
+          "required": false
+        },
+
+        "segment_9_name": {
+          "type": "string",
+          "description": "Segment name (Segment 9).",
+          "default": "Segment 9",
+          "example": "Segment 9",
+          "show": true,
+          "required": false
+        },
+        "segment_9_daily_traffic": {
+          "type": "integer",
+          "description": "Daily traffic (unique visitors per day) for Segment 9 (T).",
+          "default": 10000,
+          "min": 1,
+          "example": 10000,
+          "show": true,
+          "required": false
+        },
+        "segment_9_baseline": {
+          "type": "float",
+          "description": "Baseline conversion rate (%) for Segment 9 (p1).",
+          "default": 4.5,
+          "min": 0,
+          "max": 100,
+          "example": 4.5,
+          "show": true,
+          "required": false
+        },
+        "segment_9_lift": {
+          "type": "float",
+          "description": "Expected relative lift (%) for Segment 9 (L).",
+          "default": 8,
+          "min": 0,
+          "max": 500,
+          "example": 8,
+          "show": true,
+          "required": false
+        },
+        "segment_9_value": {
+          "type": "float",
+          "description": "Revenue value per conversion for Segment 9 (V).",
+          "default": 120,
+          "min": 0,
+          "example": 120,
+          "show": true,
+          "required": false
+        },
+
+        "segment_10_name": {
+          "type": "string",
+          "description": "Segment name (Segment 10).",
+          "default": "Segment 10",
+          "example": "Segment 10",
+          "show": true,
+          "required": false
+        },
+        "segment_10_daily_traffic": {
+          "type": "integer",
+          "description": "Daily traffic (unique visitors per day) for Segment 10 (T).",
+          "default": 10000,
+          "min": 1,
+          "example": 10000,
+          "show": true,
+          "required": false
+        },
+        "segment_10_baseline": {
+          "type": "float",
+          "description": "Baseline conversion rate (%) for Segment 10 (p1).",
+          "default": 4.5,
+          "min": 0,
+          "max": 100,
+          "example": 4.5,
+          "show": true,
+          "required": false
+        },
+        "segment_10_lift": {
+          "type": "float",
+          "description": "Expected relative lift (%) for Segment 10 (L).",
+          "default": 8,
+          "min": 0,
+          "max": 500,
+          "example": 8,
+          "show": true,
+          "required": false
+        },
+        "segment_10_value": {
+          "type": "float",
+          "description": "Revenue value per conversion for Segment 10 (V).",
+          "default": 120,
+          "min": 0,
+          "example": 120,
+          "show": true,
+          "required": false
+        },
+
+        "excellent_threshold": {
+          "type": "integer",
+          "description": "Score threshold for excellent quality status",
+          "default": 90,
+          "min": 0,
+          "max": 100,
+          "show": false,
+          "required": false
+        },
+        "good_threshold": {
+          "type": "integer",
+          "description": "Score threshold for good quality status",
+          "default": 75,
+          "min": 0,
+          "max": 100,
+          "show": false,
+          "required": false
+        }
+      }
+    }
+  }
+}

@@ -45,6 +45,129 @@ class AnalyzeMyDataDownloads(BaseDownloader):
             self._create_synthetic_control_sheet(wb, synthetic_output)
             self._create_synthetic_time_series_sheet(wb, synthetic_output)
 
+        # 5. CONTROL GROUP HOLDOUT PLANNER SHEET
+        holdout_output = agent_results.get("control-group-holdout-planner-agent", {})
+        if holdout_output.get("status") == "success":
+            self._create_holdout_planner_sheet(wb, holdout_output)
+
+
+    def _create_holdout_planner_sheet(self, wb: Workbook, agent_output: Dict[str, Any]):
+        """Create control group holdout planner sheet."""
+        ws = wb.create_sheet("Holdout Planner")
+        self.styler.set_column_widths(ws, [28, 22, 22, 22, 22, 24, 22, 22, 45])
+
+        row = 1
+        ws[f'A{row}'] = "CONTROL GROUP HOLDOUT PLANNER"
+        ws[f'A{row}'].font = Font(bold=True, size=12, color="FFFFFF")
+        ws[f'A{row}'].fill = self.header_fill
+        ws.merge_cells(f'A{row}:I{row}')
+        row += 2
+
+        data = agent_output.get("data", {})
+        global_inputs = data.get("global_inputs", {})
+        aggregate = data.get("aggregate", {})
+        constants = data.get("constants", {})
+
+        # Metadata / Inputs
+        ws[f'A{row}'] = "GLOBAL INPUTS"
+        ws[f'A{row}'].font = Font(bold=True, size=10)
+        ws[f'A{row}'].fill = self.subheader_fill
+        ws.merge_cells(f'A{row}:B{row}')
+        row += 1
+
+        inputs_rows = [
+            ["Status", agent_output.get("status", "")],
+            ["Execution Time (ms)", agent_output.get("execution_time_ms", 0)],
+            ["Holdout Ratio (%)", global_inputs.get("holdout_ratio", "")],
+            ["Confidence Level", global_inputs.get("confidence_level", "")],
+            ["Power", global_inputs.get("statistical_power", "")],
+            ["Segments Planned", global_inputs.get("segment_count", "")],
+            ["Z-Alpha", constants.get("z_alpha", "")],
+            ["Z-Beta", constants.get("z_beta", "")],
+            ["Imbalance Factor", constants.get("imbalance_factor", "")],
+        ]
+
+        for k, v in inputs_rows:
+            ws[f'A{row}'] = k
+            ws[f'B{row}'] = str(v) if v is not None else ""
+            ws[f'A{row}'].font = Font(bold=True)
+            ws[f'A{row}'].border = self.border
+            ws[f'B{row}'].border = self.border
+            row += 1
+
+        row += 1
+
+        # Aggregate
+        ws[f'A{row}'] = "AGGREGATE RESULTS"
+        ws[f'A{row}'].font = Font(bold=True, size=10)
+        ws[f'A{row}'].fill = self.subheader_fill
+        ws.merge_cells(f'A{row}:B{row}')
+        row += 1
+
+        agg_rows = [
+            ["Total Users Required", aggregate.get("total_users_required", "")],
+            ["Max Duration (Days)", aggregate.get("max_duration_days", "")],
+            ["Total Holdout Cost ($)", aggregate.get("total_holdout_cost", "")],
+            ["Computed Segments", aggregate.get("computed_segments", "")],
+            ["Underpowered Segments", aggregate.get("underpowered_segments", "")],
+        ]
+        for k, v in agg_rows:
+            ws[f'A{row}'] = k
+            ws[f'B{row}'] = str(v) if v is not None else ""
+            ws[f'A{row}'].font = Font(bold=True)
+            ws[f'A{row}'].border = self.border
+            ws[f'B{row}'].border = self.border
+            row += 1
+
+        row += 2
+
+        # Segment table
+        ws[f'A{row}'] = "SEGMENT RESULTS"
+        ws[f'A{row}'].font = Font(bold=True, size=11)
+        ws[f'A{row}'].fill = self.subheader_fill
+        ws.merge_cells(f'A{row}:I{row}')
+        row += 1
+
+        headers = [
+            "Segment",
+            "Traffic/Day",
+            "Baseline %",
+            "Lift %",
+            "Value",
+            "n (per group)",
+            "Total Users (N)",
+            "Duration (Days)",
+            "Warnings",
+        ]
+        for col_idx, header in enumerate(headers, 1):
+            cell = ws.cell(row=row, column=col_idx, value=header)
+            cell.fill = self.header_fill
+            cell.font = self.header_font
+            cell.alignment = self.center_alignment
+            cell.border = self.border
+        row += 1
+
+        for seg in data.get("segments", []):
+            inputs = seg.get("inputs", {})
+            calcs = seg.get("calculations", {})
+            warnings = "; ".join(seg.get("warnings", []))
+
+            ws.cell(row=row, column=1, value=seg.get("segment_name", ""))
+            ws.cell(row=row, column=2, value=inputs.get("daily_traffic", ""))
+            ws.cell(row=row, column=3, value=inputs.get("baseline_pct", ""))
+            ws.cell(row=row, column=4, value=inputs.get("lift_pct", ""))
+            ws.cell(row=row, column=5, value=inputs.get("value", ""))
+
+            ws.cell(row=row, column=6, value=calcs.get("n_per_group_50_50", ""))
+            ws.cell(row=row, column=7, value=calcs.get("total_users_required", ""))
+            ws.cell(row=row, column=8, value=calcs.get("duration_days", ""))
+            ws.cell(row=row, column=9, value=warnings)
+
+            for col_idx in range(1, 10):
+                ws.cell(row=row, column=col_idx).border = self.border
+                ws.cell(row=row, column=col_idx).alignment = self.left_alignment
+            row += 1
+
     def _create_segmentation_sheet(self, wb: Workbook, agent_output: Dict[str, Any]):
         """Create customer segmentation summary sheet."""
         ws = wb.create_sheet("Customer Segmentation")

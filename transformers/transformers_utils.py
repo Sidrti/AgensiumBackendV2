@@ -52,7 +52,7 @@ def get_transformer(tool_id: str):
         from transformers import master_my_data_transformer
         return master_my_data_transformer.run_master_my_data_analysis_v2_1
 
-    elif tool_id == "analyze-my-data" or tool_id == "customer-segmentation" or tool_id == "experimental-design" or tool_id == "market-basket-sequence" or tool_id == "synthetic-control":
+    elif tool_id == "analyze-my-data" or tool_id == "customer-segmentation" or tool_id == "experimental-design" or tool_id == "market-basket-sequence" or tool_id == "synthetic-control" or tool_id == "control-group-holdout-planner":
         from transformers import analyze_my_data_transformer
         return analyze_my_data_transformer.run_analyze_my_data_analysis_v2_1
     
@@ -89,7 +89,7 @@ def get_transformer_legacy(tool_id: str):
         from transformers import master_my_data_transformer
         return master_my_data_transformer.run_master_my_data_analysis
 
-    elif tool_id == "analyze-my-data" or tool_id == "customer-segmentation" or tool_id == "experimental-design" or tool_id == "market-basket-sequence" or tool_id == "synthetic-control":
+    elif tool_id == "analyze-my-data" or tool_id == "customer-segmentation" or tool_id == "experimental-design" or tool_id == "market-basket-sequence" or tool_id == "synthetic-control" or tool_id == "control-group-holdout-planner":
         from transformers import analyze_my_data_transformer
         return analyze_my_data_transformer.run_analyze_my_data_analysis
     

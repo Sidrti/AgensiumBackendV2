@@ -19,14 +19,19 @@ from datetime import datetime
 
 
 def add_analyze_my_data_agents():
-    """Add the three missing agents from analyze-my-data tool."""
+    """Add the missing agents from analyze-my-data tool."""
     
-    # Define the agents to add (only synthetic-control-agent is missing)
+    # Define the agents to add
     missing_agents = [
         {
             "agent_id": "synthetic-control-agent",
             "cost": 1,
             "description": "Synthetic control for campaign impact measurement"
+        },
+        {
+            "agent_id": "control-group-holdout-planner-agent",
+            "cost": 1,
+            "description": "Control group holdout planning and sample size calculation"
         }
     ]
     
