@@ -45,6 +45,8 @@
           "default": "rfm",
           "allowed": ["value", "rfm"],
           "example": "rfm",
+          "show_example": true,
+          "show_description": true,
           "show": false,
           "required": false
         },
@@ -54,6 +56,8 @@
           "default": "last_12_months",
           "allowed": ["ytd", "last_12_months", "custom"],
           "example": "last_12_months",
+          "show_example": true,
+          "show_description": true,
           "show": true,
           "required": false
         },
@@ -62,7 +66,9 @@
           "description": "Custom start date (ISO format YYYY-MM-DD). Used only when timeframe=custom.",
           "default": null,
           "example": "2025-01-01",
+          "show_example": true,
           "datepicker": true,
+          "show_description": true,
           "show": true,
           "required": false
         },
@@ -71,7 +77,9 @@
           "description": "Custom end date (ISO format YYYY-MM-DD). Used only when timeframe=custom.",
           "default": null,
           "example": "2025-12-31",
+          "show_example": true,
           "datepicker": true,
+          "show_description": true,
           "show": true,
           "required": false
         },
@@ -81,6 +89,8 @@
           "default": "revenue",
           "allowed": ["revenue", "gross_profit", "margin"],
           "example": "revenue",
+          "show_example": true,
+          "show_description": true,
           "show": true,
           "required": false
         },
@@ -90,6 +100,7 @@
           "default": 5,
           "min": 2,
           "max": 10,
+          "show_description": true,
           "show": false,
           "required": false
         },
@@ -98,6 +109,8 @@
           "description": "Customer identifier column",
           "default": null,
           "example": "customer_id",
+          "show_example": true,
+          "show_description": true,
           "show": true,
           "required": true,
           "columnSelection": true
@@ -107,6 +120,8 @@
           "description": "Transaction/order date column",
           "default": null,
           "example": "order_date",
+          "show_example": true,
+          "show_description": true,
           "show": true,
           "required": true,
           "columnSelection": true
@@ -116,6 +131,8 @@
           "description": "Numeric value column used for Monetary (RFM) and/or Value ranking (e.g., revenue per order)",
           "default": null,
           "example": "revenue",
+          "show_example": true,
+          "show_description": true,
           "show": true,
           "required": true,
           "columnSelection": true
@@ -126,6 +143,7 @@
           "default": 33,
           "min": 0,
           "max": 100,
+          "show_description": true,
           "show": false,
           "required": false
         },
@@ -135,6 +153,7 @@
           "default": 33,
           "min": 0,
           "max": 100,
+          "show_description": true,
           "show": false,
           "required": false
         },
@@ -144,6 +163,7 @@
           "default": 34,
           "min": 0,
           "max": 100,
+          "show_description": true,
           "show": false,
           "required": false
         },
@@ -153,6 +173,7 @@
           "default": 5,
           "min": 2,
           "max": 10,
+          "show_description": true,
           "show": false,
           "required": false
         },
@@ -162,6 +183,7 @@
           "default": 90,
           "min": 0,
           "max": 100,
+          "show_description": true,
           "show": false,
           "required": false
         },
@@ -171,6 +193,7 @@
           "default": 75,
           "min": 0,
           "max": 100,
+          "show_description": true,
           "show": false,
           "required": false
         }

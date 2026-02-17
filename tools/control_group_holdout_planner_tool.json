@@ -40,6 +40,8 @@
           "min": 1,
           "max": 50,
           "example": 10,
+          "show_example": false,
+          "show_description": false,
           "show": true,
           "required": false
         },
@@ -49,7 +51,9 @@
           "default": 0.95,
           "allowed": [0.9, 0.95, 0.99],
           "example": 0.95,
-          "show": true,
+          "show_example": false,
+          "show_description": false,
+          "show": false,
           "required": false
         },
         "statistical_power": {
@@ -58,7 +62,9 @@
           "default": 0.8,
           "allowed": [0.8, 0.9],
           "example": 0.8,
-          "show": true,
+          "show_example": false,
+          "show_description": false,
+          "show": false,
           "required": false
         },
         "segment_count": {
@@ -68,15 +74,18 @@
           "min": 1,
           "max": 10,
           "example": 3,
+          "show_example": false,
+          "show_description": false,
           "show": true,
           "required": false
         },
-
         "segment_1_name": {
           "type": "string",
           "description": "Segment name (Segment 1).",
           "default": "Segment 1",
           "example": "Segment 1",
+          "show_example": false,
+          "show_description": false,
           "show": true,
           "required": false
         },
@@ -86,6 +95,8 @@
           "default": 10000,
           "min": 1,
           "example": 10000,
+          "show_example": false,
+          "show_description": false,
           "show": true,
           "required": false
         },
@@ -96,6 +107,8 @@
           "min": 0,
           "max": 100,
           "example": 4.5,
+          "show_example": false,
+          "show_description": false,
           "show": true,
           "required": false
         },
@@ -106,6 +119,8 @@
           "min": 0,
           "max": 500,
           "example": 8,
+          "show_example": false,
+          "show_description": false,
           "show": true,
           "required": false
         },
@@ -115,15 +130,18 @@
           "default": 120,
           "min": 0,
           "example": 120,
+          "show_example": false,
+          "show_description": false,
           "show": true,
           "required": false
         },
-
         "segment_2_name": {
           "type": "string",
           "description": "Segment name (Segment 2).",
           "default": "Segment 2",
           "example": "Segment 2",
+          "show_example": false,
+          "show_description": false,
           "show": true,
           "required": false
         },
@@ -133,6 +151,8 @@
           "default": 10000,
           "min": 1,
           "example": 10000,
+          "show_example": false,
+          "show_description": false,
           "show": true,
           "required": false
         },
@@ -143,6 +163,8 @@
           "min": 0,
           "max": 100,
           "example": 4.5,
+          "show_example": false,
+          "show_description": false,
           "show": true,
           "required": false
         },
@@ -153,6 +175,8 @@
           "min": 0,
           "max": 500,
           "example": 8,
+          "show_example": false,
+          "show_description": false,
           "show": true,
           "required": false
         },
@@ -162,15 +186,18 @@
           "default": 120,
           "min": 0,
           "example": 120,
+          "show_example": false,
+          "show_description": false,
           "show": true,
           "required": false
         },
-
         "segment_3_name": {
           "type": "string",
           "description": "Segment name (Segment 3).",
           "default": "Segment 3",
           "example": "Segment 3",
+          "show_example": false,
+          "show_description": false,
           "show": true,
           "required": false
         },
@@ -180,6 +207,8 @@
           "default": 10000,
           "min": 1,
           "example": 10000,
+          "show_example": false,
+          "show_description": false,
           "show": true,
           "required": false
         },
@@ -190,6 +219,8 @@
           "min": 0,
           "max": 100,
           "example": 4.5,
+          "show_example": false,
+          "show_description": false,
           "show": true,
           "required": false
         },
@@ -200,6 +231,8 @@
           "min": 0,
           "max": 500,
           "example": 8,
+          "show_example": false,
+          "show_description": false,
           "show": true,
           "required": false
         },
@@ -209,15 +242,18 @@
           "default": 120,
           "min": 0,
           "example": 120,
+          "show_example": false,
+          "show_description": false,
           "show": true,
           "required": false
         },
-
         "segment_4_name": {
           "type": "string",
           "description": "Segment name (Segment 4).",
           "default": "Segment 4",
           "example": "Segment 4",
+          "show_example": false,
+          "show_description": false,
           "show": true,
           "required": false
         },
@@ -227,6 +263,8 @@
           "default": 10000,
           "min": 1,
           "example": 10000,
+          "show_example": false,
+          "show_description": false,
           "show": true,
           "required": false
         },
@@ -237,6 +275,8 @@
           "min": 0,
           "max": 100,
           "example": 4.5,
+          "show_example": false,
+          "show_description": false,
           "show": true,
           "required": false
         },
@@ -247,6 +287,8 @@
           "min": 0,
           "max": 500,
           "example": 8,
+          "show_example": false,
+          "show_description": false,
           "show": true,
           "required": false
         },
@@ -256,15 +298,18 @@
           "default": 120,
           "min": 0,
           "example": 120,
+          "show_example": false,
+          "show_description": false,
           "show": true,
           "required": false
         },
-
         "segment_5_name": {
           "type": "string",
           "description": "Segment name (Segment 5).",
           "default": "Segment 5",
           "example": "Segment 5",
+          "show_example": false,
+          "show_description": false,
           "show": true,
           "required": false
         },
@@ -274,6 +319,8 @@
           "default": 10000,
           "min": 1,
           "example": 10000,
+          "show_example": false,
+          "show_description": false,
           "show": true,
           "required": false
         },
@@ -284,6 +331,8 @@
           "min": 0,
           "max": 100,
           "example": 4.5,
+          "show_example": false,
+          "show_description": false,
           "show": true,
           "required": false
         },
@@ -294,6 +343,8 @@
           "min": 0,
           "max": 500,
           "example": 8,
+          "show_example": false,
+          "show_description": false,
           "show": true,
           "required": false
         },
@@ -303,15 +354,18 @@
           "default": 120,
           "min": 0,
           "example": 120,
+          "show_example": false,
+          "show_description": false,
           "show": true,
           "required": false
         },
-
         "segment_6_name": {
           "type": "string",
           "description": "Segment name (Segment 6).",
           "default": "Segment 6",
           "example": "Segment 6",
+          "show_example": false,
+          "show_description": false,
           "show": true,
           "required": false
         },
@@ -321,6 +375,8 @@
           "default": 10000,
           "min": 1,
           "example": 10000,
+          "show_example": false,
+          "show_description": false,
           "show": true,
           "required": false
         },
@@ -331,6 +387,8 @@
           "min": 0,
           "max": 100,
           "example": 4.5,
+          "show_example": false,
+          "show_description": false,
           "show": true,
           "required": false
         },
@@ -341,6 +399,8 @@
           "min": 0,
           "max": 500,
           "example": 8,
+          "show_example": false,
+          "show_description": false,
           "show": true,
           "required": false
         },
@@ -350,15 +410,18 @@
           "default": 120,
           "min": 0,
           "example": 120,
+          "show_example": false,
+          "show_description": false,
           "show": true,
           "required": false
         },
-
         "segment_7_name": {
           "type": "string",
           "description": "Segment name (Segment 7).",
           "default": "Segment 7",
           "example": "Segment 7",
+          "show_example": false,
+          "show_description": false,
           "show": true,
           "required": false
         },
@@ -368,6 +431,8 @@
           "default": 10000,
           "min": 1,
           "example": 10000,
+          "show_example": false,
+          "show_description": false,
           "show": true,
           "required": false
         },
@@ -378,6 +443,8 @@
           "min": 0,
           "max": 100,
           "example": 4.5,
+          "show_example": false,
+          "show_description": false,
           "show": true,
           "required": false
         },
@@ -388,6 +455,8 @@
           "min": 0,
           "max": 500,
           "example": 8,
+          "show_example": false,
+          "show_description": false,
           "show": true,
           "required": false
         },
@@ -397,15 +466,18 @@
           "default": 120,
           "min": 0,
           "example": 120,
+          "show_example": false,
+          "show_description": false,
           "show": true,
           "required": false
         },
-
         "segment_8_name": {
           "type": "string",
           "description": "Segment name (Segment 8).",
           "default": "Segment 8",
           "example": "Segment 8",
+          "show_example": false,
+          "show_description": false,
           "show": true,
           "required": false
         },
@@ -415,6 +487,8 @@
           "default": 10000,
           "min": 1,
           "example": 10000,
+          "show_example": false,
+          "show_description": false,
           "show": true,
           "required": false
         },
@@ -425,6 +499,8 @@
           "min": 0,
           "max": 100,
           "example": 4.5,
+          "show_example": false,
+          "show_description": false,
           "show": true,
           "required": false
         },
@@ -435,6 +511,8 @@
           "min": 0,
           "max": 500,
           "example": 8,
+          "show_example": false,
+          "show_description": false,
           "show": true,
           "required": false
         },
@@ -444,15 +522,18 @@
           "default": 120,
           "min": 0,
           "example": 120,
+          "show_example": false,
+          "show_description": false,
           "show": true,
           "required": false
         },
-
         "segment_9_name": {
           "type": "string",
           "description": "Segment name (Segment 9).",
           "default": "Segment 9",
           "example": "Segment 9",
+          "show_example": false,
+          "show_description": false,
           "show": true,
           "required": false
         },
@@ -462,6 +543,8 @@
           "default": 10000,
           "min": 1,
           "example": 10000,
+          "show_example": false,
+          "show_description": false,
           "show": true,
           "required": false
         },
@@ -472,6 +555,8 @@
           "min": 0,
           "max": 100,
           "example": 4.5,
+          "show_example": false,
+          "show_description": false,
           "show": true,
           "required": false
         },
@@ -482,6 +567,8 @@
           "min": 0,
           "max": 500,
           "example": 8,
+          "show_example": false,
+          "show_description": false,
           "show": true,
           "required": false
         },
@@ -491,15 +578,18 @@
           "default": 120,
           "min": 0,
           "example": 120,
+          "show_example": false,
+          "show_description": false,
           "show": true,
           "required": false
         },
-
         "segment_10_name": {
           "type": "string",
           "description": "Segment name (Segment 10).",
           "default": "Segment 10",
           "example": "Segment 10",
+          "show_example": false,
+          "show_description": false,
           "show": true,
           "required": false
         },
@@ -509,6 +599,8 @@
           "default": 10000,
           "min": 1,
           "example": 10000,
+          "show_example": false,
+          "show_description": false,
           "show": true,
           "required": false
         },
@@ -519,6 +611,8 @@
           "min": 0,
           "max": 100,
           "example": 4.5,
+          "show_example": false,
+          "show_description": false,
           "show": true,
           "required": false
         },
@@ -529,6 +623,8 @@
           "min": 0,
           "max": 500,
           "example": 8,
+          "show_example": false,
+          "show_description": false,
           "show": true,
           "required": false
         },
@@ -538,16 +634,18 @@
           "default": 120,
           "min": 0,
           "example": 120,
+          "show_example": false,
+          "show_description": false,
           "show": true,
           "required": false
         },
-
         "excellent_threshold": {
           "type": "integer",
           "description": "Score threshold for excellent quality status",
           "default": 90,
           "min": 0,
           "max": 100,
+          "show_description": false,
           "show": false,
           "required": false
         },
@@ -557,6 +655,7 @@
           "default": 75,
           "min": 0,
           "max": 100,
+          "show_description": false,
           "show": false,
           "required": false
         }

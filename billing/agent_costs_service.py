@@ -126,8 +126,8 @@ class AgentCostsService:
         Raises:
             ValueError: If cost is not positive
         """
-        if cost <= 0:
-            raise ValueError("Cost must be a positive integer")
+        if cost < 0:
+            raise ValueError("Cost must be a non-negative integer")
         
         normalized_id = normalize_agent_id(agent_id)
         

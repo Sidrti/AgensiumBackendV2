@@ -56,6 +56,7 @@
           "default": 50,
           "min": 0,
           "max": 100,
+          "show_description": true,
           "show": false,
           "required": false
         },
@@ -64,6 +65,7 @@
           "description": "Threshold for categorical field detection",
           "default": 20,
           "min": 1,
+          "show_description": true,
           "show": false,
           "required": false
         },
@@ -73,6 +75,7 @@
           "default": 0.05,
           "min": 0,
           "max": 1,
+          "show_description": true,
           "show": false,
           "required": false
         },
@@ -81,6 +84,7 @@
           "description": "Number of top values to track",
           "default": 10,
           "min": 1,
+          "show_description": true,
           "show": false,
           "required": false
         },
@@ -89,6 +93,7 @@
           "description": "IQR multiplier for outlier detection",
           "default": 1.5,
           "min": 0.5,
+          "show_description": true,
           "show": false,
           "required": false
         },
@@ -98,6 +103,7 @@
           "default": 5,
           "min": 0,
           "max": 100,
+          "show_description": true,
           "show": false,
           "required": false
         }
@@ -107,7 +113,7 @@
       "id": "drift-detector",
       "name": "Drift Detector",
       "description": "Detects changes (drift) between baseline and current datasets. Identifies statistical shifts, distribution changes, and anomalies using multiple statistical tests.",
-      "icon": "�",
+      "icon": "📡",
       "category": "source",
       "isAvailable": true,
       "accuracy": "97%",
@@ -128,6 +134,7 @@
           "description": "Statistical test method",
           "default": "kolmogorov_smirnov",
           "allowed": ["kolmogorov_smirnov", "chi2", "wasserstein"],
+          "show_description": true,
           "show": false,
           "required": false
         },
@@ -137,6 +144,7 @@
           "default": 0.05,
           "min": 0,
           "max": 1,
+          "show_description": true,
           "show": false,
           "required": false
         },
@@ -145,6 +153,7 @@
           "description": "Minimum sample size for analysis",
           "default": 100,
           "min": 10,
+          "show_description": true,
           "show": false,
           "required": false
         }
@@ -175,6 +184,7 @@
           "description": "Sample size for PII detection",
           "default": 100,
           "min": 10,
+          "show_description": true,
           "show": false,
           "required": false
         },
@@ -184,6 +194,7 @@
           "default": 70,
           "min": 0,
           "max": 100,
+          "show_description": true,
           "show": false,
           "required": false
         },
@@ -193,6 +204,7 @@
           "default": 40,
           "min": 0,
           "max": 100,
+          "show_description": true,
           "show": false,
           "required": false
         },
@@ -200,6 +212,7 @@
           "type": "boolean",
           "description": "Enable PII detection",
           "default": true,
+          "show_description": true,
           "show": false,
           "required": false
         },
@@ -207,6 +220,7 @@
           "type": "boolean",
           "description": "Enable sensitive field detection",
           "default": true,
+          "show_description": true,
           "show": false,
           "required": false
         },
@@ -214,6 +228,7 @@
           "type": "boolean",
           "description": "Enable governance checks",
           "default": true,
+          "show_description": true,
           "show": false,
           "required": false
         }
@@ -245,6 +260,7 @@
           "default": 0.4,
           "min": 0,
           "max": 1,
+          "show_description": true,
           "show": false,
           "required": false
         },
@@ -254,6 +270,7 @@
           "default": 0.3,
           "min": 0,
           "max": 1,
+          "show_description": true,
           "show": false,
           "required": false
         },
@@ -263,6 +280,7 @@
           "default": 0.3,
           "min": 0,
           "max": 1,
+          "show_description": true,
           "show": false,
           "required": false
         },
@@ -272,6 +290,7 @@
           "default": 90,
           "min": 0,
           "max": 100,
+          "show_description": true,
           "show": false,
           "required": false
         },
@@ -281,6 +300,7 @@
           "default": 75,
           "min": 0,
           "max": 100,
+          "show_description": true,
           "show": false,
           "required": false
         },
@@ -290,6 +310,8 @@
           "default": [],
           "items": "string",
           "example": ["user_id", "email", "ssn", "order_id"],
+          "show_example": true,
+          "show_description": true,
           "show": true,
           "required": false,
           "columnSelection": true
@@ -299,10 +321,21 @@
           "description": "Range constraints for numeric columns (column -> {min, max})",
           "default": {},
           "example": {
-            "age": { "min": 0, "max": 120 },
-            "rating": { "min": 1, "max": 5 },
-            "percentage": { "min": 0, "max": 100 }
+            "age": {
+              "min": 0,
+              "max": 120
+            },
+            "rating": {
+              "min": 1,
+              "max": 5
+            },
+            "percentage": {
+              "min": 0,
+              "max": 100
+            }
           },
+          "show_example": true,
+          "show_description": true,
           "show": true,
           "required": false
         },
@@ -318,6 +351,8 @@
             "sku": "^[A-Z]{3}-\\d{4}$",
             "phone": "^\\+?[1-9]\\d{1,14}$"
           },
+          "show_example": true,
+          "show_description": true,
           "show": true,
           "required": false
         }
@@ -349,6 +384,7 @@
           "default": 80,
           "min": 0,
           "max": 100,
+          "show_description": true,
           "show": false,
           "required": false
         },
@@ -358,6 +394,7 @@
           "default": 50,
           "min": 0,
           "max": 100,
+          "show_description": true,
           "show": false,
           "required": false
         },
@@ -367,6 +404,7 @@
           "default": 0.3,
           "min": 0,
           "max": 1,
+          "show_description": true,
           "show": false,
           "required": false
         },
@@ -376,6 +414,7 @@
           "default": 0.3,
           "min": 0,
           "max": 1,
+          "show_description": true,
           "show": false,
           "required": false
         },
@@ -385,6 +424,7 @@
           "default": 0.4,
           "min": 0,
           "max": 1,
+          "show_description": true,
           "show": false,
           "required": false
         }

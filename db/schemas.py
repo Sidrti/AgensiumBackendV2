@@ -466,7 +466,7 @@ class AgentCostsListResponse(BaseModel):
 
 class UpdateAgentCostRequest(BaseModel):
     """Request schema for updating agent cost."""
-    cost: int = Field(..., gt=0, description="New cost in credits")
+    cost: int = Field(..., ge=0, description="New cost in credits (0 for free agents)")
 
 
 class AdminGrantRequest(BaseModel):

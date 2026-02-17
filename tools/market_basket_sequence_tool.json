@@ -44,6 +44,8 @@
           "description": "Optional industry context to improve recommendations",
           "default": null,
           "example": "hardware",
+          "show_example": true,
+          "show_description": true,
           "show": false,
           "required": false
         },
@@ -53,6 +55,8 @@
           "default": "within_basket",
           "allowed": ["within_basket", "cross_transaction"],
           "example": "within_basket",
+          "show_example": true,
+          "show_description": true,
           "show": false,
           "required": false
         },
@@ -61,6 +65,7 @@
           "description": "Frequent itemset mining algorithm",
           "default": "fp_growth",
           "allowed": ["apriori", "fp_growth"],
+          "show_description": true,
           "show": false,
           "required": false
         },
@@ -70,6 +75,7 @@
           "default": 0.02,
           "min": 0,
           "max": 1,
+          "show_description": true,
           "show": false,
           "required": false
         },
@@ -79,6 +85,7 @@
           "default": 0.3,
           "min": 0,
           "max": 1,
+          "show_description": true,
           "show": false,
           "required": false
         },
@@ -88,6 +95,7 @@
           "default": 1.2,
           "min": 0,
           "max": 100,
+          "show_description": true,
           "show": false,
           "required": false
         },
@@ -97,6 +105,7 @@
           "default": 14,
           "min": 0,
           "max": 365,
+          "show_description": true,
           "show": false,
           "required": false
         },
@@ -106,6 +115,7 @@
           "default": 50,
           "min": 1,
           "max": 500,
+          "show_description": true,
           "show": false,
           "required": false
         },
@@ -114,6 +124,8 @@
           "description": "Transaction/order identifier column (required for within basket)",
           "default": null,
           "example": "order_id",
+          "show_example": true,
+          "show_description": true,
           "show": true,
           "required": true,
           "columnSelection": true
@@ -123,6 +135,8 @@
           "description": "Product identifier column",
           "default": null,
           "example": "product_sku",
+          "show_example": true,
+          "show_description": true,
           "show": true,
           "required": true,
           "columnSelection": true
@@ -132,6 +146,8 @@
           "description": "Customer identifier column (required for cross_transaction sequences)",
           "default": null,
           "example": "customer_id",
+          "show_example": true,
+          "show_description": true,
           "show": true,
           "required": false,
           "columnSelection": true
@@ -141,6 +157,8 @@
           "description": "Transaction timestamp/date column (recommended; required for cross_transaction)",
           "default": null,
           "example": "order_date",
+          "show_example": true,
+          "show_description": true,
           "show": true,
           "required": false,
           "columnSelection": true
@@ -151,6 +169,7 @@
           "default": 1,
           "min": 1,
           "max": 100,
+          "show_description": true,
           "show": false,
           "required": false
         },
@@ -160,6 +179,7 @@
           "default": 3,
           "min": 2,
           "max": 10,
+          "show_description": true,
           "show": false,
           "required": false
         },
@@ -169,6 +189,7 @@
           "default": 90,
           "min": 0,
           "max": 100,
+          "show_description": true,
           "show": false,
           "required": false
         },
@@ -178,6 +199,7 @@
           "default": 75,
           "min": 0,
           "max": 100,
+          "show_description": true,
           "show": false,
           "required": false
         }

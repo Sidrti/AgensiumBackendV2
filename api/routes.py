@@ -11,14 +11,44 @@ import time
 from datetime import datetime
 from typing import Dict, Any, Optional, List
 from fastapi import APIRouter, HTTPException, File, UploadFile, Form, Depends
+from sqlalchemy.orm import Session
 
 from ai import ChatAgent
 from auth.dependencies import get_current_active_verified_user
 from db import models
+from db.database import get_db
 from transformers.transformers_utils import get_transformer_legacy
 
 # Create router for API routes
 router = APIRouter()
+
+
+# ============================================================================
+# HELPER FUNCTIONS
+# ============================================================================
+
+def is_tool_free(db: Session, agent_ids: List[str]) -> bool:
+    """
+    Check if a tool is free by verifying all its agents are free.
+    
+    Args:
+        db: Database session
+        agent_ids: List of agent IDs for the tool
+        
+    Returns:
+        True if all agents are free (cost=0 or not found), False otherwise
+    """
+    for agent_id in agent_ids:
+        agent_cost = db.query(models.AgentCost).filter(
+            models.AgentCost.agent_id == agent_id
+        ).first()
+        
+        # If agent exists and has cost > 0, tool is not free
+        if agent_cost and agent_cost.cost > 0:
+            return False
+    
+    # All agents are free (cost=0 or not in database)
+    return True
 
 
 # ============================================================================
@@ -46,12 +76,15 @@ async def health():
 
 
 @router.get("/tools")
-async def list_tools():
-    """List all available tools."""
+async def list_tools(db: Session = Depends(get_db)):
+    """List all available tools with isFree status."""
     from main import TOOL_DEFINITIONS
      
     tools = []
     for tool_id, tool_def in TOOL_DEFINITIONS.items():
+        available_agents = tool_def["tool"]["available_agents"]
+        is_free = is_tool_free(db, available_agents)
+        
         tools.append({
             "id": tool_id,
             "name": tool_def["tool"]["name"],
@@ -59,7 +92,8 @@ async def list_tools():
             "icon": tool_def["tool"].get("icon", "🔧"),
             "category": tool_def["tool"].get("category", "source"),
             "isAvailable": tool_def["tool"].get("isAvailable", True),
-            "available_agents": tool_def["tool"]["available_agents"],
+            "available_agents": available_agents,
+            "isFree": is_free,
             "required_files": list(tool_def["tool"].get("files", {}).keys())
         })
     return {"tools": tools}

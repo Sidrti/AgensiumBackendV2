@@ -74,6 +74,8 @@
             }
           ],
           "items": "object",
+          "show_example": true,
+          "show_description": true,
           "show": true,
           "required": false
         },
@@ -83,6 +85,7 @@
           "default": 10,
           "min": 0,
           "max": 100,
+          "show_description": true,
           "show": false,
           "required": false
         },
@@ -92,6 +95,7 @@
           "default": 5,
           "min": 0,
           "max": 100,
+          "show_description": true,
           "show": false,
           "required": false
         },
@@ -101,6 +105,7 @@
           "default": 0.95,
           "min": 0.8,
           "max": 0.99,
+          "show_description": true,
           "show": false,
           "required": false
         },
@@ -108,6 +113,7 @@
           "type": "boolean",
           "description": "Calculate distribution metrics (skewness, kurtosis)",
           "default": true,
+          "show_description": true,
           "show": false,
           "required": false
         },
@@ -115,6 +121,7 @@
           "type": "boolean",
           "description": "Compare statistical measures before/after",
           "default": true,
+          "show_description": true,
           "show": false,
           "required": false
         },
@@ -122,6 +129,7 @@
           "type": "boolean",
           "description": "Analyze correlation changes",
           "default": false,
+          "show_description": true,
           "show": false,
           "required": false
         },
@@ -131,6 +139,7 @@
           "default": 0.4,
           "min": 0,
           "max": 1,
+          "show_description": true,
           "show": false,
           "required": false
         },
@@ -140,6 +149,7 @@
           "default": 0.3,
           "min": 0,
           "max": 1,
+          "show_description": true,
           "show": false,
           "required": false
         },
@@ -149,6 +159,7 @@
           "default": 0.3,
           "min": 0,
           "max": 1,
+          "show_description": true,
           "show": false,
           "required": false
         },
@@ -158,6 +169,7 @@
           "default": 90,
           "min": 0,
           "max": 100,
+          "show_description": true,
           "show": false,
           "required": false
         },
@@ -167,6 +179,7 @@
           "default": 75,
           "min": 0,
           "max": 100,
+          "show_description": true,
           "show": false,
           "required": false
         }
@@ -197,6 +210,7 @@
           "type": "boolean",
           "description": "Detect missing required fields",
           "default": true,
+          "show_description": true,
           "show": false,
           "required": false
         },
@@ -204,6 +218,7 @@
           "type": "boolean",
           "description": "Detect data type mismatches",
           "default": true,
+          "show_description": true,
           "show": false,
           "required": false
         },
@@ -211,6 +226,7 @@
           "type": "boolean",
           "description": "Detect out-of-range numeric values",
           "default": true,
+          "show_description": true,
           "show": false,
           "required": false
         },
@@ -218,6 +234,7 @@
           "type": "boolean",
           "description": "Detect invalid format values",
           "default": true,
+          "show_description": true,
           "show": false,
           "required": false
         },
@@ -225,6 +242,7 @@
           "type": "boolean",
           "description": "Detect corrupted or broken records",
           "default": true,
+          "show_description": true,
           "show": false,
           "required": false
         },
@@ -232,6 +250,7 @@
           "type": "boolean",
           "description": "Detect schema mismatches",
           "default": true,
+          "show_description": true,
           "show": false,
           "required": false
         },
@@ -241,6 +260,8 @@
           "default": [],
           "items": "string",
           "example": ["customer_id", "email", "created_at"],
+          "show_example": true,
+          "show_description": true,
           "show": true,
           "required": false,
           "columnSelection": true
@@ -250,10 +271,21 @@
           "description": "Numeric range constraints (column -> {min, max})",
           "default": {},
           "example": {
-            "age": { "min": 18, "max": 120 },
-            "salary": { "min": 0, "max": 1000000 },
-            "score": { "min": 0, "max": 100 }
+            "age": {
+              "min": 18,
+              "max": 120
+            },
+            "salary": {
+              "min": 0,
+              "max": 1000000
+            },
+            "score": {
+              "min": 0,
+              "max": 100
+            }
           },
+          "show_example": true,
+          "show_description": true,
           "show": true,
           "required": false
         },
@@ -266,6 +298,8 @@
             "phone": "^\\+?[1-9]\\d{1,14}$",
             "zip_code": "^\\d{5}(-\\d{4})?$"
           },
+          "show_example": true,
+          "show_description": true,
           "show": true,
           "required": false
         },
@@ -273,6 +307,7 @@
           "type": "object",
           "description": "Expected data types for columns (column -> type)",
           "default": {},
+          "show_description": true,
           "show": false,
           "required": false
         },
@@ -282,6 +317,7 @@
           "default": 0.5,
           "min": 0,
           "max": 1,
+          "show_description": true,
           "show": false,
           "required": false
         },
@@ -291,6 +327,7 @@
           "default": 0.3,
           "min": 0,
           "max": 1,
+          "show_description": true,
           "show": false,
           "required": false
         },
@@ -300,6 +337,7 @@
           "default": 0.2,
           "min": 0,
           "max": 1,
+          "show_description": true,
           "show": false,
           "required": false
         },
@@ -309,6 +347,7 @@
           "default": 90,
           "min": 0,
           "max": 100,
+          "show_description": true,
           "show": false,
           "required": false
         },
@@ -318,6 +357,7 @@
           "default": 75,
           "min": 0,
           "max": 100,
+          "show_description": true,
           "show": false,
           "required": false
         }
@@ -347,6 +387,7 @@
           "type": "boolean",
           "description": "Automatically convert to numeric type",
           "default": true,
+          "show_description": true,
           "show": false,
           "required": false
         },
@@ -354,6 +395,7 @@
           "type": "boolean",
           "description": "Automatically convert to datetime type",
           "default": true,
+          "show_description": true,
           "show": false,
           "required": false
         },
@@ -361,6 +403,7 @@
           "type": "boolean",
           "description": "Automatically convert to category type",
           "default": true,
+          "show_description": true,
           "show": false,
           "required": false
         },
@@ -368,6 +411,7 @@
           "type": "boolean",
           "description": "Keep columns with mixed types as object",
           "default": false,
+          "show_description": true,
           "show": false,
           "required": false
         },
@@ -377,6 +421,7 @@
           "default": 0.5,
           "min": 0,
           "max": 1,
+          "show_description": true,
           "show": false,
           "required": false
         },
@@ -386,6 +431,7 @@
           "default": 0.3,
           "min": 0,
           "max": 1,
+          "show_description": true,
           "show": false,
           "required": false
         },
@@ -395,6 +441,7 @@
           "default": 0.2,
           "min": 0,
           "max": 1,
+          "show_description": true,
           "show": false,
           "required": false
         },
@@ -404,6 +451,7 @@
           "default": 90,
           "min": 0,
           "max": 100,
+          "show_description": true,
           "show": false,
           "required": false
         },
@@ -413,6 +461,7 @@
           "default": 75,
           "min": 0,
           "max": 100,
+          "show_description": true,
           "show": false,
           "required": false
         }
@@ -445,6 +494,8 @@
           "default": "lowercase",
           "allowed": ["lowercase", "uppercase", "titlecase", "none"],
           "example": "lowercase",
+          "show_example": true,
+          "show_description": true,
           "show": true,
           "required": false
         },
@@ -452,6 +503,7 @@
           "type": "boolean",
           "description": "Remove leading and trailing whitespace",
           "default": true,
+          "show_description": true,
           "show": false,
           "required": false
         },
@@ -459,6 +511,7 @@
           "type": "boolean",
           "description": "Normalize internal spacing (collapse multiple spaces to single space)",
           "default": true,
+          "show_description": true,
           "show": false,
           "required": false
         },
@@ -466,6 +519,7 @@
           "type": "boolean",
           "description": "Apply synonym replacement mappings",
           "default": true,
+          "show_description": true,
           "show": false,
           "required": false
         },
@@ -486,6 +540,8 @@
               "0": "Inactive"
             }
           },
+          "show_example": true,
+          "show_description": true,
           "show": true,
           "required": false
         },
@@ -493,6 +549,7 @@
           "type": "boolean",
           "description": "Apply unit conversion and standardization",
           "default": false,
+          "show_description": true,
           "show": false,
           "required": false
         },
@@ -502,14 +559,28 @@
           "default": {},
           "example": {
             "weight": {
-              "kg": { "factor": 2.20462, "target_unit": "lbs" },
-              "g": { "factor": 0.00220462, "target_unit": "lbs" }
+              "kg": {
+                "factor": 2.20462,
+                "target_unit": "lbs"
+              },
+              "g": {
+                "factor": 0.00220462,
+                "target_unit": "lbs"
+              }
             },
             "distance": {
-              "km": { "factor": 0.621371, "target_unit": "miles" },
-              "m": { "factor": 0.000621371, "target_unit": "miles" }
+              "km": {
+                "factor": 0.621371,
+                "target_unit": "miles"
+              },
+              "m": {
+                "factor": 0.000621371,
+                "target_unit": "miles"
+              }
             }
           },
+          "show_example": true,
+          "show_description": true,
           "show": true,
           "required": false
         },
@@ -517,6 +588,7 @@
           "type": "boolean",
           "description": "Standardize date formats to a consistent target format",
           "default": true,
+          "show_description": true,
           "show": false,
           "required": false
         },
@@ -525,6 +597,8 @@
           "description": "Target format for date standardization (e.g., %Y-%m-%d)",
           "default": "%Y-%m-%d",
           "example": "%Y-%m-%d",
+          "show_example": true,
+          "show_description": true,
           "show": true,
           "required": false
         },
@@ -534,6 +608,8 @@
           "default": [],
           "items": "string",
           "example": ["first_name", "last_name", "city"],
+          "show_example": true,
+          "show_description": true,
           "show": true,
           "required": false,
           "columnSelection": true
@@ -544,6 +620,8 @@
           "default": [],
           "items": "string",
           "example": ["id", "metadata"],
+          "show_example": true,
+          "show_description": true,
           "show": true,
           "required": false,
           "columnSelection": true
@@ -554,6 +632,7 @@
           "default": 0.5,
           "min": 0,
           "max": 1,
+          "show_description": true,
           "show": false,
           "required": false
         },
@@ -563,6 +642,7 @@
           "default": 0.3,
           "min": 0,
           "max": 1,
+          "show_description": true,
           "show": false,
           "required": false
         },
@@ -572,6 +652,7 @@
           "default": 0.2,
           "min": 0,
           "max": 1,
+          "show_description": true,
           "show": false,
           "required": false
         },
@@ -581,6 +662,7 @@
           "default": 90,
           "min": 0,
           "max": 100,
+          "show_description": true,
           "show": false,
           "required": false
         },
@@ -590,6 +672,7 @@
           "default": 75,
           "min": 0,
           "max": 100,
+          "show_description": true,
           "show": false,
           "required": false
         }
@@ -635,6 +718,7 @@
             "missing_values",
             "conflicting"
           ],
+          "show_description": true,
           "show": false,
           "required": false
         },
@@ -644,6 +728,8 @@
           "default": "remove_duplicates",
           "allowed": ["remove_duplicates", "merge_smart"],
           "example": "merge_smart",
+          "show_example": true,
+          "show_description": true,
           "show": true,
           "required": false
         },
@@ -653,6 +739,8 @@
           "default": [],
           "items": "string",
           "example": ["email", "work_email"],
+          "show_example": true,
+          "show_description": true,
           "show": true,
           "required": false,
           "columnSelection": true
@@ -663,6 +751,8 @@
           "default": [],
           "items": "string",
           "example": ["first_name", "last_name", "dob"],
+          "show_example": true,
+          "show_description": true,
           "show": true,
           "required": false,
           "columnSelection": true
@@ -672,6 +762,7 @@
           "description": "How to handle null values in duplicate detection",
           "default": "ignore_nulls",
           "allowed": ["ignore_nulls", "match_nulls"],
+          "show_description": true,
           "show": false,
           "required": false
         },
@@ -680,6 +771,7 @@
           "description": "Strategy for resolving conflicting duplicate values",
           "default": "keep_first",
           "allowed": ["keep_first", "keep_last", "merge_smart"],
+          "show_description": true,
           "show": false,
           "required": false
         },
@@ -689,6 +781,7 @@
           "default": 0.5,
           "min": 0,
           "max": 1,
+          "show_description": true,
           "show": false,
           "required": false
         },
@@ -698,6 +791,7 @@
           "default": 0.3,
           "min": 0,
           "max": 1,
+          "show_description": true,
           "show": false,
           "required": false
         },
@@ -707,6 +801,7 @@
           "default": 0.2,
           "min": 0,
           "max": 1,
+          "show_description": true,
           "show": false,
           "required": false
         },
@@ -716,6 +811,7 @@
           "default": 90,
           "min": 0,
           "max": 100,
+          "show_description": true,
           "show": false,
           "required": false
         },
@@ -725,6 +821,7 @@
           "default": 75,
           "min": 0,
           "max": 100,
+          "show_description": true,
           "show": false,
           "required": false
         }
@@ -756,6 +853,8 @@
           "default": "column_specific",
           "allowed": ["drop_rows", "column_specific"],
           "example": "column_specific",
+          "show_example": true,
+          "show_description": true,
           "show": true,
           "required": false
         },
@@ -769,6 +868,8 @@
             "category": "mode",
             "comments": "constant"
           },
+          "show_example": true,
+          "show_description": true,
           "show": false,
           "required": false
         },
@@ -780,6 +881,8 @@
             "comments": "No comments",
             "status": "Unknown"
           },
+          "show_example": true,
+          "show_description": true,
           "show": false,
           "required": false
         },
@@ -789,6 +892,7 @@
           "default": 5,
           "min": 1,
           "max": 20,
+          "show_description": true,
           "show": false,
           "required": false
         },
@@ -798,6 +902,7 @@
           "default": 0.5,
           "min": 0,
           "max": 1,
+          "show_description": true,
           "show": false,
           "required": false
         },
@@ -807,6 +912,7 @@
           "default": 0.3,
           "min": 0,
           "max": 1,
+          "show_description": true,
           "show": false,
           "required": false
         },
@@ -816,6 +922,7 @@
           "default": 0.2,
           "min": 0,
           "max": 1,
+          "show_description": true,
           "show": false,
           "required": false
         },
@@ -825,6 +932,7 @@
           "default": 90,
           "min": 0,
           "max": 100,
+          "show_description": true,
           "show": false,
           "required": false
         },
@@ -834,6 +942,7 @@
           "default": 75,
           "min": 0,
           "max": 100,
+          "show_description": true,
           "show": false,
           "required": false
         }
@@ -865,6 +974,8 @@
           "default": "iqr",
           "allowed": ["z_score", "iqr", "percentile"],
           "example": "iqr",
+          "show_example": true,
+          "show_description": true,
           "show": true,
           "required": false
         },
@@ -874,6 +985,8 @@
           "default": "remove",
           "allowed": ["remove", "impute_mean", "impute_median"],
           "example": "impute_median",
+          "show_example": true,
+          "show_description": true,
           "show": true,
           "required": false
         },
@@ -883,6 +996,7 @@
           "default": 3.0,
           "min": 1.0,
           "max": 5.0,
+          "show_description": true,
           "show": false,
           "required": false
         },
@@ -892,6 +1006,7 @@
           "default": 1.5,
           "min": 0.5,
           "max": 3.0,
+          "show_description": true,
           "show": false,
           "required": false
         },
@@ -901,6 +1016,7 @@
           "default": 1.0,
           "min": 0,
           "max": 10,
+          "show_description": true,
           "show": false,
           "required": false
         },
@@ -910,6 +1026,7 @@
           "default": 99.0,
           "min": 90,
           "max": 100,
+          "show_description": true,
           "show": false,
           "required": false
         },
@@ -919,6 +1036,7 @@
           "default": 0.5,
           "min": 0,
           "max": 1,
+          "show_description": true,
           "show": false,
           "required": false
         },
@@ -928,6 +1046,7 @@
           "default": 0.3,
           "min": 0,
           "max": 1,
+          "show_description": true,
           "show": false,
           "required": false
         },
@@ -937,6 +1056,7 @@
           "default": 0.2,
           "min": 0,
           "max": 1,
+          "show_description": true,
           "show": false,
           "required": false
         },
@@ -946,6 +1066,7 @@
           "default": 90,
           "min": 0,
           "max": 100,
+          "show_description": true,
           "show": false,
           "required": false
         },
@@ -955,6 +1076,7 @@
           "default": 75,
           "min": 0,
           "max": 100,
+          "show_description": true,
           "show": false,
           "required": false
         }
@@ -986,6 +1108,7 @@
           "type": "boolean",
           "description": "Verify that numeric columns are truly numeric after cleaning",
           "default": true,
+          "show_description": true,
           "show": false,
           "required": false
         },
@@ -993,6 +1116,7 @@
           "type": "boolean",
           "description": "Verify that datetime columns are properly formatted",
           "default": true,
+          "show_description": true,
           "show": false,
           "required": false
         },
@@ -1000,6 +1124,7 @@
           "type": "boolean",
           "description": "Verify that cleaning operations did not introduce new nulls",
           "default": true,
+          "show_description": true,
           "show": false,
           "required": false
         },
@@ -1007,6 +1132,7 @@
           "type": "boolean",
           "description": "Verify that no duplicate rows were introduced during cleaning",
           "default": true,
+          "show_description": true,
           "show": false,
           "required": false
         },
@@ -1014,6 +1140,7 @@
           "type": "boolean",
           "description": "Verify that data retention is within acceptable limits",
           "default": true,
+          "show_description": true,
           "show": false,
           "required": false
         },
@@ -1021,6 +1148,7 @@
           "type": "boolean",
           "description": "Generate comprehensive cleansing manifest with all agent actions",
           "default": true,
+          "show_description": true,
           "show": false,
           "required": false
         },
@@ -1028,6 +1156,7 @@
           "type": "boolean",
           "description": "Include high-level transformation summary in manifest",
           "default": true,
+          "show_description": true,
           "show": false,
           "required": false
         },
@@ -1035,6 +1164,7 @@
           "type": "object",
           "description": "Dictionary of agent_id -> agent output for manifest aggregation",
           "default": {},
+          "show_description": true,
           "show": false,
           "required": false
         },
@@ -1042,6 +1172,7 @@
           "type": "integer",
           "description": "Original row count before cleaning (for retention verification)",
           "default": null,
+          "show_description": true,
           "show": false,
           "required": false
         },
@@ -1049,6 +1180,7 @@
           "type": "integer",
           "description": "Original column count before cleaning (for retention verification)",
           "default": null,
+          "show_description": true,
           "show": false,
           "required": false
         },
@@ -1058,6 +1190,7 @@
           "default": 0.4,
           "min": 0,
           "max": 1,
+          "show_description": true,
           "show": false,
           "required": false
         },
@@ -1067,6 +1200,7 @@
           "default": 0.3,
           "min": 0,
           "max": 1,
+          "show_description": true,
           "show": false,
           "required": false
         },
@@ -1076,6 +1210,7 @@
           "default": 0.3,
           "min": 0,
           "max": 1,
+          "show_description": true,
           "show": false,
           "required": false
         },
@@ -1085,6 +1220,7 @@
           "default": 95,
           "min": 0,
           "max": 100,
+          "show_description": true,
           "show": false,
           "required": false
         },
@@ -1094,6 +1230,7 @@
           "default": 85,
           "min": 0,
           "max": 100,
+          "show_description": true,
           "show": false,
           "required": false
         }
