@@ -57,8 +57,13 @@ class User(Base):
     # Primary Fields
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
     email = Column(String(255), unique=True, index=True, nullable=False)
-    hashed_password = Column(String(255), nullable=False)
+    hashed_password = Column(String(255), nullable=True)  # Nullable for Google OAuth users
     full_name = Column(String(100), nullable=False)
+
+    # OAuth Fields
+    auth_provider = Column(String(20), nullable=False, default="local")  # 'local' or 'google'
+    google_id = Column(String(255), unique=True, nullable=True, index=True)
+    profile_picture = Column(String(500), nullable=True)
 
     # Stripe Integration
     stripe_customer_id = Column(String(255), unique=True, nullable=True, index=True)

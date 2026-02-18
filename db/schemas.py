@@ -316,6 +316,11 @@ class ResendOTP(BaseModel):
 # RESPONSE SCHEMAS
 # ============================================================================
 
+class GoogleAuthRequest(BaseModel):
+    """Schema for Google OAuth login/register."""
+    credential: str = Field(..., min_length=1, description="Google ID token (JWT credential)")
+
+
 class UserResponse(BaseModel):
     """Response schema for user data."""
     id: int
@@ -323,6 +328,8 @@ class UserResponse(BaseModel):
     full_name: str
     is_active: bool
     is_verified: bool
+    auth_provider: Optional[str] = "local"
+    profile_picture: Optional[str] = None
     message: Optional[str] = None
 
     model_config = {"from_attributes": True}
@@ -352,6 +359,17 @@ class Token(BaseModel):
 class TokenData(BaseModel):
     """Token data for internal use."""
     email: Optional[str] = None
+
+
+class GoogleAuthResponse(BaseModel):
+    """Response schema for Google OAuth."""
+    access_token: str
+    token_type: str = "bearer"
+    expires_in: int = Field(..., description="Token expiry time in seconds")
+    user_email: EmailStr
+    is_new_user: bool = False
+    auth_provider: str = "google"
+    message: str
 
 
 class GenericResponse(BaseModel):

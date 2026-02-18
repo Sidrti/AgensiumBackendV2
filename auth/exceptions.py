@@ -145,3 +145,26 @@ class PasswordMismatchException(AuthException):
             detail="Current password is incorrect",
             error_code="AUTH_010"
         )
+
+
+class GoogleAuthException(AuthException):
+    """Exception for Google OAuth errors."""
+
+    def __init__(self, detail: str = "Google authentication failed"):
+        super().__init__(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=detail,
+            error_code="AUTH_011",
+            headers={"WWW-Authenticate": "Bearer"}
+        )
+
+
+class GoogleAccountNoPasswordException(AuthException):
+    """Exception when a Google-only user tries an action requiring a password."""
+
+    def __init__(self, detail: str = None):
+        super().__init__(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=detail or "This account uses Google Sign-In. Please use 'Continue with Google' to login.",
+            error_code="AUTH_012"
+        )

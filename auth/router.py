@@ -21,7 +21,9 @@ from .exceptions import (
     InvalidOTPException,
     OTPExpiredException,
     OTPTypeMismatchException,
-    PasswordMismatchException
+    PasswordMismatchException,
+    GoogleAuthException,
+    GoogleAccountNoPasswordException
 )
 
 logger = logging.getLogger(__name__)
@@ -365,6 +367,12 @@ async def change_password(
     - Updates password
     - Sends password changed notification email
     """
+    # Google-only users cannot change password (they have no old password)
+    if current_user.hashed_password is None:
+        raise GoogleAccountNoPasswordException(
+            detail="This account uses Google Sign-In. To set a password, use 'Forgot Password'."
+        )
+
     if not utils.verify_password(data.old_password, current_user.hashed_password):
         raise PasswordMismatchException()
 
@@ -413,6 +421,10 @@ async def login(
     if not user:
         raise InvalidCredentialsException()
 
+    # Google-only users (no password set) cannot use password login
+    if user.hashed_password is None:
+        raise GoogleAccountNoPasswordException()
+
     if not utils.verify_password(form_data.password, user.hashed_password):
         raise InvalidCredentialsException()
 
@@ -445,6 +457,123 @@ async def login(
 
 
 # ============================================================================
+# GOOGLE OAUTH
+# ============================================================================
+
+@router.post(
+    "/google",
+    response_model=schemas.GoogleAuthResponse,
+    summary="Google OAuth Login/Register",
+    description="Authenticate with Google. Creates account if new user, links Google if existing."
+)
+async def google_auth(
+    data: schemas.GoogleAuthRequest,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+    email_service: EmailService = Depends(get_email_service)
+):
+    """
+    Authenticate or register a user via Google OAuth.
+
+    - Verifies Google ID token server-side
+    - Creates new user if email doesn't exist
+    - Links Google to existing password account if email matches
+    - Returns JWT access token
+    """
+    # 1. Verify Google ID token
+    try:
+        google_info = utils.verify_google_token(data.credential)
+    except ValueError as e:
+        logger.warning(f"Google token verification failed: {e}")
+        raise GoogleAuthException(detail=str(e))
+
+    email = google_info["email"]
+    google_id = google_info["google_id"]
+    full_name = google_info["name"] or email.split("@")[0]
+    picture = google_info.get("picture")
+    email_verified = google_info.get("email_verified", False)
+
+    # 2. Reject if Google email is not verified
+    if not email_verified:
+        raise GoogleAuthException(detail="Google account email is not verified.")
+
+    # 3. Lookup user by email
+    user = db.query(models.User).filter(
+        models.User.email == email
+    ).first()
+
+    is_new_user = False
+
+    if user is None:
+        # CASE A: New user — auto-create account
+        user = models.User(
+            email=email,
+            hashed_password=None,
+            full_name=full_name,
+            auth_provider="google",
+            google_id=google_id,
+            profile_picture=picture,
+            is_verified=True,
+            is_active=True
+        )
+        db.add(user)
+        db.commit()
+        db.refresh(user)
+        is_new_user = True
+
+        # Send welcome email for new Google users
+        background_tasks.add_task(
+            email_service.send_welcome_email,
+            to_email=user.email,
+            to_name=user.full_name
+        )
+
+        logger.info(f"New Google user created: {email}")
+
+    else:
+        # User exists — check if active
+        if not user.is_active:
+            raise UserInactiveException()
+
+        if user.google_id and user.google_id != google_id:
+            # Security: google_id mismatch (different Google account, same email — shouldn't happen normally)
+            raise GoogleAuthException(detail="Google account mismatch. Please contact support.")
+
+        # CASE B / C: Existing user — link Google if not already linked
+        if not user.google_id:
+            user.google_id = google_id
+            logger.info(f"Linked Google account to existing user: {email}")
+
+        # Update profile picture if not set
+        if picture and not user.profile_picture:
+            user.profile_picture = picture
+
+        # Auto-verify if not yet verified (Google verified this email)
+        if not user.is_verified:
+            user.is_verified = True
+
+        db.commit()
+
+    # 4. Issue JWT token
+    access_token = utils.create_access_token(
+        data={"sub": user.email},
+        expires_delta=timedelta(minutes=utils.ACCESS_TOKEN_EXPIRE_MINUTES)
+    )
+
+    message = "Account created successfully via Google." if is_new_user else "Logged in successfully via Google."
+
+    return schemas.GoogleAuthResponse(
+        access_token=access_token,
+        token_type="bearer",
+        expires_in=utils.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+        user_email=user.email,
+        is_new_user=is_new_user,
+        auth_provider=user.auth_provider,
+        message=message
+    )
+
+
+# ============================================================================
 # USER PROFILE
 # ============================================================================
 
@@ -469,5 +598,7 @@ def get_current_user_profile(
         full_name=current_user.full_name,
         is_active=current_user.is_active,
         is_verified=current_user.is_verified,
+        auth_provider=current_user.auth_provider,
+        profile_picture=current_user.profile_picture,
         message="Profile retrieved successfully"
     )

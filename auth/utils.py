@@ -11,6 +11,8 @@ from typing import Optional
 import bcrypt
 from jose import JWTError, jwt
 from dotenv import load_dotenv
+from google.oauth2 import id_token as google_id_token
+from google.auth.transport import requests as google_requests
 
 load_dotenv()
 
@@ -19,6 +21,7 @@ SECRET_KEY = os.getenv("SECRET_KEY", "your-secret-key-change-in-production")
 ALGORITHM = os.getenv("ALGORITHM", "HS256")
 ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "30"))
 OTP_EXPIRE_MINUTES = int(os.getenv("OTP_EXPIRE_MINUTES", "10"))
+GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID", "")
 
 
 # ============================================================================
@@ -146,3 +149,42 @@ def is_otp_expired(expires_at: datetime) -> bool:
         True if expired, False otherwise
     """
     return datetime.utcnow() > expires_at
+
+
+# ============================================================================
+# GOOGLE OAUTH FUNCTIONS
+# ============================================================================
+
+def verify_google_token(credential: str) -> dict:
+    """
+    Verify a Google ID token and extract user info.
+
+    Args:
+        credential: The Google ID token (JWT) from the frontend
+
+    Returns:
+        Dict with: email, name, sub (google_id), picture, email_verified
+
+    Raises:
+        ValueError: If the token is invalid, expired, or audience doesn't match
+    """
+    if not GOOGLE_CLIENT_ID:
+        raise ValueError("Google Client ID is not configured on the server")
+
+    idinfo = google_id_token.verify_oauth2_token(
+        credential,
+        google_requests.Request(),
+        GOOGLE_CLIENT_ID
+    )
+
+    # Verify the issuer
+    if idinfo["iss"] not in ["accounts.google.com", "https://accounts.google.com"]:
+        raise ValueError("Invalid token issuer")
+
+    return {
+        "email": idinfo.get("email", "").lower(),
+        "name": idinfo.get("name", ""),
+        "google_id": idinfo.get("sub"),
+        "picture": idinfo.get("picture"),
+        "email_verified": idinfo.get("email_verified", False),
+    }
