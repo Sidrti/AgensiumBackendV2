@@ -69,10 +69,16 @@ async def root():
     }
 
 
-@router.get("/health")
+# @router.get("/health")
+# async def health():
+#     """Health check endpoint."""
+#     return {"status": "ok"}
+
+@router.api_route("/health", methods=["GET", "HEAD"])
 async def health():
     """Health check endpoint."""
     return {"status": "ok"}
+
 
 
 @router.get("/tools")
