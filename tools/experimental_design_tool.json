@@ -6,6 +6,8 @@
     "icon": "📐",
     "category": "analyze",
     "isAvailable": true,
+    "status": "Private",
+    "show": true,
     "version": "1.0.0",
     "available_agents": ["experimental-design-agent"],
     "files": {

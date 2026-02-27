@@ -88,6 +88,10 @@ async def list_tools(db: Session = Depends(get_db)):
      
     tools = []
     for tool_id, tool_def in TOOL_DEFINITIONS.items():
+        # Filter out tools where show is False
+        if not tool_def["tool"].get("show", True):
+            continue
+            
         available_agents = tool_def["tool"]["available_agents"]
         is_free = is_tool_free(db, available_agents)
         
@@ -97,6 +101,7 @@ async def list_tools(db: Session = Depends(get_db)):
             "description": tool_def["tool"]["description"],
             "icon": tool_def["tool"].get("icon", "🔧"),
             "category": tool_def["tool"].get("category", "source"),
+            "status": tool_def["tool"].get("status", "Private"),
             "isAvailable": tool_def["tool"].get("isAvailable", True),
             "available_agents": available_agents,
             "isFree": is_free,
@@ -192,6 +197,139 @@ async def analyze(
             "analysis_id": analysis_id,
             "status": "error",
             "error": str(e),
+            "execution_time_ms": int((time.time() - start_time) * 1000)
+        }
+
+
+# ============================================================================
+# FORM ENDPOINTS
+# ============================================================================
+
+@router.post("/submit-form")
+async def submit_form(
+    form_type: str = Form(...),
+    tool_id: Optional[str] = Form(None),
+    tool_name: Optional[str] = Form(None),
+    tool_category: Optional[str] = Form(None),
+    request_status: Optional[str] = Form(None),
+    poc_email: Optional[str] = Form(None),
+    use_case: Optional[str] = Form(None),
+    build_type: Optional[str] = Form(None),
+    template_id: Optional[str] = Form(None),
+    template_name: Optional[str] = Form(None),
+    vision: Optional[str] = Form(None),
+    contact_name: Optional[str] = Form(None),
+    contact_email: Optional[str] = Form(None),
+    contact_org: Optional[str] = Form(None),
+    kpi: Optional[str] = Form(None),
+    stack: Optional[str] = Form(None),
+    current_user: models.User = Depends(get_current_active_verified_user)
+):
+    """
+    Unified form submission endpoint for both ContactToDeployModal and CustomBuilderPage.
+    
+    Args:
+        form_type: "contact_request" or "custom_build"
+        
+        For contact_request:
+            - tool_id, tool_name, tool_category, request_status, poc_email, use_case
+            
+        For custom_build:
+            - build_type (template/own), template_id, template_name, vision
+            - contact_name, contact_email, contact_org
+            - kpi, stack (for custom builds)
+        
+        current_user: Authenticated user
+        
+    Returns:
+        Standardized API response with request ID and confirmation
+    """
+    request_id = str(uuid.uuid4())
+    start_time = time.time()
+    
+    try:
+        # Validate form_type
+        if form_type not in ["contact_request", "custom_build"]:
+            raise ValueError(f"Invalid form_type: {form_type}. Must be 'contact_request' or 'custom_build'")
+        
+        # Build response based on form type
+        if form_type == "contact_request":
+            # Contact to Deploy form
+            if not all([tool_id, tool_name, tool_category, request_status, poc_email, use_case]):
+                raise ValueError("Missing required fields for contact_request form")
+            
+            form_data = {
+                "formType": "contact_request",
+                "toolId": tool_id,
+                "toolName": tool_name,
+                "toolCategory": tool_category,
+                "requestStatus": request_status,
+                "pocEmail": poc_email,
+                "useCase": use_case,
+                "submittedBy": current_user.email,
+                "userId": current_user.id
+            }
+            
+        elif form_type == "custom_build":
+            # Custom Builder form
+            if not all([build_type, vision, contact_name, contact_email, contact_org]):
+                raise ValueError("Missing required fields for custom_build form")
+            
+            form_data = {
+                "formType": "custom_build",
+                "buildType": build_type,
+                "templateId": template_id,
+                "templateName": template_name,
+                "vision": vision,
+                "contact": {
+                    "name": contact_name,
+                    "email": contact_email,
+                    "org": contact_org
+                },
+                "submittedBy": current_user.email,
+                "userId": current_user.id
+            }
+            
+            # Add strategic specs if custom build
+            if build_type == "own":
+                form_data["strategicSpecs"] = {
+                    "kpi": kpi,
+                    "stack": stack
+                }
+        
+        # Log form data
+        print(f"\n{'='*70}")
+        print(f"FORM SUBMISSION: {form_type.upper()}")
+        print(f"{'='*70}")
+        print(json.dumps(form_data, indent=2))
+        print(f"{'='*70}\n")
+        
+        return {
+            "request_id": request_id,
+            "status": "success",
+            "message": f"Form '{form_type}' submitted successfully",
+            "form_type": form_type,
+            "data": form_data,
+            "timestamp": datetime.utcnow().isoformat() + "Z",
+            "execution_time_ms": int((time.time() - start_time) * 1000)
+        }
+        
+    except ValueError as e:
+        return {
+            "request_id": request_id,
+            "status": "error",
+            "message": f"Validation error: {str(e)}",
+            "error": str(e),
+            "timestamp": datetime.utcnow().isoformat() + "Z",
+            "execution_time_ms": int((time.time() - start_time) * 1000)
+        }
+    except Exception as e:
+        return {
+            "request_id": request_id,
+            "status": "error",
+            "message": f"Failed to process form submission: {str(e)}",
+            "error": str(e),
+            "timestamp": datetime.utcnow().isoformat() + "Z",
             "execution_time_ms": int((time.time() - start_time) * 1000)
         }
 

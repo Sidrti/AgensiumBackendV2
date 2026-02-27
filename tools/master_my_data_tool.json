@@ -6,6 +6,8 @@
     "icon": "👑",
     "category": "source",
     "isAvailable": true,
+    "status": "Claim",
+    "show": true,
     "version": "1.0.0",
     "available_agents": [
       "key-identifier",

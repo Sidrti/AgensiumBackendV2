@@ -6,6 +6,8 @@
     "icon": "📊",
     "category": "source",
     "isAvailable": true,
+    "status": "Private",
+    "show": true,
     "version": "2.0.0",
     "available_agents": [
       "unified-profiler",

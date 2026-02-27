@@ -6,6 +6,8 @@
     "icon": "✨",
     "category": "shape",
     "isAvailable": true,
+    "status": "Ready",
+    "show": true,
     "version": "1.0.0",
     "available_agents": [
       "cleanse-previewer",

@@ -6,6 +6,8 @@
     "icon": "🧮",
     "category": "analyze",
     "isAvailable": true,
+    "status": "Private",
+    "show": false,
     "version": "1.0.0",
     "available_agents": ["control-group-holdout-planner-agent"],
     "files": {}

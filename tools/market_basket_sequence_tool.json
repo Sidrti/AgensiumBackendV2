@@ -6,6 +6,8 @@
     "icon": "🛒",
     "category": "analyze",
     "isAvailable": true,
+    "status": "Building",
+    "show": true,
     "version": "1.0.0",
     "available_agents": ["market-basket-sequence-agent"],
     "files": {
