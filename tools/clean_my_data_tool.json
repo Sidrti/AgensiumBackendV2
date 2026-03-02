@@ -5,9 +5,9 @@
     "description": "Comprehensive data cleaning and validation tool. Handle missing values, detect and remove outliers, validate governance compliance, and ensure test coverage requirements. Clean your data with configurable strategies while maintaining data integrity.",
     "icon": "✨",
     "category": "shape",
-    "tags": ["MDM"],
+    "tags": ["DATA OPS & ENGINEERING"],
     "isAvailable": true,
-    "status": "Ready",
+    "status": "Private",
     "show": true,
     "version": "1.0.0",
     "available_agents": [
