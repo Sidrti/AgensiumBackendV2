@@ -5,9 +5,9 @@
     "description": "Comprehensive Master Data Management (MDM) tool. Identify keys, enforce contracts, map semantics, trace lineage, build golden records, resolve survivorship, and manage stewardship tasks to ensure a single source of truth.",
     "icon": "👑",
     "category": "source",
-    "tags": ["MDM"],
+    "tags": ["DATA OPS & ENGINEERING"],
     "isAvailable": true,
-    "status": "Claim",
+    "status": "Private",
     "show": true,
     "version": "1.0.0",
     "available_agents": [
