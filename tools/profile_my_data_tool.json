@@ -5,6 +5,7 @@
     "description": "Comprehensive data profiling and quality assessment tool. Analyze data completeness, quality metrics, detect patterns, identify risks, and assess readiness for analytics.",
     "icon": "📊",
     "category": "source",
+    "tags": ["MDM"],
     "isAvailable": true,
     "status": "Private",
     "show": true,

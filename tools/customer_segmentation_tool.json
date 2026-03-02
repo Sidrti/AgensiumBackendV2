@@ -5,6 +5,7 @@
     "description": "Classifies customers into value-based or behavior-based segments using decile logic or weighted RFM modeling for targeted strategy and prioritization.",
     "icon": "👥",
     "category": "analyze",
+    "tags": ["Marketing"],
     "isAvailable": true,
     "status": "Private",
     "show": true,

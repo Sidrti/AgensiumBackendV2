@@ -5,6 +5,7 @@
     "description": "Plans statistically valid control (holdout) group sizes across up to 10 segments. Estimates required users, duration, and revenue opportunity cost for holdouts under configurable confidence and power.",
     "icon": "🧮",
     "category": "analyze",
+    "tags": ["Marketing"],
     "isAvailable": true,
     "status": "Private",
     "show": false,

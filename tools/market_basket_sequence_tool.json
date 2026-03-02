@@ -5,6 +5,7 @@
     "description": "Finds product co-purchase rules (within basket) and next-purchase sequences (cross transaction) to support bundling, promotions, and intent prediction.",
     "icon": "🛒",
     "category": "analyze",
+    "tags": ["Marketing"],
     "isAvailable": true,
     "status": "Building",
     "show": true,

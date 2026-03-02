@@ -103,6 +103,7 @@ async def list_tools(db: Session = Depends(get_db)):
             "category": tool_def["tool"].get("category", "source"),
             "status": tool_def["tool"].get("status", "Private"),
             "isAvailable": tool_def["tool"].get("isAvailable", True),
+            "tags": tool_def["tool"].get("tags", []),
             "available_agents": available_agents,
             "isFree": is_free,
             "required_files": list(tool_def["tool"].get("files", {}).keys())
