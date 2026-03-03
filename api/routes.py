@@ -6,6 +6,7 @@ Supports flexible file handling based on tool definitions.
 """
 
 import json
+import logging
 import uuid
 import time
 from datetime import datetime
@@ -17,10 +18,12 @@ from ai import ChatAgent
 from auth.dependencies import get_current_active_verified_user
 from db import models
 from db.database import get_db
+from email_services import get_email_service, EmailService
 from transformers.transformers_utils import get_transformer_legacy
 
 # Create router for API routes
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 
 # ============================================================================
@@ -227,7 +230,8 @@ async def submit_form(
     selected_product: Optional[str] = Form(None),
     full_name: Optional[str] = Form(None),
     details: Optional[str] = Form(None),
-    current_user: models.User = Depends(get_current_active_verified_user)
+    current_user: models.User = Depends(get_current_active_verified_user),
+    email_service: EmailService = Depends(get_email_service)
 ):
     """
     Unified form submission endpoint for ContactToDeployModal, CustomBuilderPage, and ProductInvestmentHub.
@@ -325,7 +329,18 @@ async def submit_form(
         print(f"{'='*70}")
         print(json.dumps(form_data, indent=2))
         print(f"{'='*70}\n")
-        
+
+        # Send notification email to client/admin (non-blocking on failure)
+        try:
+            email_result = await email_service.send_form_notification_email(
+                form_type=form_type,
+                form_data=form_data,
+                submitted_by=current_user.email
+            )
+            logger.info(f"Form notification email result: {email_result}")
+        except Exception as email_err:
+            logger.warning(f"Form notification email failed (non-critical): {email_err}", exc_info=True)
+
         return {
             "request_id": request_id,
             "status": "success",

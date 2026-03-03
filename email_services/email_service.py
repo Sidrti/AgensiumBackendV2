@@ -8,7 +8,7 @@ from enum import Enum
 
 from dotenv import load_dotenv
 
-from email_services.email_templates import get_otp_template, get_welcome_template, get_password_changed_template
+from email_services.email_templates import get_otp_template, get_welcome_template, get_password_changed_template, get_form_notification_template
 from email_services.email_config import EmailConfig
 
 load_dotenv()
@@ -31,6 +31,7 @@ class EmailType(str, Enum):
     OTP_PASSWORD_RESET = "otp_password_reset"
     WELCOME = "welcome"
     PASSWORD_CHANGED = "password_changed"
+    FORM_NOTIFICATION = "form_notification"
 
 
 class EmailService:
@@ -258,6 +259,51 @@ class EmailService:
             subject=subject,
             html_content=html_content,
             tags=[EmailType.PASSWORD_CHANGED.value, "security"]
+        )
+
+
+    async def send_form_notification_email(
+        self,
+        form_type: str,
+        form_data: dict,
+        submitted_by: str
+    ) -> Dict[str, Any]:
+        """
+        Send a form submission notification email to the client/admin.
+
+        Args:
+            form_type: 'contact_request', 'custom_build', or 'investment_hub'
+            form_data: The full form data dict to display in the email
+            submitted_by: Email of the user who submitted the form
+
+        Returns:
+            Dict with send status
+        """
+        client_email = os.getenv("CLIENT_NOTIFICATION_EMAIL")
+        if not client_email:
+            logger.warning("CLIENT_NOTIFICATION_EMAIL not set — form notification email skipped")
+            return {"success": False, "error": "CLIENT_NOTIFICATION_EMAIL not configured"}
+
+        form_type_labels = {
+            "contact_request": "Contact to Deploy Request",
+            "custom_build": "Custom Build Request",
+            "investment_hub": "Product Investment Inquiry",
+        }
+        label = form_type_labels.get(form_type, "Form Submission")
+        subject = f"[Agensium] New {label} from {submitted_by}"
+
+        html_content = get_form_notification_template(
+            form_type=form_type,
+            form_data=form_data,
+            submitted_by=submitted_by
+        )
+
+        return await self.send_email(
+            to_email=client_email,
+            to_name="Agensium Admin",
+            subject=subject,
+            html_content=html_content,
+            tags=[EmailType.FORM_NOTIFICATION.value, form_type]
         )
 
 

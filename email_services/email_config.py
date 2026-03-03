@@ -18,6 +18,9 @@ class EmailConfig:
     sender_email: str = field(default="noreply@agensium.com")
     sender_name: str = field(default="Agensium")
     
+    # Client/admin notification email (receives form submissions)
+    client_notification_email: Optional[str] = field(default=None)
+
     # Feature flags
     enabled: bool = field(default=True)
     debug: bool = field(default=False)
@@ -34,6 +37,7 @@ class EmailConfig:
         self.api_key = os.getenv("BREVO_API_KEY")
         self.sender_email = os.getenv("BREVO_SENDER_EMAIL", self.sender_email)
         self.sender_name = os.getenv("BREVO_SENDER_NAME", self.sender_name)
+        self.client_notification_email = os.getenv("CLIENT_NOTIFICATION_EMAIL")
         self.enabled = os.getenv("EMAIL_ENABLED", "true").lower() == "true"
         self.debug = os.getenv("EMAIL_DEBUG", "false").lower() == "true"
         self.otp_expire_minutes = int(os.getenv("OTP_EXPIRE_MINUTES", "10"))
