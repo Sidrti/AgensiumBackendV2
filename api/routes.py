@@ -233,7 +233,7 @@ async def submit_form(
     email: Optional[str] = Form(None),
     subject: Optional[str] = Form(None),
     message: Optional[str] = Form(None),
-    current_user: models.User = Depends(get_current_active_verified_user),
+    # current_user: models.User = Depends(get_current_active_verified_user),
     email_service: EmailService = Depends(get_email_service)
 ):
     """
@@ -280,7 +280,7 @@ async def submit_form(
                 "requestStatus": request_status,
                 "pocEmail": poc_email,
                 "useCase": use_case,
-                "submittedBy": current_user.email,
+                "submittedBy": ",
                 "userId": current_user.id
             }
             
