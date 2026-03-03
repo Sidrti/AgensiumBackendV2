@@ -1,1 +1,1 @@
- <!-- "Ready" "Building", "Claim", or "Private" -->
+ <!-- "Public" "Building", "Claim", or "Private" -->
