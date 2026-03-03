@@ -288,6 +288,7 @@ class EmailService:
             "contact_request": "Contact to Deploy Request",
             "custom_build": "Custom Build Request",
             "investment_hub": "Product Investment Inquiry",
+            "general_contact": "General Contact Inquiry",
         }
         label = form_type_labels.get(form_type, "Form Submission")
         subject = f"[Agensium] New {label} from {submitted_by}"

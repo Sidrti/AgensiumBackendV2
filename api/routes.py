@@ -230,11 +230,14 @@ async def submit_form(
     selected_product: Optional[str] = Form(None),
     full_name: Optional[str] = Form(None),
     details: Optional[str] = Form(None),
+    email: Optional[str] = Form(None),
+    subject: Optional[str] = Form(None),
+    message: Optional[str] = Form(None),
     current_user: models.User = Depends(get_current_active_verified_user),
     email_service: EmailService = Depends(get_email_service)
 ):
     """
-    Unified form submission endpoint for ContactToDeployModal, CustomBuilderPage, and ProductInvestmentHub.
+    Unified form submission endpoint for ContactToDeployModal, CustomBuilderPage, ProductInvestmentHub, and ContactUsModal.
     
     Args:
         form_type: "contact_request", "custom_build", or "investment_hub"
@@ -260,8 +263,8 @@ async def submit_form(
     
     try:
         # Validate form_type
-        if form_type not in ["contact_request", "custom_build", "investment_hub"]:
-            raise ValueError(f"Invalid form_type: {form_type}. Must be 'contact_request', 'custom_build', or 'investment_hub'")
+        if form_type not in ["contact_request", "custom_build", "investment_hub", "general_contact"]:
+            raise ValueError(f"Invalid form_type: {form_type}. Must be 'contact_request', 'custom_build', 'investment_hub', or 'general_contact'")
         
         # Build response based on form type
         if form_type == "contact_request":
@@ -319,6 +322,20 @@ async def submit_form(
                 "fullName": full_name,
                 "email": contact_email,
                 "details": details,
+                "submittedBy": current_user.email,
+                "userId": current_user.id
+            }
+
+        elif form_type == "general_contact":
+            # General Contact form (ContactUsModal)
+            if not all([email, subject, message]):
+                raise ValueError("Missing required fields for general_contact form")
+            
+            form_data = {
+                "formType": "general_contact",
+                "email": email,
+                "subject": subject,
+                "message": message,
                 "submittedBy": current_user.email,
                 "userId": current_user.id
             }

@@ -79,3 +79,18 @@ Triggered when a user requests a participation template for an agentic product.
   "details": "Interested in standard participation."
 }
 ```
+
+---
+
+## 5. ContactUsModal
+
+Triggered when a user submits a general inquiry or feedback through the contact modal.
+
+```json
+{
+  "formType": "general_contact",
+  "email": "john@company.com",
+  "subject": "Inquiry or Feedback",
+  "message": "How can we help you?"
+}
+```

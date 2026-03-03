@@ -299,6 +299,7 @@ def get_form_notification_template(
         "contact_request": ("Contact to Deploy Request", "#3b82f6", "📋"),
         "custom_build": ("Custom Build Request", "#8b5cf6", "🛠️"),
         "investment_hub": ("Product Investment Inquiry", "#10b981", "💼"),
+        "general_contact": ("General Contact Inquiry", "#00AEEF", "📩"),
     }
     label, accent_color, icon = form_type_labels.get(
         form_type, ("Form Submission", "#667eea", "📝")
