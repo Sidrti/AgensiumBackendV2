@@ -233,6 +233,8 @@ async def submit_form(
     email: Optional[str] = Form(None),
     subject: Optional[str] = Form(None),
     message: Optional[str] = Form(None),
+    org_name: Optional[str] = Form(None),
+    mission: Optional[str] = Form(None),
     # current_user: models.User = Depends(get_current_active_verified_user),
     email_service: EmailService = Depends(get_email_service)
 ):
@@ -263,8 +265,8 @@ async def submit_form(
     
     try:
         # Validate form_type
-        if form_type not in ["contact_request", "custom_build", "investment_hub", "general_contact"]:
-            raise ValueError(f"Invalid form_type: {form_type}. Must be 'contact_request', 'custom_build', 'investment_hub', or 'general_contact'")
+        if form_type not in ["contact_request", "custom_build", "investment_hub", "general_contact", "impact_protocol_nomination"]:
+            raise ValueError(f"Invalid form_type: {form_type}. Must be 'contact_request', 'custom_build', 'investment_hub', 'general_contact', or 'impact_protocol_nomination'")
         
         # Build response based on form type
         if form_type == "contact_request":
@@ -280,8 +282,8 @@ async def submit_form(
                 "requestStatus": request_status,
                 "pocEmail": poc_email,
                 "useCase": use_case,
-                "submittedBy": ",
-                "userId": current_user.id
+                "submittedBy": poc_email or "anonymous",
+                "userId": None
             }
             
         elif form_type == "custom_build":
@@ -300,8 +302,8 @@ async def submit_form(
                     "email": contact_email,
                     "org": contact_org
                 },
-                "submittedBy": current_user.email,
-                "userId": current_user.id
+                "submittedBy": contact_email or "anonymous",
+                "userId": None
             }
             
             # Add strategic specs if custom build
@@ -322,8 +324,8 @@ async def submit_form(
                 "fullName": full_name,
                 "email": contact_email,
                 "details": details,
-                "submittedBy": current_user.email,
-                "userId": current_user.id
+                "submittedBy": contact_email or "anonymous",
+                "userId": None
             }
 
         elif form_type == "general_contact":
@@ -336,8 +338,22 @@ async def submit_form(
                 "email": email,
                 "subject": subject,
                 "message": message,
-                "submittedBy": current_user.email,
-                "userId": current_user.id
+                "submittedBy": email or "anonymous",
+                "userId": None
+            }
+            
+        elif form_type == "impact_protocol_nomination":
+            # Impact Protocol Nomination form
+            if not all([org_name, mission]):
+                raise ValueError("Missing required fields for impact_protocol_nomination form")
+            
+            form_data = {
+                "formType": "impact_protocol_nomination",
+                "orgName": org_name,
+                "mission": mission,
+                "email": email,
+                "submittedBy": email or "anonymous",
+                "userId": None
             }
         
         # Log form data
@@ -352,7 +368,7 @@ async def submit_form(
             email_result = await email_service.send_form_notification_email(
                 form_type=form_type,
                 form_data=form_data,
-                submitted_by=current_user.email
+                submitted_by=form_data.get("submittedBy", "anonymous")
             )
             logger.info(f"Form notification email result: {email_result}")
         except Exception as email_err:
