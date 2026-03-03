@@ -7,7 +7,7 @@
     "category": "analyze",
     "tags": ["Marketing"],
     "isAvailable": true,
-    "status": "Private",
+    "status": "Claim",
     "show": false,
     "version": "1.0.0",
     "available_agents": ["control-group-holdout-planner-agent"],

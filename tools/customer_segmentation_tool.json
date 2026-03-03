@@ -7,7 +7,7 @@
     "category": "analyze",
     "tags": ["MARKETING & RENTION"],
     "isAvailable": true,
-    "status": "Private",
+    "status": "Claim",
     "show": true,
     "version": "1.0.0",
     "available_agents": ["customer-segmentation-agent"],

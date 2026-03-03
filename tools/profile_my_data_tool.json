@@ -5,9 +5,9 @@
     "description": "Comprehensive data profiling and quality assessment tool. Analyze data completeness, quality metrics, detect patterns, identify risks, and assess readiness for analytics.",
     "icon": "📊",
     "category": "source",
-    "tags": ["DATA OPS & ENGINEERING"],
+    "tags": ["DATA, OPS & ENGINEERING"],
     "isAvailable": true,
-    "status": "Private",
+    "status": "Claim",
     "show": true,
     "version": "2.0.0",
     "available_agents": [

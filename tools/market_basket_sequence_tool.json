@@ -1,13 +1,13 @@
 {
   "tool": {
     "id": "market-basket-sequence",
-    "name": "Market Basket Sequence",
+    "name": "Market Basket Analysis",
     "description": "Finds product co-purchase rules (within basket) and next-purchase sequences (cross transaction) to support bundling, promotions, and intent prediction.",
     "icon": "🛒",
     "category": "analyze",
     "tags": ["MARKETING & RENTION"],
     "isAvailable": true,
-    "status": "Private",
+    "status": "Claim",
     "show": true,
     "version": "1.0.0",
     "available_agents": ["market-basket-sequence-agent"],
