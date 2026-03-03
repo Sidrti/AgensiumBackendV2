@@ -224,13 +224,16 @@ async def submit_form(
     contact_org: Optional[str] = Form(None),
     kpi: Optional[str] = Form(None),
     stack: Optional[str] = Form(None),
+    selected_product: Optional[str] = Form(None),
+    full_name: Optional[str] = Form(None),
+    details: Optional[str] = Form(None),
     current_user: models.User = Depends(get_current_active_verified_user)
 ):
     """
-    Unified form submission endpoint for both ContactToDeployModal and CustomBuilderPage.
+    Unified form submission endpoint for ContactToDeployModal, CustomBuilderPage, and ProductInvestmentHub.
     
     Args:
-        form_type: "contact_request" or "custom_build"
+        form_type: "contact_request", "custom_build", or "investment_hub"
         
         For contact_request:
             - tool_id, tool_name, tool_category, request_status, poc_email, use_case
@@ -239,6 +242,9 @@ async def submit_form(
             - build_type (template/own), template_id, template_name, vision
             - contact_name, contact_email, contact_org
             - kpi, stack (for custom builds)
+        
+        For investment_hub:
+            - selected_product, full_name, email (form contact_email), details
         
         current_user: Authenticated user
         
@@ -250,8 +256,8 @@ async def submit_form(
     
     try:
         # Validate form_type
-        if form_type not in ["contact_request", "custom_build"]:
-            raise ValueError(f"Invalid form_type: {form_type}. Must be 'contact_request' or 'custom_build'")
+        if form_type not in ["contact_request", "custom_build", "investment_hub"]:
+            raise ValueError(f"Invalid form_type: {form_type}. Must be 'contact_request', 'custom_build', or 'investment_hub'")
         
         # Build response based on form type
         if form_type == "contact_request":
@@ -297,6 +303,21 @@ async def submit_form(
                     "kpi": kpi,
                     "stack": stack
                 }
+        
+        elif form_type == "investment_hub":
+            # Product Investment Hub form
+            if not all([selected_product, full_name, contact_email, details]):
+                raise ValueError("Missing required fields for investment_hub form")
+            
+            form_data = {
+                "formType": "investment_hub",
+                "selectedProduct": selected_product,
+                "fullName": full_name,
+                "email": contact_email,
+                "details": details,
+                "submittedBy": current_user.email,
+                "userId": current_user.id
+            }
         
         # Log form data
         print(f"\n{'='*70}")

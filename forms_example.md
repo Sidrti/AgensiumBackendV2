@@ -63,3 +63,19 @@ Triggered when a user completes the 5-step custom architecture flow.
   }
 }
 ```
+
+---
+
+## 4. ProductInvestmentHub
+
+Triggered when a user requests a participation template for an agentic product.
+
+```json
+{
+  "formType": "investment_hub",
+  "selectedProduct": "Data Profiler (PUBLICLY AVAILABLE)",
+  "fullName": "Alice Founder",
+  "email": "alice@startup.io",
+  "details": "Interested in standard participation."
+}
+```
