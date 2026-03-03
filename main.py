@@ -63,7 +63,9 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "http://localhost:5173",  # Local development URL
+        "https://agentsium.ai",
         "https://agensium2.netlify.app"  # Production frontend URL from environment
+        
     ],
     allow_credentials=True,
     allow_methods=["*"],
