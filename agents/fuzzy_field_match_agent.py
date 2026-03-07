@@ -1,7 +1,7 @@
 """
 Fuzzy Field Match Agent
 
-Node‑04: Cognitive Near‑Match
+Node‑05: Cognitive Near‑Match
 
 Detects near‑duplicate invoices using fuzzy string similarity, numeric tolerance
 matching, and weighted multi‑field scoring. Designed to catch duplicates that
