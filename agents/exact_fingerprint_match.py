@@ -1,7 +1,7 @@
 """
 Exact Fingerprint Match Agent
 
-Node‑02: Zero‑Tolerance Duplicate Detector
+Node‑03: Zero‑Tolerance Duplicate Detector
 
 Consumes normalized invoice data and computes deterministic fingerprints
 to detect exact duplicates across key invoice fields.
