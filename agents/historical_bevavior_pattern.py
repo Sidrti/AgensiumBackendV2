@@ -1,7 +1,7 @@
 """
 Historical & Behavioral Pattern Agent
 
-Node‑06: Temporal & Behavioral Anomaly Detection
+Node‑07: Temporal & Behavioral Anomaly Detection
 
 Analyzes historical invoice behavior to detect unusual patterns such as:
 - Sudden vendor spend spikes
