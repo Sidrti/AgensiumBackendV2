@@ -1,7 +1,7 @@
 """
 Semantic Similarity Agent
 
-Node‑05: Vector Context
+Node‑06: Vector Context
 
 Uses local text embeddings to detect semantically similar invoices that may not match
 exactly on fields but are meaningfully alike in description, vendor context, and notes.
