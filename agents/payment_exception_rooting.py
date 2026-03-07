@@ -1,7 +1,7 @@
 """
 Payment Exception Routing Agent
 
-Node‑07: Workflow Decision Engine
+Node‑08: Workflow Decision Engine
 
 Consumes upstream signals from the duplicate‑invoice pipeline and assigns each invoice
 to a routing category:
