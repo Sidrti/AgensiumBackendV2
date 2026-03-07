@@ -1,7 +1,7 @@
 """
 Cross‑System Reconciliation Agent
 
-Node‑03: Ledger Alignment
+Node‑04: Ledger Alignment
 
 Compares invoices across multiple systems (OCR, AP, ERP, Vendor feeds) and identifies:
 - Missing invoices in one or more systems
