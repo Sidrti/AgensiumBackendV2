@@ -145,34 +145,70 @@ def get_welcome_template(user_name: str) -> str:
                     <!-- Content -->
                     <tr>
                         <td style="padding: 40px;">
-                            <h2 style="margin: 0 0 20px; color: #333333; font-size: 24px; font-weight: 600;">
-                                Hi {user_name}!
-                            </h2>
+                            <p style="margin: 0 0 20px; color: #333333; font-size: 16px; line-height: 1.8; font-weight: 600;">
+                                Hi {user_name},
+                            </p>
                             
-                            <p style="margin: 0 0 20px; color: #666666; font-size: 16px; line-height: 1.6;">
-                                Your email has been successfully verified. Welcome to Agensium - your intelligent data mastering platform!
+                            <p style="margin: 0 0 20px; color: #666666; font-size: 15px; line-height: 1.7;">
+                                Your email is verified — welcome home to Agentsium. Across industries, teams face the same blockers: dashboards no one trusts, apps that cost more than they return, data that never gets monetized, and ideas that never make it past the whiteboard. These aren't technology problems — they're ecosystem problems. Agentsium exists to solve them.
                             </p>
 
-                            <p style="margin: 0 0 20px; color: #666666; font-size: 16px; line-height: 1.6;">
-                                Here's what you can do:
+                            <p style="margin: 0 0 30px; color: #333333; font-size: 15px; line-height: 1.7; font-weight: 600;">
+                                Agentsium is your home — a unified ecosystem to create, launch, monetize, and invest in intelligent products. Your tools, your agents, your data marketplace, and your AI investments all live and grow together.
                             </p>
 
-                            <ul style="margin: 0 0 30px; padding-left: 20px; color: #666666; font-size: 16px; line-height: 1.8;">
-                                <li><strong>Profile Your Data</strong> - Understand your data quality</li>
-                                <li><strong>Clean Your Data</strong> - Fix issues automatically</li>
-                                <li><strong>Master Your Data</strong> - Create golden records</li>
-                            </ul>
-
-                            <!-- CTA Button -->
-                            <div style="text-align: center; margin: 30px 0;">
-                                <a href="https://agensium2.netlify.app/login" 
-                                   style="display: inline-block; padding: 16px 32px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: #ffffff; text-decoration: none; border-radius: 6px; font-size: 16px; font-weight: 600;">
-                                    Get Started →
-                                </a>
+                            <div style="background-color: #f0f4ff; border-left: 4px solid #667eea; padding: 20px; margin: 0 0 30px; border-radius: 4px;">
+                                <p style="margin: 0; color: #333333; font-size: 15px; line-height: 1.7;">
+                                    <strong>Explore the platform:</strong> <a href="https://agentsium.ai/" style="color: #667eea; text-decoration: none; font-weight: 600;">https://agentsium.ai/</a>
+                                </p>
                             </div>
 
-                            <p style="margin: 0; color: #999999; font-size: 14px; line-height: 1.6;">
-                                If you have any questions, feel free to reach out to our support team.
+                            <h3 style="margin: 0 0 12px; color: #333333; font-size: 16px; font-weight: 700;">📊 Marketers & Analysts</h3>
+                            <p style="margin: 0 0 12px; color: #666666; font-size: 14px; line-height: 1.7;">
+                                Measure with confidence. Get exact control‑group sizes instantly with no wasted spend — or replace holdouts entirely with synthetic control.
+                            </p>
+                            <p style="margin: 0 0 24px; color: #666666; font-size: 14px; line-height: 1.7;">
+                                Start with Holdout Planner (free): <a href="https://agentsium.ai/holdout-planner" style="color: #667eea; text-decoration: none; font-weight: 600;">https://agentsium.ai/holdout-planner</a>
+                            </p>
+
+                            <h3 style="margin: 0 0 12px; color: #333333; font-size: 16px; font-weight: 700;">🏢 Enterprise Teams</h3>
+                            <p style="margin: 0 0 12px; color: #666666; font-size: 14px; line-height: 1.7;">
+                                Adopt ready‑made tools, build internal agentic apps, and finally monetize your data. Nine tools are live today — from Profile My Data and Master My Data to Glauq (SR&amp;ED), Customer Segmentation, Experimental Design, Market Basket Analysis, Synthetic Control, and Next Best Action.
+                            </p>
+                            <p style="margin: 0 0 24px; color: #666666; font-size: 14px; line-height: 1.7;">
+                                Browse the marketplace: <a href="https://agentsium.ai/marketplace" style="color: #667eea; text-decoration: none; font-weight: 600;">https://agentsium.ai/marketplace</a>
+                            </p>
+
+                            <h3 style="margin: 0 0 12px; color: #333333; font-size: 16px; font-weight: 700;">🚀 Product Creators & Owners</h3>
+                            <p style="margin: 0 0 12px; color: #666666; font-size: 14px; line-height: 1.7;">
+                                Turn expertise into products. Build a production‑ready AI product starting at $5K in under two weeks — and you own it outright. We co‑invest to help you scale.
+                            </p>
+                            <p style="margin: 0 0 24px; color: #666666; font-size: 14px; line-height: 1.7;">
+                                Start building: <a href="https://agentsium.ai/builder" style="color: #667eea; text-decoration: none; font-weight: 600;">https://agentsium.ai/builder</a>
+                            </p>
+
+                            <h3 style="margin: 0 0 12px; color: #333333; font-size: 16px; font-weight: 700;">🤖 Agent Builders</h3>
+                            <p style="margin: 0 0 12px; color: #666666; font-size: 14px; line-height: 1.7;">
+                                Create agents and earn. Build one or more of our 18 open agents and generate income through publishing and revenue share. Season 1: The First Operators is now open.
+                            </p>
+                            <p style="margin: 0 0 24px; color: #666666; font-size: 14px; line-height: 1.7;">
+                                Explore the agent library: <a href="https://agentsium.ai/agent-library" style="color: #667eea; text-decoration: none; font-weight: 600;">https://agentsium.ai/agent-library</a>
+                            </p>
+
+                            <h3 style="margin: 0 0 12px; color: #333333; font-size: 16px; font-weight: 700;">💼 Investors</h3>
+                            <p style="margin: 0 0 12px; color: #666666; font-size: 14px; line-height: 1.7;">
+                                Back what you understand. Invest in AI you actually understand — individual products and verticals you know and care about.
+                            </p>
+                            <p style="margin: 0 0 30px; color: #666666; font-size: 14px; line-height: 1.7;">
+                                Begin here: <a href="https://agentsium.ai/investment-hub" style="color: #667eea; text-decoration: none; font-weight: 600;">https://agentsium.ai/investment-hub</a>
+                            </p>
+
+                            <p style="margin: 0 0 24px; color: #333333; font-size: 15px; line-height: 1.7; font-weight: 600;">
+                                Once again, welcome to Agentsium — your home for getting true value from data, agents, and AI.
+                            </p>
+
+                            <p style="margin: 0; color: #666666; font-size: 14px; line-height: 1.7;">
+                                ~The AGENTSIUM Team
                             </p>
                         </td>
                     </tr>
