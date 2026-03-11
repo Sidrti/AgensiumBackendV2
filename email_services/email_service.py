@@ -52,8 +52,8 @@ class EmailService:
         """Initialize Brevo API client."""
         self.config = EmailConfig()
         self.api_key = os.getenv("BREVO_API_KEY")
-        self.sender_email = os.getenv("BREVO_SENDER_EMAIL", "noreply@agensium.com")
-        self.sender_name = os.getenv("BREVO_SENDER_NAME", "Agensium")
+        self.sender_email = os.getenv("BREVO_SENDER_EMAIL", "noreply@agentsium.com")
+        self.sender_name = os.getenv("BREVO_SENDER_NAME", "Agentsium")
         self.enabled = os.getenv("EMAIL_ENABLED", "true").lower() == "true"
         self.debug = os.getenv("EMAIL_DEBUG", "false").lower() == "true"
         self.api_instance = None
@@ -195,10 +195,10 @@ class EmailService:
 
         # Set subject based on OTP type
         if otp_type == "registration":
-            subject = f"Verify your Agensium account - OTP: {otp_code}"
+            subject = f"Verify your Agentsium account - OTP: {otp_code}"
             email_type = EmailType.OTP_REGISTRATION
         else:
-            subject = f"Reset your Agensium password - OTP: {otp_code}"
+            subject = f"Reset your Agentsium password - OTP: {otp_code}"
             email_type = EmailType.OTP_PASSWORD_RESET
 
         return await self.send_email(
@@ -225,7 +225,7 @@ class EmailService:
             Dict with send status
         """
         html_content = get_welcome_template(user_name=to_name)
-        subject = f"Welcome to Agensium, {to_name}!"
+        subject = f"Welcome to Agentsium, {to_name}!"
 
         return await self.send_email(
             to_email=to_email,
@@ -251,7 +251,7 @@ class EmailService:
             Dict with send status
         """
         html_content = get_password_changed_template(user_name=to_name)
-        subject = "Your Agensium password has been changed"
+        subject = "Your Agentsium password has been changed"
 
         return await self.send_email(
             to_email=to_email,
@@ -291,7 +291,7 @@ class EmailService:
             "general_contact": "General Contact Inquiry",
         }
         label = form_type_labels.get(form_type, "Form Submission")
-        subject = f"[Agensium] New {label} from {submitted_by}"
+        subject = f"[Agentsium] New {label} from {submitted_by}"
 
         html_content = get_form_notification_template(
             form_type=form_type,
@@ -301,7 +301,7 @@ class EmailService:
 
         return await self.send_email(
             to_email=client_email,
-            to_name="Agensium Admin",
+            to_name="Agentsium Admin",
             subject=subject,
             html_content=html_content,
             tags=[EmailType.FORM_NOTIFICATION.value, form_type]

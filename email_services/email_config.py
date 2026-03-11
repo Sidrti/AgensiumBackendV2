@@ -15,8 +15,8 @@ class EmailConfig:
     
     # Brevo settings
     api_key: Optional[str] = field(default=None)
-    sender_email: str = field(default="noreply@agensium.com")
-    sender_name: str = field(default="Agensium")
+    sender_email: str = field(default="noreply@agentsium.com")
+    sender_name: str = field(default="Agentsium")
     
     # Client/admin notification email (receives form submissions)
     client_notification_email: Optional[str] = field(default=None)

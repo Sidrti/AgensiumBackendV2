@@ -1,5 +1,5 @@
 """
-HTML email templates for Agensium.
+HTML email templates for Agentsium.
 Professional, responsive email templates for authentication flows.
 """
 import json
@@ -25,7 +25,7 @@ def get_otp_template(
     """
     if otp_type == "registration":
         title = "Verify Your Email"
-        message = "Thank you for registering with Agensium! Please use the following OTP to verify your email address:"
+        message = "Thank you for registering with Agentsium! Please use the following OTP to verify your email address:"
         action_text = "verify your email"
     else:
         title = "Reset Your Password"
@@ -49,7 +49,7 @@ def get_otp_template(
                     <tr>
                         <td style="padding: 40px 40px 20px; text-align: center; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 8px 8px 0 0;">
                             <h1 style="margin: 0; color: #ffffff; font-size: 28px; font-weight: 600;">
-                                Agensium
+                                Agentsium
                             </h1>
                         </td>
                     </tr>
@@ -93,11 +93,11 @@ def get_otp_template(
                     <tr>
                         <td style="padding: 30px 40px; background-color: #f8f9fa; border-radius: 0 0 8px 8px; text-align: center;">
                             <p style="margin: 0 0 10px; color: #999999; font-size: 12px;">
-                                © 2025 Agensium. All rights reserved.
+                                © 2025 Agentsium. All rights reserved.
                             </p>
                             <p style="margin: 0; color: #999999; font-size: 12px;">
                                 Need help? Contact us at 
-                                <a href="mailto:support@agensium.com" style="color: #667eea; text-decoration: none;">support@agensium.com</a>
+                                <a href="mailto:info@agentsium.com" style="color: #667eea; text-decoration: none;">info@agentsium.com</a>
                             </p>
                         </td>
                     </tr>
@@ -126,7 +126,7 @@ def get_welcome_template(user_name: str) -> str:
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Welcome to Agensium</title>
+    <title>Welcome to Agentsium</title>
 </head>
 <body style="margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f4f7;">
     <table role="presentation" style="width: 100%; border-collapse: collapse;">
@@ -137,7 +137,7 @@ def get_welcome_template(user_name: str) -> str:
                     <tr>
                         <td style="padding: 40px 40px 20px; text-align: center; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 8px 8px 0 0;">
                             <h1 style="margin: 0; color: #ffffff; font-size: 28px; font-weight: 600;">
-                                🎉 Welcome to Agensium!
+                                🎉 Welcome to Agentsium!
                             </h1>
                         </td>
                     </tr>
@@ -217,11 +217,11 @@ def get_welcome_template(user_name: str) -> str:
                     <tr>
                         <td style="padding: 30px 40px; background-color: #f8f9fa; border-radius: 0 0 8px 8px; text-align: center;">
                             <p style="margin: 0 0 10px; color: #999999; font-size: 12px;">
-                                © 2025 Agensium. All rights reserved.
+                                © 2025 Agentsium. All rights reserved.
                             </p>
                             <p style="margin: 0; color: #999999; font-size: 12px;">
                                 Need help? Contact us at 
-                                <a href="mailto:support@agensium.com" style="color: #667eea; text-decoration: none;">support@agensium.com</a>
+                                <a href="mailto:info@agentsium.com" style="color: #667eea; text-decoration: none;">info@agentsium.com</a>
                             </p>
                         </td>
                     </tr>
@@ -261,7 +261,7 @@ def get_password_changed_template(user_name: str) -> str:
                     <tr>
                         <td style="padding: 40px 40px 20px; text-align: center; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 8px 8px 0 0;">
                             <h1 style="margin: 0; color: #ffffff; font-size: 28px; font-weight: 600;">
-                                Agensium
+                                Agentsium
                             </h1>
                         </td>
                     </tr>
@@ -298,11 +298,11 @@ def get_password_changed_template(user_name: str) -> str:
                     <tr>
                         <td style="padding: 30px 40px; background-color: #f8f9fa; border-radius: 0 0 8px 8px; text-align: center;">
                             <p style="margin: 0 0 10px; color: #999999; font-size: 12px;">
-                                © 2025 Agensium. All rights reserved.
+                                © 2025 Agentsium. All rights reserved.
                             </p>
                             <p style="margin: 0; color: #999999; font-size: 12px;">
                                 Need help? Contact us at 
-                                <a href="mailto:support@agensium.com" style="color: #667eea; text-decoration: none;">support@agensium.com</a>
+                                <a href="mailto:info@agentsium.com" style="color: #667eea; text-decoration: none;">info@agentsium.com</a>
                             </p>
                         </td>
                     </tr>
@@ -381,7 +381,7 @@ def get_form_notification_template(
                                 New {label}
                             </h1>
                             <p style="margin: 8px 0 0; color: rgba(255,255,255,0.85); font-size: 14px;">
-                                Agensium Platform
+                                Agentsium Platform
                             </p>
                         </td>
                     </tr>
@@ -418,10 +418,10 @@ def get_form_notification_template(
                     <tr>
                         <td style="padding: 24px 40px; background-color: #f8f9fa; border-radius: 0 0 8px 8px; text-align: center;">
                             <p style="margin: 0 0 6px; color: #999999; font-size: 12px;">
-                                © 2026 Agensium. All rights reserved.
+                                © 2026 Agentsium. All rights reserved.
                             </p>
                             <p style="margin: 0; color: #999999; font-size: 12px;">
-                                This is an automated notification from the Agensium platform.
+                                This is an automated notification from the Agentsium platform.
                             </p>
                         </td>
                     </tr>
