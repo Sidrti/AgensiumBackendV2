@@ -1,0 +1,25 @@
+name: Deploy FastAPI to CyberPanel
+
+on:
+  push:
+    branches:
+      - main  # Trigger on every push to main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Deploy to Server via SSH
+        uses: appleboy/ssh-action@master
+        with:
+          host: 173.212.213.153
+          username: root
+          password: Boxinall@325
+          script: |
+            cd /home/agentsium.ai/api.agentsium.ai/
+            git pull origin main
+            ./venv/bin/pip install -r requirements.txt
+            sudo systemctl restart agensium-api
