@@ -2,11 +2,13 @@
 Authentication API routes.
 All input validation is handled by Pydantic schemas - routes stay clean.
 """
+import urllib.parse
 import logging
 from fastapi import APIRouter, Depends, status, BackgroundTasks
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 from datetime import timedelta
+import ulid
 
 from db.database import get_db
 from db import models, schemas
@@ -29,6 +31,32 @@ from .exceptions import (
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
+
+
+def generate_unique_handle(full_name: str, db: Session) -> str:
+    """
+    Generates a unique public_handle based on the user's full name.
+    It checks the database dynamically to guarantee no collisions.
+    """
+    import re
+    # Clean the name: lowercased, spaces to underscores, remove special chars
+    base_handle = full_name.lower().replace(" ", "_")
+    base_handle = re.sub(r'[^a-z0-9_]', '', base_handle)
+    
+    if not base_handle:
+        base_handle = "user"
+
+    unique_handle = base_handle
+    
+    while True:
+        # Check if handle exists
+        exists = db.query(models.Profile).filter(models.Profile.public_handle == unique_handle).first()
+        if not exists:
+            return unique_handle
+            
+        # If taken, generate a random suffix using the randomness portion of a ULID
+        random_suffix = str(ulid.ULID()).lower()[-6:]
+        unique_handle = f"{base_handle}_{random_suffix}"
 
 
 # ============================================================================
@@ -73,6 +101,7 @@ async def register_user(
         email=user.email,
         hashed_password=utils.get_password_hash(user.password),
         full_name=user.full_name,
+        profile_picture=f"https://api.dicebear.com/9.x/bottts/svg?seed={urllib.parse.quote(user.full_name)}&backgroundColor=00aeef",
         otp_code=otp_code,
         otp_expires_at=otp_expires_at,
         otp_type="registration",
@@ -81,7 +110,20 @@ async def register_user(
     )
 
     db.add(db_user)
-    db.commit()
+    db.flush()  # We use flush instead of commit so we get db_user.id without finalizing the transaction
+
+    # --- ADD PROFILE CREATION HERE ---
+    unique_handle = generate_unique_handle(db_user.full_name, db)
+
+    new_profile = models.Profile(
+        user_id=db_user.id,
+        display_name=db_user.full_name,
+        public_handle=unique_handle
+    )
+    db.add(new_profile)
+    # ---------------------------------
+
+    db.commit() # Now commit them both together!
     db.refresh(db_user)
 
     # Send OTP via email (non-blocking)
@@ -512,11 +554,24 @@ async def google_auth(
             full_name=full_name,
             auth_provider="google",
             google_id=google_id,
-            profile_picture=picture,
+            profile_picture=picture or f"https://api.dicebear.com/9.x/bottts/svg?seed={urllib.parse.quote(full_name)}&backgroundColor=00aeef",
             is_verified=True,
             is_active=True
         )
         db.add(user)
+        db.flush()  # Flush to get user.id
+
+        # --- ADD PROFILE CREATION HERE ---
+        unique_handle = generate_unique_handle(user.full_name, db)
+
+        new_profile = models.Profile(
+            user_id=user.id,
+            display_name=user.full_name,
+            public_handle=unique_handle
+        )
+        db.add(new_profile)
+        # ---------------------------------
+
         db.commit()
         db.refresh(user)
         is_new_user = True
@@ -573,32 +628,4 @@ async def google_auth(
     )
 
 
-# ============================================================================
-# USER PROFILE
-# ============================================================================
 
-@router.get(
-    "/me",
-    response_model=schemas.UserResponse,
-    summary="Get current user",
-    description="Get the current authenticated user's profile."
-)
-def get_current_user_profile(
-    current_user: models.User = Depends(dependencies.get_current_user)
-):
-    """
-    Get current user's profile.
-
-    - Requires valid JWT token
-    - Returns user profile data
-    """
-    return schemas.UserResponse(
-        id=current_user.id,
-        email=current_user.email,
-        full_name=current_user.full_name,
-        is_active=current_user.is_active,
-        is_verified=current_user.is_verified,
-        auth_provider=current_user.auth_provider,
-        profile_picture=current_user.profile_picture,
-        message="Profile retrieved successfully"
-    )

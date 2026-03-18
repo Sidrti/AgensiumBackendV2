@@ -315,16 +315,16 @@ async def submit_form(
         
         elif form_type == "investment_hub":
             # Product Investment Hub form
-            if not all([selected_product, full_name, contact_email, details]):
+            if not all([selected_product, full_name, email, details]):
                 raise ValueError("Missing required fields for investment_hub form")
             
             form_data = {
                 "formType": "investment_hub",
                 "selectedProduct": selected_product,
                 "fullName": full_name,
-                "email": contact_email,
+                "email": email,
                 "details": details,
-                "submittedBy": contact_email or "anonymous",
+                "submittedBy": email or "anonymous",
                 "userId": None
             }
 

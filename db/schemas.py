@@ -321,8 +321,8 @@ class GoogleAuthRequest(BaseModel):
     credential: str = Field(..., min_length=1, description="Google ID token (JWT credential)")
 
 
-class UserResponse(BaseModel):
-    """Response schema for user data."""
+class CombinedProfileResponse(BaseModel):
+    """Response schema combining User and Profile data into a single level."""
     id: int
     email: EmailStr
     full_name: str
@@ -330,6 +330,14 @@ class UserResponse(BaseModel):
     is_verified: bool
     auth_provider: Optional[str] = "local"
     profile_picture: Optional[str] = None
+    
+    # Profile fields mapped directly
+    display_name: Optional[str] = None
+    public_handle: Optional[str] = None
+    company_name: Optional[str] = None
+    industry_vertical: Optional[str] = None
+    business_email: Optional[str] = None
+    
     message: Optional[str] = None
 
     model_config = {"from_attributes": True}
@@ -370,6 +378,21 @@ class GoogleAuthResponse(BaseModel):
     is_new_user: bool = False
     auth_provider: str = "google"
     message: str
+
+
+class ProfileUpdate(BaseModel):
+    """Schema for updating a user's profile."""
+    display_name: Optional[str] = Field(None, max_length=100, description="Display name for the profile")
+    public_handle: Optional[str] = Field(None, max_length=50, description="Unique public handle")
+    company_name: Optional[str] = Field(None, max_length=150, description="Company name")
+    industry_vertical: Optional[str] = Field(None, max_length=100, description="Industry vertical")
+    business_email: Optional[str] = Field(None, max_length=255, description="Business email address")
+
+
+class HandleCheckResponse(BaseModel):
+    """Response schema for checking handle availability."""
+    handle: str = Field(..., description="Requested handle")
+    is_available: bool = Field(..., description="Whether the handle is available")
 
 
 class GenericResponse(BaseModel):

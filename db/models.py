@@ -85,9 +85,38 @@ class User(Base):
     wallet = relationship("CreditWallet", back_populates="user", uselist=False)
     transactions = relationship("CreditTransaction", back_populates="user")
     tasks = relationship("Task", back_populates="user", lazy="dynamic")  # V2.1: Add tasks relationship
+    profile = relationship("Profile", back_populates="user", uselist=False)
 
     def __repr__(self):
         return f"<User(id={self.id}, email={self.email}, is_verified={self.is_verified})>"
+
+
+class Profile(Base):
+    """User profile information."""
+
+    __tablename__ = "profiles"
+
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    user_id = Column(Integer, ForeignKey("users.id"), unique=True, nullable=False, index=True)
+
+    # --- Identity & Display ---
+    display_name = Column(String(100), nullable=True)
+    public_handle = Column(String(50), unique=True, index=True, nullable=True)
+    
+    # --- Professional / Business Details ---
+    company_name = Column(String(150), nullable=True)
+    industry_vertical = Column(String(100), nullable=True)
+    business_email = Column(String(255), nullable=True)
+
+    # --- Timestamps ---
+    created_at = Column(DateTime, server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now(), nullable=False)
+
+    # --- Relationships ---
+    user = relationship("User", back_populates="profile")
+
+    def __repr__(self):
+        return f"<Profile(id={self.id}, handle={self.public_handle}, user_id={self.user_id})>"
 
 
 class CreditWallet(Base):
