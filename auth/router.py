@@ -118,7 +118,8 @@ async def register_user(
     new_profile = models.Profile(
         user_id=db_user.id,
         display_name=db_user.full_name,
-        public_handle=unique_handle
+        public_handle=unique_handle,
+        business_email=db_user.email
     )
     db.add(new_profile)
     # ---------------------------------
@@ -567,7 +568,8 @@ async def google_auth(
         new_profile = models.Profile(
             user_id=user.id,
             display_name=user.full_name,
-            public_handle=unique_handle
+            public_handle=unique_handle,
+            business_email=user.email
         )
         db.add(new_profile)
         # ---------------------------------
