@@ -103,7 +103,7 @@ async def list_tools(db: Session = Depends(get_db)):
             "name": tool_def["tool"]["name"],
             "description": tool_def["tool"]["description"],
             "icon": tool_def["tool"].get("icon", "🔧"),
-            "category": tool_def["tool"].get("category", "source"),
+            "category": tool_def["tool"].get("category") or "source",
             "status": tool_def["tool"].get("status", "Private"),
             "isAvailable": tool_def["tool"].get("isAvailable", True),
             "tags": tool_def["tool"].get("tags", []),
@@ -127,7 +127,7 @@ async def get_tool(tool_id: str):
     # Enhance tool definition with category and availability
     enhanced_tool = {
         **tool_def["tool"],
-        "category": tool_def["tool"].get("category", "source"),
+        "category": tool_def["tool"].get("category") or "source",
         "isAvailable": tool_def["tool"].get("isAvailable", True)
     }
     
@@ -271,6 +271,7 @@ async def submit_form(
         # Build response based on form type
         if form_type == "contact_request":
             # Contact to Deploy form
+            tool_category = tool_category or "Uncategorized"
             if not all([tool_id, tool_name, tool_category, request_status, poc_email, use_case]):
                 raise ValueError("Missing required fields for contact_request form")
             

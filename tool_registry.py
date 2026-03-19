@@ -60,7 +60,7 @@ def _load_tool_definitions_from_disk() -> Dict[str, Dict[str, Any]]:
                                     "name": tool_obj.get("name"),
                                     "description": tool_obj.get("description", ""),
                                     "icon": tool_obj.get("icon", "🔧"),
-                                    "category": tool_obj.get("category", ""),
+                                    "category": tool_obj.get("category") or "source",
                                     "isAvailable": tool_obj.get("isAvailable", True),
                                     "status": tool_obj.get("status", "Private"),
                                     "tags": tags,
