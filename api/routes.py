@@ -235,6 +235,10 @@ async def submit_form(
     message: Optional[str] = Form(None),
     org_name: Optional[str] = Form(None),
     mission: Optional[str] = Form(None),
+    first_name: Optional[str] = Form(None),
+    last_name: Optional[str] = Form(None),
+    handle: Optional[str] = Form(None),
+    mission_id: Optional[str] = Form(None),
     # current_user: models.User = Depends(get_current_active_verified_user),
     email_service: EmailService = Depends(get_email_service)
 ):
@@ -265,8 +269,8 @@ async def submit_form(
     
     try:
         # Validate form_type
-        if form_type not in ["contact_request", "custom_build", "investment_hub", "general_contact", "impact_protocol_nomination"]:
-            raise ValueError(f"Invalid form_type: {form_type}. Must be 'contact_request', 'custom_build', 'investment_hub', 'general_contact', or 'impact_protocol_nomination'")
+        if form_type not in ["contact_request", "custom_build", "investment_hub", "general_contact", "impact_protocol_nomination", "operator_identity"]:
+            raise ValueError(f"Invalid form_type: {form_type}. Must be 'contact_request', 'custom_build', 'investment_hub', 'general_contact', 'impact_protocol_nomination', or 'operator_identity'")
         
         # Build response based on form type
         if form_type == "contact_request":
@@ -353,6 +357,22 @@ async def submit_form(
                 "orgName": org_name,
                 "mission": mission,
                 "email": email,
+                "submittedBy": email or "anonymous",
+                "userId": None
+            }
+            
+        elif form_type == "operator_identity":
+            # Operator Identity Verification form
+            if not all([first_name, last_name, email, handle, mission_id]):
+                raise ValueError("Missing required fields for operator_identity form")
+            
+            form_data = {
+                "formType": "operator_identity",
+                "firstName": first_name,
+                "lastName": last_name,
+                "email": email,
+                "handle": handle,
+                "missionId": mission_id,
                 "submittedBy": email or "anonymous",
                 "userId": None
             }
