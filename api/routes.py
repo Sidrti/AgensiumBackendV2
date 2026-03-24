@@ -239,6 +239,7 @@ async def submit_form(
     last_name: Optional[str] = Form(None),
     handle: Optional[str] = Form(None),
     mission_id: Optional[str] = Form(None),
+    repo_url: Optional[str] = Form(None),
     # current_user: models.User = Depends(get_current_active_verified_user),
     email_service: EmailService = Depends(get_email_service)
 ):
@@ -363,7 +364,7 @@ async def submit_form(
             
         elif form_type == "operator_identity":
             # Operator Identity Verification form
-            if not all([first_name, last_name, email, handle, mission_id]):
+            if not all([first_name, last_name, email, handle, mission_id, repo_url]):
                 raise ValueError("Missing required fields for operator_identity form")
             
             form_data = {
@@ -373,6 +374,7 @@ async def submit_form(
                 "email": email,
                 "handle": handle,
                 "missionId": mission_id,
+                "repoUrl": repo_url,
                 "submittedBy": email or "anonymous",
                 "userId": None
             }
